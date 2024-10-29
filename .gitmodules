@@ -1,0 +1,3 @@
+[submodule "unitree_mujoco_container"]
+	path = unitree_mujoco_container
+	url = git@github.com:Atarilab/unitree_mujoco_container.git
