@@ -1,6 +1,14 @@
 # DOOM
 Repository for running the experiments on the real robots.
 
+## Requirements 
+- docker
+  
+## Fetch Submodules
+```bash
+git submodule update --init --recursive
+```
+
 ## Building the Docker Image
 To build the Docker image, use the following command:
 
