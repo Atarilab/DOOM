@@ -1,16 +1,13 @@
 # DOOM
 Repository for running the experiments on the real robots.
 
-## Building the Docker Image
-To build the Docker image, use the following command:
-
+## Requirements 
+- docker
+- conda
+  
+## Installation Instructions
 ```bash
-docker build -t mujuni-image unitree_mujoco_container/.devcontainer/.
-```
-
-Source the following file to save some aliases:
-```bash
-source .env.base
+./doom.sh
 ```
 
 # Running the container
