@@ -8,3 +8,5 @@ echo "source $PWD/.env.base" > $(conda info --base)/envs/doom/etc/conda/activate
 conda activate doom
 # Build Image
 docker build -t mujuni-image unitree_mujoco_container/.devcontainer/.
+# Setup Network Interface
+sudo nmcli con add type ethernet ifname $NETWORK_INTERFACE ipv4.addresses 192.168.123.1/24 ipv4.method manual
