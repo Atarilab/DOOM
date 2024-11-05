@@ -10,10 +10,10 @@ Repository for running the experiments on the real robots.
 ./doom.sh
 ```
 
-# Running the container
+## Running the container
 ```bash
 dungeon
 ```
 
-# Resources
+## Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
