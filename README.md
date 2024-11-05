@@ -3,7 +3,7 @@ Repository for running the experiments on the real robots.
 
 ## Requirements 
 - docker
-- conda (used for setting environment variables)
+- conda (used for setting environment variables, creating aliases etc.)
   
 ## Installation Instructions
 ```bash
