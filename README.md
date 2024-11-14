@@ -8,7 +8,7 @@ Repository for running the experiments on the real robots.
   
 ## Installation Instructions
 ```bash
-./doom.sh
+./doom.sh -i
 ```
 
 ## Running the container
