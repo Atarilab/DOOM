@@ -5,7 +5,7 @@
 	path = unitree_sdk2
 	url = git@github.com:unitreerobotics/unitree_sdk2.git
 [submodule "ros2-vicon-receiver"]
-	path = ros2-vicon-receiver
+	path = src/ros2-vicon-receiver
 	url = git@github.com:OPT4SMART/ros2-vicon-receiver.git
 [submodule "unitree_sdk2_python"]
 	path = src/unitree_sdk2_python
