@@ -89,6 +89,11 @@ while [[ $# -gt 0 ]]; do
 
         shift
         ;;
+
+        -h|--help)
+            print_help
+            exit 1
+            ;;
         
         *) # Unknown option
             echo "[Error] Invalid argument provided: $1"
