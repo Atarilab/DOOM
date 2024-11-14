@@ -42,6 +42,10 @@ sudo ./filename $NETWORK_INTERFACE
 ```
 Note that `$NETWORK_INTERFACE` is already setup when you install using `./doom.sh -i` and is necessary to identify the robot through the network.
 
+#### Tested example scripts from `unitree_sdk2_python`
+`read_lowstate.py`
+`go2_stand_example.py`
+
 ## TODO
 - [ ] ROS container with unitree_legged_sdk for AlienGo
 - [ ] Get vicon frame from Vicon SDK and transform to robot base
