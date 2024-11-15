@@ -5,3 +5,6 @@ __# Python
 **/.pytest_cache/
 **/*.pyc
 **/*.pb
+**/install/
+**/build/
+**/log/
