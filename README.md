@@ -46,6 +46,18 @@ Note that `$NETWORK_INTERFACE` is already setup when you install using `./doom.s
 `read_lowstate.py`
 `go2_stand_example.py`
 
+## Vicon State Estimation
+Run the following script to install the Vicon DataStream Client and the ROS package that handles the Vicon Datastream:
+```bash
+cd DOOM/src
+bash setup_vicon.sh
+```
+
+You can now launch the Vicon Data Publisher using:
+```bash
+ros2 launch vicon_receiver client.launch.py
+```
+
 ## TODO
 - [ ] ROS container with unitree_legged_sdk for AlienGo
 - [ ] Get vicon frame from Vicon SDK and transform to robot base
