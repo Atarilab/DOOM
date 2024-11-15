@@ -57,6 +57,7 @@ You can now launch the Vicon Data Publisher using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
+> Remember to set up the IP address for the Vicon as required in the launch script. It should be manually set to 192.168.123.100, as it is not exposed in the `ros-vicon-receiver` pkg due to security concerns.
 
 ## TODO
 - [ ] ROS container with unitree_legged_sdk for AlienGo
