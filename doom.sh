@@ -26,6 +26,9 @@ print_help () {
     echo -e "\t-h, --help           Display the help content."
     echo -e "\t-i, --install        Install ATARI DOOM inside conda env, build docker container and setup network interface with Go2."
     echo -e "\t-b, --build          Build the docker image."
+    echo -e "\t-e, --enter          Enter the DOOM docker container."
+    echo -e "\t-d, --delete         Delete all existing DOOM docker containers and images."
+    echo -e "\t-a, --attach         Attach shell to existing DOOM docker container."
     echo -e "\n" >&2
 }
 
@@ -99,6 +102,42 @@ while [[ $# -gt 0 ]]; do
             else
                 echo "Docker image 'mujuni-image' already exists. Skipping build."
             fi
+            shift
+            ;;
+
+        -e|--enter)
+            # Check if a container with the same name exists
+            CONTAINER_NAME="DOOM"  # Replace with your container's desired name
+            if ! docker ps -a --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
+                # If container doesn't exist, create and start a new container
+                xhost +local:root & \
+                docker run -it --privileged \
+                    --env-file .env.docker \
+                    --network host \
+                    --gpus all \
+                    -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
+                    -v $PWD/src:/home/atari/workspace/DOOM/src \
+                    --name $CONTAINER_NAME mujuni-image
+            else
+                # If container exists, just start it
+                echo "Container $CONTAINER_NAME already exists. Starting the container..."
+                docker start -i $CONTAINER_NAME
+            fi
+            shift
+            ;;
+
+
+        -d|--delete)
+            # Enter the docker container
+            docker image prune -f
+            docker rmi mujuni-image
+            docker container prune -f
+            shift
+            ;;
+
+        -a|--attach)
+            # Attach shell to existing docker container
+            docker exec -it $(docker ps --filter "ancestor=mujuni-image" -q | head -n 1) /bin/bash
             shift
             ;;
 
