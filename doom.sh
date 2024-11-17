@@ -45,6 +45,9 @@ while [[ $# -gt 0 ]]; do
     # Read the key
     case "$1" in
         -i|--install)
+
+            # Get submodules
+            git submodule update --init --recursive
             
             # Build Docker Image if it doesn't exist
             if ! docker image inspect mujuni-image >/dev/null 2>&1; then
