@@ -60,6 +60,11 @@ The vicon receiver client is already installed in the docker container. You can 
 ros2 launch vicon_receiver client.launch.py
 ```
 
+## Installed ROS2 Packages
+- [unitree_sdk](https://github.com/unitreerobotics/unitree_sdk2)
+- [unitree_sdk_python](https://github.com/unitreerobotics/unitree_sdk2_python)
+- [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
+
 ## TODO
 - [ ] ROS container with unitree_legged_sdk for AlienGo
 - [ ] Get vicon frame from Vicon SDK and transform to robot base
