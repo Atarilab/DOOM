@@ -45,34 +45,6 @@ while [[ $# -gt 0 ]]; do
     # Read the key
     case "$1" in
         -i|--install)
-
-            # Initialize Conda for the current shell session
-            eval "$(conda shell.bash hook)"
-    
-            # Get submodules
-            git submodule update --init --recursive
-            
-            # Check if the Conda environment exists, and create it only if it doesn't
-            if ! conda info --envs | grep -q "^doom\s"; then
-                echo "Creating Conda environment 'doom'..."
-                conda create -n doom python=3.12 -y
-            else
-                echo "Conda environment 'doom' already exists. Skipping creation."
-            fi
-    
-            # Source env vars upon Conda activation
-            mkdir -p $(conda info --base)/envs/doom/etc/conda/activate.d
-    
-            # Check if the file exists before creating it
-            if [ ! -f "$(conda info --base)/envs/doom/etc/conda/activate.d/env_vars.sh" ]; then
-                echo "Creating env_vars.sh to source environment variables..."
-                echo -e "export DOOM_DIR=$PWD\nsource $PWD/.env.base" > $(conda info --base)/envs/doom/etc/conda/activate.d/env_vars.sh
-            else
-                echo "env_vars.sh already exists. Skipping file creation."
-            fi
-    
-            # Activate the Conda environment
-            conda activate doom
             
             # Build Docker Image if it doesn't exist
             if ! docker image inspect mujuni-image >/dev/null 2>&1; then
@@ -129,9 +101,9 @@ while [[ $# -gt 0 ]]; do
 
         -d|--delete)
             # Enter the docker container
+            docker container prune -f
             docker image prune -f
             docker rmi mujuni-image
-            docker container prune -f
             shift
             ;;
 
