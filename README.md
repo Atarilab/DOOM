@@ -6,18 +6,27 @@ Repository for running the experiments on the real robots.
 - unitree Go2 
   
 ## Installation Instructions
+For installation of the DOOM project, run:
 ```bash
 ./doom.sh -i
 ```
+The above script, updates all submodules, builds the docker container, and manually sets up a network interface in the same subnetwork as the robot.
 
-## Running the container
+## Building and running the container
 ```bash
-dungeon
+./doom.sh -b # build
+./doom.sh -e # enter
 ```
+
+For more helpful functions from `./doom.sh`, run:
+```bash
+./doom.sh -h
+```
+
 > **Warning:** Before you run the example scripts provided by Unitree from unitree_sdk, make sure to turn off the sports mode using the Go2 app. To do this, toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot.
 
 ## Testing Robot Connection
-Once inside the conda env, you can access the Robot's IP address via `$ROBOT_IP`. You can test the connection using:
+Once inside the docker container, you can access the Robot's IP address via `$ROBOT_IP`. You can test the connection using:
 ```bash
 ping $ROBOT_IP
 ```
