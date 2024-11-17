@@ -7,6 +7,3 @@
 [submodule "src/unitree_sdk2_python"]
 	path = src/unitree_sdk2_python
 	url = git@github.com:unitreerobotics/unitree_sdk2_python.git
-[submodule "src/ros_ws/ros2-vicon-receiver"]
-	path = src/ros_ws/ros2-vicon-receiver
-	url = git@github.com:Atarilab/ros2-vicon-receiver.git
