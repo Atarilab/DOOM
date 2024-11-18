@@ -2,7 +2,7 @@
 Repository for running the experiments on the real robots.
 
 ## Requirements 
-- docker (ros2 container with unitree_sdk for Go2, ros container with unitree_legged_sdk for AlienGo)
+- docker (ros2 container with unitree_sdk)
 - unitree Go2 
   
 ## Installation Instructions
@@ -66,7 +66,7 @@ ros2 launch vicon_receiver client.launch.py
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
-- [ ] ROS container with unitree_legged_sdk for AlienGo
+- [ ] Add support for AlienGo
 - [ ] Get vicon frame from Vicon SDK and transform to robot base
 - [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Test Velocity-conditioned policy using joystick
