@@ -1,0 +1,2 @@
+horizon: 10
+cost_function: "sum_squares"
