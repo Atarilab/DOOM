@@ -92,6 +92,8 @@ while [[ $# -gt 0 ]]; do
                     --gpus all \
                     -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
                     -v $PWD/src:/home/atari/workspace/DOOM/src \
+                    --env XAUTHORITY=/root/.Xauthority \
+                    -v $HOME/.Xauthority:/root/.Xauthority \
                     --name $CONTAINER_NAME mujuni-image
             else
                 # If container exists, just start it
