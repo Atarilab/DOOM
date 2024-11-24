@@ -1,5 +1,4 @@
 # robot_interfaces/sim_robot_interface.py
-import yaml
 import os 
 import time
 import mujoco
@@ -16,8 +15,8 @@ class SimRobotInterface(RobotInterfaceBase):
 
         self.robot_name = config["ROBOT"]
         self.robot_scene = os.getcwd() + "/robots/" + self.robot_name + "/scene.xml"
-        
-         # Initialize Mujoco model and data
+
+        # Initialize Mujoco model and data
         self.mj_model = mujoco.MjModel.from_xml_path(self.robot_scene)
         self.mj_data = mujoco.MjData(self.mj_model)
         

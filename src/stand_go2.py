@@ -1,5 +1,7 @@
 import time
+import os
 import sys
+import argparse
 import threading
 
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber
@@ -9,13 +11,17 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 
-from controllers.stand_controller import IdleController, StandUpController, StandDownController, StayDownController
+from tasks.task_configs import TASK_CONFIG
+from utils.config_loader import load_config
+
+from controllers.stand_controller import *
 
 COMMANDS = {
     0: "IDLE",
     1: "STAY_DOWN",  # Example of another mode
     2: "STAND_UP",
     3: "STAND_DOWN",
+    9: "STANCE"
 }
 
 dt = 0.002
@@ -33,9 +39,9 @@ def handle_user_input():
         for cmd_id, cmd_name in COMMANDS.items():
             print(f"{cmd_id}: {cmd_name}")
         try:
-            command = int(input("Enter your command: ").strip())
-            if command in COMMANDS:
-                command = command
+            key_command = int(input("Enter your command: ").strip())
+            if key_command in COMMANDS:
+                command = key_command
                 command_start_time = time.perf_counter()
                 print(f"Switched to controller: {COMMANDS[command]}")
             else:
@@ -47,20 +53,37 @@ def handle_user_input():
 if __name__ == '__main__':
 
     input("Press enter to start")
+    
+    # Parse arguments
+    parser = argparse.ArgumentParser(description="ATARI DOOM Controller")
+    parser.add_argument("--task", type=str, required=True, help="Task name to run (e.g., rl-sim, mpc-real).")
+    args = parser.parse_args()
+
+    # Load task-specific configurations
+    if args.task not in TASK_CONFIG:
+        raise ValueError(f"Unknown task: {args.task}. Check tasks/task_configs.py for available tasks.")
+    
+    task_configs = TASK_CONFIG[args.task]
+
+    # Load individual configurations
+    controller_config = load_config("controller", task_configs["controller_config"])
+    robot_interface_config = load_config("robot_interfaces", task_configs["robot_interface_config"])
+    robot_config = load_config("robot", task_configs["robot_config"])
 
     # Initialize controllers
     controllers = {
         0: IdleController(),
-        1: StayDownController(),
-        2: StandUpController(),
-        3: StandDownController(),
+        1: StayDownController(robot_config),
+        2: StandUpController(robot_config),
+        3: StandDownController(robot_config),
+        9: StanceController(robot_config)
     }
 
     # Robot Network Interface Initialization
-    if len(sys.argv) < 2:
-        ChannelFactoryInitialize(1, "lo")
+    if "sim" in args.task:
+        ChannelFactoryInitialize(robot_interface_config["DOMAIN_ID"], robot_interface_config["INTERFACE"])
     else:
-        ChannelFactoryInitialize(0, sys.argv[1])
+        ChannelFactoryInitialize(0, os.environ.get('NETWORK_INTERFACE'))
 
     input_thread = threading.Thread(target=handle_user_input, daemon=True)
     input_thread.start()

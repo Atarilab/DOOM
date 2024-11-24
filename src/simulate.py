@@ -20,7 +20,7 @@ def main():
     task_configs = TASK_CONFIG[args.task]
 
     # Load individual configurations
-    robot_interface_config = load_config("robot_interfaces", task_configs["robot_interface_config"].split("/")[-1])
+    robot_interface_config = load_config("robot_interfaces", task_configs["robot_interface_config"])
 
     logger = get_logger(args.log)
     logger.info(f"Task Name: {args.task}")
@@ -32,15 +32,12 @@ def main():
     # Execution loop
     try:
         for step in range(10000000):
-            # state = robot_interface.receive_state()
-            # command = controller.compute_command(state, desired_goal={"goal": [0, 0, 1]})
-            # robot_interface.send_command(command)
             logger.info(f"Step {step}: Command sent.")
             time.sleep(robot_interface.simulate_dt)  # Sync with simulation timestep
             
-
     except KeyboardInterrupt:
         logger.info("Execution interrupted, stopping simulation.")
+
     finally:
         robot_interface.stop(logger)
         
