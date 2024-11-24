@@ -24,7 +24,7 @@ print_help () {
     echo -e "\nusage: $(basename "$0") [-h] [-i] -- Utility to manage ATARI DOOM."
     echo -e "\noptional arguments:"
     echo -e "\t-h, --help           Display the help content."
-    echo -e "\t-i, --install        Install ATARI DOOM inside conda env, build docker container and setup network interface with Go2."
+    echo -e "\t-i, --install        Install ATARI DOOM, build docker container and setup network interface with Go2."
     echo -e "\t-b, --build          Build the docker image."
     echo -e "\t-e, --enter          Enter the DOOM docker container."
     echo -e "\t-d, --delete         Delete all existing DOOM docker containers and images."
