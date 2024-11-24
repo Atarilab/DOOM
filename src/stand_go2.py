@@ -121,7 +121,7 @@ if __name__ == '__main__':
             current_controller = controllers[command]
 
             # Compute commands using the controller
-            motor_commands = current_controller.compute_command(state, desired_goal)
+            motor_commands = current_controller.compute_torques(state, desired_goal)
 
             # Update cmd structure
             for i in range(12):
@@ -148,7 +148,7 @@ if __name__ == '__main__':
         desired_goal = {}
 
         # Compute idle commands and send them
-        motor_commands = idle_controller.compute_command(state, desired_goal)
+        motor_commands = idle_controller.compute_torques(state, desired_goal)
         for i in range(12):
             motor = motor_commands[f'motor_{i}']
             cmd.motor_cmd[i].q = motor['q']

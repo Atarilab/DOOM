@@ -13,7 +13,7 @@ class ModelPredictiveController(ControllerBase):
         self.horizon = horizon
         self.cost_function = cost_function
 
-    def compute_command(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal):
         # Example: Compute the command using optimization
         command = np.zeros(6)  # Dummy 6-DOF command
         # Implement MPC logic here

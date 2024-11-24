@@ -11,7 +11,7 @@ class RLController(ControllerBase):
         self.normalize_obs = config.get('observation_normalization', False)
         self.clip_actions = config.get('action_clipping', False)
 
-    def compute_command(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal):
         state_tensor = torch.tensor(state['observation'], dtype=torch.float32)
         action = self.policy(state_tensor).detach().numpy()
 

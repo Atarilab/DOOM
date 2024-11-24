@@ -6,7 +6,7 @@ class IdleController(ControllerBase):
     Used to set zero commands to the motor. This is particularly useful when exiting the controller to reset the torques to 0.
     """
 
-    def compute_command(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal):
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -28,7 +28,7 @@ class StandUpController(ControllerBase):
         self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
 
-    def compute_command(self, state, desired_goal=None):
+    def compute_torques(self, state, desired_goal=None):
         elapsed_time = state["elapsed_time"]
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
@@ -52,7 +52,7 @@ class StandDownController(ControllerBase):
         self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
 
-    def compute_command(self, state, desired_goal=None):
+    def compute_torques(self, state, desired_goal=None):
         elapsed_time = state["elapsed_time"]
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
@@ -74,7 +74,7 @@ class StayDownController(ControllerBase):
     def __init__(self, robot_config):
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
 
-    def compute_command(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal):
         elapsed_time = state["elapsed_time"]
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
@@ -96,7 +96,7 @@ class StanceController(ControllerBase):
     def __init__(self, robot_config):
         self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
 
-    def compute_command(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal):
         elapsed_time = state["elapsed_time"]
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 class ControllerBase(ABC):
     @abstractmethod
-    def compute_command(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal):
         """
         Compute control commands based on the current state and desired goal.
 
