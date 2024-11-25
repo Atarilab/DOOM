@@ -16,12 +16,13 @@ jobs:
           submodules: recursive  # Initialize and update submodules
           token: ${{ secrets.GH_PAT }}  # Use the secret for authentication
 
-      - name: Checkout specific branch for submodule
+      - name: Set submodule branch and fetch
         run: |
+          git submodule set-branch --branch doom unitree_mujoco_container
+          git submodule update --remote
           cd unitree_mujoco_container
           git fetch origin doom
           git checkout doom
-          git pull origin doom
 
       - name: Build Docker Image
         run: docker build unitree_mujoco_container/.devcontainer/. --tag mujuni-image:$(date +%s)
