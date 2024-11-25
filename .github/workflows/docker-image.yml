@@ -13,8 +13,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          submodules: recursive # Initialize and update submodules
-          token: ${{ secrets.GH_PAT }}
+          submodules: recursive  # Initialize and update submodules
+          token: ${{ secrets.GH_PAT }}  # Use the secret for authentication
 
       - name: Checkout specific branch for submodule
         run: |
