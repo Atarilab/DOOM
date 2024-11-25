@@ -1,16 +1,13 @@
 from enum import Enum, auto
+from typing import Dict, Optional
+from dataclasses import dataclass
+
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical
 from textual.widgets import Header, Footer, Button, Static, Select
 from textual.reactive import reactive
 from textual.css.query import NoMatches
 from textual.message import Message
-
-from typing import Dict, Optional
-
-
-from dataclasses import dataclass
-
 
 class RobotMode(Enum):
     IDLE = auto()
@@ -30,12 +27,6 @@ class RLGait(Enum):
     WALK = auto()
     GALLOP = auto()
     BOUND = auto()
-
-# class MPCGait(Enum):
-#     CRAWL = auto()
-#     TROT = auto()
-#     PACE = auto()
-#     DYNAMIC_TROT = auto()
     
 @dataclass
 class MotorCommand:
@@ -51,7 +42,7 @@ class GaitConfig:
     params: Dict[str, float]
 
 class RobotControlUI(App):
-    """A Textual UI for robot control with RL and MPC support."""
+    """A Textual UI for robot control."""
     
     CSS = """
     Screen {
