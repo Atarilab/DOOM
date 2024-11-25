@@ -2,17 +2,18 @@ name: ATARI DOOM Image
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build unitree_mujoco_container/.devcontainer/. --tag mujuni-image:$(date +%s)
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive # Initialize and update submodules
+
+      - name: Build Docker Image
+        run: docker build unitree_mujoco_container/.devcontainer/. --tag mujuni-image:$(date +%s)
