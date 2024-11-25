@@ -34,6 +34,9 @@ If the connection is not established, you might need to manually set the IP for 
 
 ---
 
+## VS Code Workspace Setup
+Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container.
+
 ## Running the scripts
 Once inside the container and the connection to the robot has been established, you can run the python scripts by:
 ```bash
@@ -58,6 +61,19 @@ Note that `$NETWORK_INTERFACE` is already setup when you install using `./doom.s
 The vicon receiver client is already installed in the docker container. You can simply launch it using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
+```
+
+## Simulation Tests
+This repository also has a simulation mode which allows you to run your scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. 
+To launch the simulator, run:
+```bash
+python3 simulate.py --task custom-task-name --log test
+```
+The various tasks are defined in `tasks/task_configs.json`.
+
+Once the simulator is up and running, you can try out the stand up controller using:
+```bash
+python3 stand_go2.py --task custom-task-name
 ```
 
 ## Installed ROS2 Packages
