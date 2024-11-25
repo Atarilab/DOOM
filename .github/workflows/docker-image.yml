@@ -15,5 +15,12 @@ jobs:
         with:
           submodules: recursive # Initialize and update submodules
 
+      - name: Checkout specific branch for submodule
+        run: |
+          cd unitree_mujoco_container
+          git fetch origin doom
+          git checkout doom
+          git pull origin doom
+
       - name: Build Docker Image
         run: docker build unitree_mujoco_container/.devcontainer/. --tag mujuni-image:$(date +%s)
