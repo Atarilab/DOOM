@@ -1,6 +1,6 @@
 [submodule "unitree_mujoco_container"]
 	path = unitree_mujoco_container
-	url = git@github.com:Atarilab/unitree_mujoco_container.git
+	url = https://github.com/Atarilab/unitree_mujoco_container.git
 [submodule "unitree_sdk2"]
 	path = unitree_sdk2
 	url = git@github.com:unitreerobotics/unitree_sdk2.git
