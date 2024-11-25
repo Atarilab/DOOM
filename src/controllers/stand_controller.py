@@ -81,7 +81,7 @@ class StayDownController(ControllerBase):
         for i in range(12):
             cmd[f'motor_{i}'] = {
                 'q': self.stand_down_joint_pos[i],
-                'kp': 20.0,
+                'kp': 15.0,
                 'dq': 0.0,
                 'kd': 3.5,
                 'tau': 0.0,
