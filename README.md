@@ -76,6 +76,10 @@ Once the simulator is up and running, you can try out the stand up controller us
 python3 stand_go2.py --task custom-task-name
 ```
 
+## Convert IDL Messages to Python for DDS Communication
+idlc -l py -o output_dir file.idl
+
+
 ## Installed ROS2 Packages
 - [unitree_sdk](https://github.com/unitreerobotics/unitree_sdk2)
 - [unitree_sdk_python](https://github.com/unitreerobotics/unitree_sdk2_python)
