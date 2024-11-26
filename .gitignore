@@ -8,4 +8,5 @@ __# Python
 **/install/
 **/build/
 **/log/
+**/logs/
 **/system.log

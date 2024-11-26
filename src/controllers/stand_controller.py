@@ -27,9 +27,10 @@ class StandUpController(ControllerBase):
     def __init__(self, robot_config):
         self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
+        self.start_time = 0.0
 
     def compute_torques(self, state, desired_goal=None):
-        elapsed_time = state["elapsed_time"]
+        elapsed_time = state["elapsed_time"]- self.start_time
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
         for i in range(12):
@@ -51,9 +52,10 @@ class StandDownController(ControllerBase):
     def __init__(self, robot_config):
         self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
+        self.start_time = 0.0
 
     def compute_torques(self, state, desired_goal=None):
-        elapsed_time = state["elapsed_time"]
+        elapsed_time = state["elapsed_time"]- self.start_time
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
         for i in range(12):
@@ -73,10 +75,9 @@ class StayDownController(ControllerBase):
     """
     def __init__(self, robot_config):
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
+        self.start_time = 0.0
 
     def compute_torques(self, state, desired_goal):
-        elapsed_time = state["elapsed_time"]
-        phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -95,9 +96,10 @@ class StanceController(ControllerBase):
     """
     def __init__(self, robot_config):
         self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
+        self.start_time = 0.0
 
     def compute_torques(self, state, desired_goal):
-        elapsed_time = state["elapsed_time"]
+        elapsed_time = state["elapsed_time"]- self.start_time
         phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
         for i in range(12):

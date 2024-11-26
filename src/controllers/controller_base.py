@@ -1,6 +1,12 @@
 from abc import ABC, abstractmethod
 
 class ControllerBase(ABC):
+    def __init__(self):
+        self.start_time = 0.0
+        
+    def set_start_time(self, start_time):
+        self.start_time = start_time
+    
     @abstractmethod
     def compute_torques(self, state, desired_goal):
         """
