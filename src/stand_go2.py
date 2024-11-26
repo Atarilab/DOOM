@@ -91,7 +91,7 @@ class RobotController:
 async def main():
     
     # Parse arguments
-    parser = argparse.ArgumentParser(description="Robot Controller")
+    parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
     parser.add_argument("--task", type=str, required=True, help="Task name to run")
     parser.add_argument("--log", type=str, required=True, help="Experiment name to log information")
     
@@ -100,7 +100,6 @@ async def main():
     # Setup logger with a more specific log file path
     log_file = os.path.join('logs', f"{args.task}_robot_controller.log")
     logger = get_logger(f"{args.task}_robot_controller", log_file)
-    
     
     try:
         # Log the start of the application
@@ -115,9 +114,9 @@ async def main():
         logger.info("Configurations loaded successfully")
 
         # Rest of the existing main function code...
-        controller_config = load_config("controller", task_configs["controller_config"])
-        robot_interface_config = load_config("robot_interfaces", task_configs["robot_interface_config"])
-        robot_config = load_config("robot", task_configs["robot_config"])
+        controller_config = load_config(task_configs["controller"])
+        robot_interface_config = load_config(task_configs["robot_interface"])
+        robot_config = load_config(task_configs["robot"])
 
         # Log network initialization
         if "sim" in args.task:

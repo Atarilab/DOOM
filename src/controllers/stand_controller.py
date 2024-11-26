@@ -99,8 +99,6 @@ class StanceController(ControllerBase):
         self.start_time = 0.0
 
     def compute_torques(self, state, desired_goal):
-        elapsed_time = state["elapsed_time"]- self.start_time
-        phase = np.tanh(elapsed_time / 1.2)
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {

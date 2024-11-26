@@ -1,5 +1,7 @@
 import argparse
 import time
+import os
+
 from tasks.task_configs import TASK_CONFIG
 from utils.config_loader import load_config
 from utils.logger import get_logger
@@ -20,11 +22,13 @@ def main():
     task_configs = TASK_CONFIG[args.task]
 
     # Load individual configurations
-    robot_interface_config = load_config("robot_interfaces", task_configs["robot_interface_config"])
+    robot_interface_config = load_config(task_configs["robot_interface"])
 
-    logger = get_logger(args.log)
+    # Setup logger with a more specific log file path
+    log_file = os.path.join('logs', f"{args.task}_simulate.log")
+    logger = get_logger(f"{args.task}_simulate", log_file)
     logger.info(f"Task Name: {args.task}")
-    logger.info(f"Robot Config: {task_configs['robot_interface_config']}")
+    logger.info(f"Robot Config: {task_configs['robot_interface']}")
 
     # Initialize robot interface
     robot_interface = SimRobotInterface(robot_interface_config)
