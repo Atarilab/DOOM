@@ -1,7 +1,12 @@
-# utils/logger.py
+import os
 import logging
 
 def get_logger(name, log_file="system.log", level=logging.INFO):
+    # Ensure the log directory exists
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):  # Only check if there's a directory path
+        os.makedirs(log_dir)
+
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
@@ -18,7 +23,9 @@ def get_logger(name, log_file="system.log", level=logging.INFO):
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    # Avoid duplicate handlers if the logger is already configured
+    if not logger.handlers:
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
 
     return logger

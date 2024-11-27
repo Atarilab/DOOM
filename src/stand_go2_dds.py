@@ -4,22 +4,20 @@ import argparse
 import logging
 from typing import Dict, Any, Optional
 
-from tasks.task_configs import TASK_CONFIG
-from utils.config_loader import load_config
-from utils.logger import get_logger  # Import the logger you've created
-
-
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber, ChannelFactoryInitialize
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_, LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 
-
+from tasks.task_configs import TASK_CONFIG
 from utils.ui_interface import ModeManager, RobotControlUI
+from utils.config_loader import load_config
+from utils.logger import get_logger 
 from controllers.stand_controller import *
 
+
 NUM_MOTORS = 12
-UPDATE_INTERVAL = 0.002  # 2ms/5Hz control loop
+UPDATE_INTERVAL = 0.002  # 2ms/500Hz control loop
         
 class RobotController:
     """
@@ -48,7 +46,7 @@ class RobotController:
             self.cmd.motor_cmd[i].kd = 0.0
             self.cmd.motor_cmd[i].tau = 0.0
     
-    async def run_control_loop(self, publisher: ChannelPublisher):
+    async def run_control_loop(self, publisher: ChannelPublisher): 
         """
         Generic control loop that uses the mode manager.
         
@@ -84,7 +82,6 @@ class RobotController:
             
             # Maintain control frequency
             elapsed = asyncio.get_event_loop().time() - loop_start
-            
             if elapsed < UPDATE_INTERVAL:
                 await asyncio.sleep(UPDATE_INTERVAL - elapsed)
 
@@ -146,9 +143,9 @@ async def main():
         })
         
         mode_manager.register_mode('STANDING', {
+            'STAY_DOWN': StayDownController(robot_config),
             'STAND_UP': StandUpController(robot_config),
             'STAND_DOWN': StandDownController(robot_config),
-            'STAY_DOWN': StayDownController(robot_config)
         })
         
         mode_manager.register_mode('STANCE', {

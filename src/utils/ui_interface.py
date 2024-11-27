@@ -1,4 +1,4 @@
-import asyncio
+import time
 from typing import Dict, Optional
 
 from textual.app import App, ComposeResult
@@ -285,7 +285,7 @@ class RobotControlUI(App):
                 # Note: Can be used to set other properties within the controller
                 active_controller = self.mode_manager.get_active_controller()
                 if hasattr(active_controller, 'set_start_time'):
-                    active_controller.set_start_time(asyncio.get_event_loop().time())
+                    active_controller.set_start_time(time.time())
                 
                 break
             

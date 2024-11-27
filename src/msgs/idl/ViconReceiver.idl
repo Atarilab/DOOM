@@ -1,0 +1,48 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from vicon_receiver/msg/Position.msg
+// generated code does not contain a copyright notice
+
+
+module vicon_receiver {
+  module msg {
+    struct Position {
+      float x_trans;
+
+      float y_trans;
+
+      float z_trans;
+
+      @verbatim (language="comment", text=
+        "first element of the quaternion")
+      float x_rot;
+
+      @verbatim (language="comment", text=
+        "second element of the quaternion")
+      float y_rot;
+
+      @verbatim (language="comment", text=
+        "third element of the quaternion")
+      float z_rot;
+
+      @verbatim (language="comment", text=
+        "forth element of the quaternion")
+      float w;
+
+      @verbatim (language="comment", text=
+        "name of a specific component of the object")
+      string segment_name;
+
+      @verbatim (language="comment", text=
+        "name of the entire object")
+      string subject_name;
+
+      @verbatim (language="comment", text=
+        "unit of time for each capture")
+      int32 frame_number;
+
+      @verbatim (language="comment", text=
+        "Local or Global")
+      string translation_type;
+    };
+  };
+};
