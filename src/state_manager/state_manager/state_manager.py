@@ -64,11 +64,12 @@ class DDSStateSubscriber(StateSubscriber):
     def _message_callback(self, msg):
         """Internal callback to store latest state."""
         with self._lock:
-            # Convert DDS message to dictionary
-            self._latest_state = self._extract_state_from_message(msg)
             # Call handler if exists
+            self._latest_state = self._extract_state_from_message(msg)
             if self.handler_func:
-                self.handler_func(msg, self.logger)
+                self._latest_state = self.handler_func(self._latest_state, self.logger)
+                
+            self.logger.debug(self._latest_state)
     
     def _extract_state_from_message(self, msg):
         """
@@ -129,11 +130,10 @@ class ROS2StateSubscriber(StateSubscriber):
     def _message_callback(self, msg):
         """Internal callback to store latest state."""
         with self._lock:
-            # Convert ROS2 message to dictionary
+            # Call handler if exists
             self._latest_state = self._extract_state_from_message(msg)
-            # Call user-provided handler if exists
             if self.handler_func:
-                self.handler_func(msg, self.logger)
+                self._latest_state = self.handler_func(self._latest_state, self.logger)
     
     def _extract_state_from_message(self, msg):
         """

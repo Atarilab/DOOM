@@ -15,6 +15,7 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_
 from unitree_sdk2py.utils.crc import CRC
 
 from unitree_go.msg._low_state import LowState
+from vicon_receiver.msg import Position
 
 from utils.ui_interface import ModeManager, RobotControlUI
 from utils.logger import get_logger 
@@ -34,7 +35,6 @@ from state_manager.state_manager import (
 )
 from state_manager.handlers import *
 
-from vicon_receiver.msg import Position
 
 class LowLevelCmdPublisher(Node):
     """Manages low-level robot command publishing."""
