@@ -68,9 +68,7 @@ class DDSStateSubscriber(StateSubscriber):
             self._latest_state = self._extract_state_from_message(msg)
             if self.handler_func:
                 self._latest_state = self.handler_func(self._latest_state, self.logger)
-                
-            self.logger.debug(self._latest_state)
-    
+                    
     def _extract_state_from_message(self, msg):
         """
         Extract state from DDS message.
@@ -184,6 +182,7 @@ class StateManager:
         :param logger: Optional logger for tracking state updates
         """
         self._subscribers: Dict[str, StateSubscriber] = {}
+        self._combined_state = {}
         self.logger = logger
     
     def add_subscriber(self, 
@@ -226,11 +225,11 @@ class StateManager:
         
         :return: Merged state dictionary
         """
-        combined_state = {}
         for name, subscriber in self._subscribers.items():
-            combined_state[name] = subscriber.get_latest_state()
+            for state_name, state_value in subscriber.get_latest_state().items():        
+                self._combined_state[state_name] = state_value
         
-        return combined_state
+        return self._combined_state
     
     def spin_subscribers(self):
         """

@@ -86,11 +86,8 @@ class LowLevelCmdPublisher(Node):
         active_controller = self.mode_manager.get_active_controller()
         try:
             # Retrieve states from state manager
-            combined_state = {
-                "elapsed_time": time.time(),
-                "low_state": self.state_manager.get_state("low_state"),
-                "vicon_state": self.state_manager.get_state("vicon")
-            }
+            combined_state = self.state_manager.get_combined_state()
+            self.logger.debug(combined_state.keys())
 
             # Compute motor commands
             motor_commands = active_controller.compute_torques(combined_state, {})
