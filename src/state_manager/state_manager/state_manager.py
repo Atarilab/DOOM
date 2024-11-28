@@ -1,4 +1,6 @@
 import rclpy
+import logging
+
 from typing import Dict, Any, Callable, Optional
 import threading
 from abc import ABC, abstractmethod
@@ -6,6 +8,9 @@ from abc import ABC, abstractmethod
 class StateSubscriber(ABC):
     """Abstract base class for state subscribers."""
     
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        self.logger = logger
+     
     @abstractmethod
     def start_subscription(self):
         """Start the state subscription."""
@@ -20,6 +25,12 @@ class StateSubscriber(ABC):
     def get_latest_state(self) -> Dict[str, Any]:
         """Retrieve the latest state."""
         pass
+    
+    @abstractmethod
+    def spin_once(self):
+        """Spin the subscriber node once."""
+        pass
+
 
 class DDSStateSubscriber(StateSubscriber):
     """DDS-based state subscriber."""
@@ -28,6 +39,7 @@ class DDSStateSubscriber(StateSubscriber):
                  topic: str, 
                  msg_type, 
                  handler_func: Callable,
+                 logger: Optional[logging.Logger] = None,
 ):
         """
         Initialize DDS state subscriber.
@@ -35,10 +47,11 @@ class DDSStateSubscriber(StateSubscriber):
         :param topic: DDS topic to subscribe to
         :param msg_type: Message type for the topic
         :param handler_func: Function to process received messages
-        :param domain_id: DDS domain ID
-        :param network_interface: Network interface to use
+
         """
-        from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
+        from unitree_sdk2py.core.channel import ChannelSubscriber
+        
+        super().__init__(logger)
         
         self.topic = topic
         self.msg_type = msg_type
@@ -53,16 +66,15 @@ class DDSStateSubscriber(StateSubscriber):
         with self._lock:
             # Convert DDS message to dictionary
             self._latest_state = self._extract_state_from_message(msg)
-            # Call user-provided handler if exists
+            # Call handler if exists
             if self.handler_func:
-                self.handler_func(msg)
+                self.handler_func(msg, self.logger)
     
     def _extract_state_from_message(self, msg):
         """
         Extract state from DDS message.
         Override this method to customize state extraction.
         """
-        # Basic implementation - convert message to dict
         return {
             field: getattr(msg, field) 
             for field in dir(msg) if not field.startswith('_')
@@ -81,6 +93,10 @@ class DDSStateSubscriber(StateSubscriber):
         """Retrieve the latest state."""
         with self._lock:
             return self._latest_state.copy()
+        
+    def spin_once(self):
+        """Spin the subscriber node once. This is not required for Unitree Cyclone DDS messages."""
+        pass
 
 class ROS2StateSubscriber(StateSubscriber):
     """ROS2-based state subscriber."""
@@ -89,7 +105,8 @@ class ROS2StateSubscriber(StateSubscriber):
                  topic: str, 
                  node_name: str,
                  msg_type,
-                 handler_func: Optional[Callable] = None):
+                 handler_func: Optional[Callable] = None,
+                 logger: Optional[logging.Logger] = None):
         """
         Initialize ROS2 state subscriber.
         
@@ -97,6 +114,9 @@ class ROS2StateSubscriber(StateSubscriber):
         :param msg_type: Message type for the topic
         :param handler_func: Optional function to process received messages
         """
+        
+        super().__init__(logger)
+        
         self.topic = topic
         self.msg_type = msg_type
         self.handler_func = handler_func
@@ -113,7 +133,7 @@ class ROS2StateSubscriber(StateSubscriber):
             self._latest_state = self._extract_state_from_message(msg)
             # Call user-provided handler if exists
             if self.handler_func:
-                self.handler_func(msg)
+                self.handler_func(msg, self.logger)
     
     def _extract_state_from_message(self, msg):
         """
@@ -145,6 +165,11 @@ class ROS2StateSubscriber(StateSubscriber):
         """Retrieve the latest state."""
         with self._lock:
             return self._latest_state.copy()
+        
+    def spin_once(self):
+        """Spin the subscriber node once."""
+        rclpy.spin_once(self.node)
+    
 
 class StateManager:
     """
@@ -206,3 +231,28 @@ class StateManager:
             combined_state[name] = subscriber.get_latest_state()
         
         return combined_state
+    
+    def spin_subscribers(self):
+        """
+        Spin all registered subscribers once.
+        """
+        for name, subscriber in self._subscribers.items():
+            try:
+                subscriber.spin_once()
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error spinning subscriber {name}: {e}")
+    
+    def destroy_subscribers(self):
+        """
+        Destroy all registered subscribers.
+        """
+        for name, subscriber in self._subscribers.items():
+            try:
+                subscriber.stop_subscription()
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error destroying subscriber {name}: {e}")
+        
+        # Clear the subscribers dictionary
+        self._subscribers.clear()

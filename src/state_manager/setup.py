@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'state_manager = state_manager.state_manager:main',
+            'vicon_subscriber = state_manager.vicon_subscriber:main',
         ],
     },
 )

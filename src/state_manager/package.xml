@@ -3,8 +3,8 @@
 <package format="3">
   <name>state_manager</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="atari@todo.todo">atari</maintainer>
+  <description>Centralized State Manager (Unitree Cyclone DDS/ROS2)</description>
+  <maintainer email="shafeef.omar@tum.de">Shafeef Omar</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>

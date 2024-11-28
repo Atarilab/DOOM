@@ -1,5 +1,3 @@
-# New Version
-
 import os
 import time
 import asyncio
@@ -34,6 +32,7 @@ from state_manager.state_manager import (
     DDSStateSubscriber, 
     ROS2StateSubscriber
 )
+from state_manager.handlers import *
 
 from vicon_receiver.msg import Position
 
@@ -41,7 +40,7 @@ class LowLevelCmdPublisher(Node):
     """Manages low-level robot command publishing."""
     
     def __init__(self, 
-                 frequency: float,
+                 dt: float,
                  mode_manager: ModeManager, 
                  state_manager: StateManager,
                  logger: Optional[logging.Logger] = None):
@@ -56,11 +55,11 @@ class LowLevelCmdPublisher(Node):
         self.dds_pub.Init()
 
         # Control parameters
-        self.dt = 0.002
+        self.dt = dt
         self.running_time = 0.0
 
         # Create timer for periodic command publishing
-        self.timer = self.create_timer(self.dt, self.low_level_cmd_callback)
+        self.timer = self.create_timer(dt, self.low_level_cmd_callback)
 
         # Initialize command message
         self.dds_cmd = unitree_go_msg_dds__LowCmd_()
@@ -120,12 +119,13 @@ async def main_async(args=None):
     parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
     parser.add_argument("--task", type=str, required=True, help="Task name to run")
     parser.add_argument("--log", type=str, required=True, help="Experiment name to log information")
+    parser.add_argument("--debug", action="store_true", help="Show debug logs")
     
     args = parser.parse_args()
     
     # Setup logger
-    log_file = os.path.join('logs', f"{args.task}_robot_controller.log")
-    logger = get_logger(f"{args.task}_robot_controller", log_file)
+    log_file = os.path.join('logs', args.log, f"{args.task}_robot_controller.log")
+    logger = get_logger(f"{args.task}_robot_controller", log_file, debug=args.debug)
     
     try:
         logger.info(f"Starting robot controller for task: {args.task}")
@@ -138,47 +138,32 @@ async def main_async(args=None):
         
         state_manager = StateManager(logger=logger)
         #######################################################
-        # TODO: Move Individual State Management Inside its class and handle them properly
+        # TODO: Move Individual State Handlers Inside its class and handle them properly
         #######################################################
-        # Add DDS Low State Subscriver
-        def low_state_handler(msg):
-            logger.debug(f"Received low state at {time.time()}")
-            print("FR_0 motor state: ", msg.motor_state[go2.LegID["FR_0"]].q)
-            try:
-                # Log detailed message inspection
-                logger.debug(f"Low State Message Details: {vars(msg)}")
-            except Exception as e:
-                logger.error(f"Error processing low state: {e}")
 
-        # dds_low_state_sub = DDSStateSubscriber(
-        #     topic="rt/lowstate", 
-        #     msg_type=LowState_, 
+        dds_low_state_sub = DDSStateSubscriber(
+            topic="rt/lowstate", 
+            msg_type=LowState_, 
+            handler_func=low_state_handler,
+            logger=logger
+        )
+        state_manager.add_subscriber("low_state", dds_low_state_sub)
+        
+        # ros2_low_state_sub = ROS2StateSubscriber(
+        #     topic="/lowstate", 
+        #     node_name="low_state",
+        #     msg_type=LowState, 
         #     handler_func=low_state_handler
         # )
-        # state_manager.add_subscriber("low_state", dds_low_state_sub)
-        
-        ros2_low_state_sub = ROS2StateSubscriber(
-            topic="/lowstate", 
-            node_name="low_state",
-            msg_type=LowState, 
-            handler_func=low_state_handler
-        )
-        state_manager.add_subscriber("low_state", ros2_low_state_sub)
+        # state_manager.add_subscriber("low_state", ros2_low_state_sub)
 
-        # Add ROS2 Vicon subscriber
-        def vicon_handler(msg):
-            logger.debug(f"Received Vicon data at {time.time()}")
-            try:
-                # Log detailed message inspection
-                logger.debug(f"Vicon Message Details: {vars(msg)}")
-            except Exception as e:
-                logger.error(f"Error processing Vicon data: {e}")
-                
+            
         ros2_vicon_sub = ROS2StateSubscriber(
             topic="/vicon/Go2/Go2", 
             node_name="vicon",
             msg_type=Position, 
-            handler_func=vicon_handler
+            handler_func=vicon_handler,
+            logger=logger
         )
         state_manager.add_subscriber("vicon", ros2_vicon_sub)
 
@@ -200,13 +185,12 @@ async def main_async(args=None):
         
         mode_manager.set_mode('IDLE')
         
-        node = LowLevelCmdPublisher(frequency=configs['controller_config']['control_dt'],
+        node = LowLevelCmdPublisher(dt=configs['controller_config']['control_dt'],
                                     mode_manager=mode_manager,
                                     state_manager=state_manager,
                                     logger=logger)
         
-        # Modify the concurrent running
-        async def run_app_and_node():
+        async def run():
             logger.info("Starting concurrent tasks")
             
             app_task = asyncio.create_task(RobotControlUI(mode_manager).run_async())
@@ -214,17 +198,19 @@ async def main_async(args=None):
             def spin_node():
                 while rclpy.ok():
                     rclpy.spin_once(node)
+                    state_manager.spin_subscribers()
             
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
             await asyncio.gather(app_task, node_task)
 
-        await run_app_and_node()
+        await run()
 
     except Exception as e:
         logger.exception(f"An error occurred: {e}")
         raise
     finally:
         node.destroy_node()
+        state_manager.stop_subscription()
         rclpy.shutdown()
         
 def main():
