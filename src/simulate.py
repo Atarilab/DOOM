@@ -32,11 +32,10 @@ def main():
 
     # Initialize robot interface
     robot_interface = SimRobotInterface(robot_interface_config)
-
+    logger.info(f"Starting Simulation.")
     # Execution loop
     try:
         for step in range(10000000):
-            logger.info(f"Step {step}: Command sent.")
             time.sleep(robot_interface.simulate_dt)  # Sync with simulation timestep
             
     except KeyboardInterrupt:

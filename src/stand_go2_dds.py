@@ -23,7 +23,7 @@ class RobotController:
     """
     Generic Robot Controller that reads robot data from Unitree 
     """
-    def __init__(self, mode_manager: ModeManager, config: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    def __init__(self, mode_manager: ModeManager, logger: Optional[logging.Logger] = None):
         self.mode_manager = mode_manager
         self.mode_change_event = asyncio.Event()
         self.crc = CRC()

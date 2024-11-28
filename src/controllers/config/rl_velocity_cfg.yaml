@@ -1,3 +1,4 @@
 policy_path: "path/to/pretrained/policy.pt"
 observation_normalization: true
 action_clipping: true
+control_dt: 0.002

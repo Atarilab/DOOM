@@ -1,5 +1,6 @@
 import rclpy
-from typing import Dict, Any, Callable, Optional
+from rclpy.node import Node
+from typing import Dict, Any, Callable, Optional, Union
 import threading
 from abc import ABC, abstractmethod
 
@@ -28,7 +29,8 @@ class DDSStateSubscriber(StateSubscriber):
                  topic: str, 
                  msg_type, 
                  handler_func: Callable,
-):
+                 domain_id: int = 0,
+                 network_interface: Optional[str] = None):
         """
         Initialize DDS state subscriber.
         
@@ -43,6 +45,12 @@ class DDSStateSubscriber(StateSubscriber):
         self.topic = topic
         self.msg_type = msg_type
         self.handler_func = handler_func
+        
+        # Initialize channel
+        if network_interface:
+            ChannelFactoryInitialize(domain_id, network_interface)
+        else:
+            ChannelFactoryInitialize(domain_id, "lo")
         
         self.subscriber = ChannelSubscriber(topic, msg_type)
         self._latest_state = {}
@@ -87,7 +95,6 @@ class ROS2StateSubscriber(StateSubscriber):
     
     def __init__(self, 
                  topic: str, 
-                 node_name: str,
                  msg_type,
                  handler_func: Optional[Callable] = None):
         """
@@ -101,7 +108,7 @@ class ROS2StateSubscriber(StateSubscriber):
         self.msg_type = msg_type
         self.handler_func = handler_func
         
-        self.node = rclpy.create_node(node_name)
+        self.node = rclpy.create_node(f'{topic}_subscriber')
         self._latest_state = {}
         self._lock = threading.Lock()
         self.subscription = None
