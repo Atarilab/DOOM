@@ -2,17 +2,20 @@ import os
 import logging
 
 def get_logger(name, log_file="system.log", debug=False):
-    level = logging.INFO if not debug else logging.DEBUG
+    level = logging.INFO if not debug else logging.DEBUG    
     
     # Ensure the log directory exists
-    log_dir = os.path.dirname(log_file)
     try:
+        final_log_file = os.path.abspath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), '../', log_file)
+        )
+        log_dir = os.path.dirname(final_log_file)
+        
         os.makedirs(log_dir, exist_ok=True)
     except Exception as e:
         print(f"Failed to create log directory: {e}")
         # Fallback to current directory
-        log_dir = '.'
-        log_file = os.path.join(log_dir, os.path.basename(log_file))
+        final_log_file = os.path.abspath(os.path.basename(log_file))
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -23,13 +26,12 @@ def get_logger(name, log_file="system.log", debug=False):
 
     # File handler
     try:
-        file_handler = logging.FileHandler(log_file)
+        file_handler = logging.FileHandler(final_log_file)
         file_handler.setLevel(level)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         logger.addHandler(file_handler)
     except IOError as e:
         print(f"Failed to create log file handler: {e}")
-        # Ensure console logging still works
 
     # Console handler
     console_handler = logging.StreamHandler()
