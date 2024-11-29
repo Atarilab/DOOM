@@ -1,10 +1,16 @@
 import os
 import logging
 
-def get_logger(name, log_file="system.log", debug=False):
-    level = logging.INFO if not debug else logging.DEBUG    
-    
-    # Ensure the log directory exists
+def get_logger(name, log_file="system.log", debug=False, file_level=logging.DEBUG, console_level=logging.INFO):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)  # Set to lowest level to capture all logs
+
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    log_format = '[%(levelname)s] [%(filename)s:%(lineno)d]: %(message)s'
+
+    # File Logs
     try:
         final_log_file = os.path.abspath(
             os.path.join(os.path.dirname(os.path.abspath(__file__)), '../', log_file)
@@ -12,31 +18,19 @@ def get_logger(name, log_file="system.log", debug=False):
         log_dir = os.path.dirname(final_log_file)
         
         os.makedirs(log_dir, exist_ok=True)
-    except Exception as e:
-        print(f"Failed to create log directory: {e}")
-        # Fallback to current directory
-        final_log_file = os.path.abspath(os.path.basename(log_file))
-
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    # Clear existing handlers to avoid duplication
-    if logger.hasHandlers():
-        logger.handlers.clear()
-
-    # File handler
-    try:
+        
         file_handler = logging.FileHandler(final_log_file)
-        file_handler.setLevel(level)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        file_handler.setLevel(file_level)
+        file_handler.setFormatter(logging.Formatter(log_format))
         logger.addHandler(file_handler)
-    except IOError as e:
+    except Exception as e:
         print(f"Failed to create log file handler: {e}")
 
-    # Console handler
+    # Console Logs
+    console_level = logging.INFO if not debug else logging.DEBUG   
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    console_handler.setLevel(console_level)
+    console_handler.setFormatter(logging.Formatter(log_format))
     logger.addHandler(console_handler)
 
     return logger
