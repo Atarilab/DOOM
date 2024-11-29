@@ -1,0 +1,64 @@
+{
+    "name": "ATARI Container",  // Name of container
+    "privileged": true,  // Privileged is used by a lot of people, but its also gives docker too much access. Solve by device and bind-mounts
+    "remoteUser": "atari",  // name of remote user
+    "build": {
+        "dockerfile": "Dockerfile",  // Define Dockerfile
+        "args": {
+            "USERNAME": "atari"  // define username argument
+        }
+    },
+    "workspaceFolder": "/home/atari/workspace/",  // define workspace folder in container
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/atari/workspace/project/,type=bind",  // Bind mount local workspace (git repo) to container
+    "customizations": {
+        "vscode": {  // VSCode e>tensions
+            "extensions":[
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-themes",
+                "ms-vscode.cpptools-extension-pack",
+                "twxs.cmake",
+                "donjayamanne.python-extension-pack",
+                "ms-vscode.cmake-tools",
+                "ms-azuretools.vscode-docker",
+                "gruntfuggly.todo-tree",
+                "percy.vscode-numpy-viewer",
+                "ms-toolsai.jupyter",
+                "ms-toolsai.tensorboard"
+                // Add any vscode extension you like here
+            ]
+        }
+    },
+    "containerEnv": {
+        "DISPLAY": "${localEnv:DISPLAY}",  // define display port for interfaces
+        "XAUTHORITY": "${localEnv:XAUTHORITY}"
+        // "ROS_LOCALHOST_ONLY": "0",  // commented out to enable connection to local host (interesting for hardware deployment)
+        // "ROS_DOMAIN_ID": "42"
+    },
+    "runArgs": [  // Run arguments
+    // "-e", "DISPLAY="
+    // $DISPLAY,
+    // "--env", "DISPLAY=$DISPLAY",
+    "--env-file", "${localWorkspaceFolder}/../.env.docker",
+    "--interactive",
+    "-v", "${localWorkspaceFolder}/../src:/home/atari/workspace/DOOM/src",
+    "--env", "LIBGL_ALWAYS_INDIRECT=0",
+    "--net=host",
+    "--ipc=host",
+    "--runtime=nvidia",
+    "--gpus",
+    "all"
+    ],
+    "mounts": [  // other mounts
+        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+        "source=/dev/dri,target=/dev/dri,type=bind"
+    ],
+    // Post create command - dependency check and permission for read write for workspace folder
+    // "postStartCommand": "",
+    "postStartCommand": "sudo chown -R atari:atari /home/atari/workspace",
+    "postAttachCommand": [
+        ". /home/atari/.bashrc",
+        "xhost local:root",
+        "cd project"
+          // Display with root user
+    ]
+}

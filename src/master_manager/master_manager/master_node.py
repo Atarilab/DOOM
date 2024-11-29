@@ -84,14 +84,16 @@ class LowLevelCmdPublisher(Node):
 
         # Get active controller and compute torques
         active_controller = self.mode_manager.get_active_controller()
+        self.logger.debug(active_controller)
         try:
             # Retrieve states from state manager
             combined_state = {
                 "elapsed_time": time.time(),
                 "low_state": self.state_manager.get_state("low_state"),
-                "vicon_state": self.state_manager.get_state("vicon")
+                # "vicon_state": self.state_manager.get_state("vicon")
             }
-
+            
+            
             # Compute motor commands
             motor_commands = active_controller.compute_torques(combined_state, {})
             
@@ -157,15 +159,15 @@ async def main_async(args=None):
         # )
         # state_manager.add_subscriber("low_state", ros2_low_state_sub)
 
-            
-        ros2_vicon_sub = ROS2StateSubscriber(
-            topic="/vicon/Go2/Go2", 
-            node_name="vicon",
-            msg_type=Position, 
-            handler_func=vicon_handler,
-            logger=logger
-        )
-        state_manager.add_subscriber("vicon", ros2_vicon_sub)
+        # comment out when not connected to vicon
+        # ros2_vicon_sub = ROS2StateSubscriber(
+        #     topic="/vicon/Go2/Go2", 
+        #     node_name="vicon",
+        #     msg_type=Position, 
+        #     handler_func=vicon_handler,
+        #     logger=logger
+        # )
+        # state_manager.add_subscriber("vicon", ros2_vicon_sub)
 
         # Create mode manager and register controllers
         mode_manager = ModeManager()
