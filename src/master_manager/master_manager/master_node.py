@@ -4,14 +4,16 @@ import asyncio
 import logging
 import argparse
 from typing import Optional
+from state_manager import state_manager
 import unitree_legged_const as go2
+import torch
 
 import rclpy
 from rclpy.node import Node
 
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportModeState_
 from unitree_sdk2py.utils.crc import CRC
 
 from unitree_go.msg._low_state import LowState
@@ -70,6 +72,8 @@ class LowLevelCmdPublisher(Node):
         # Control parameters
         self.dt = dt
         self.running_time = 0.0
+        
+        self.last_motor_torques = torch.zeros(12)
 
         # Create timer for periodic command publishing
         self.timer = self.create_timer(dt, self.low_level_cmd_callback)
@@ -100,12 +104,9 @@ class LowLevelCmdPublisher(Node):
         self.logger.debug(active_controller)
         try:
             # Retrieve states from state manager
-            combined_state = {
-                "elapsed_time": time.time(),
-                "low_state": self.state_manager.get_state("low_state"),
-                # "vicon_state": self.state_manager.get_state("vicon")
-            }
-            
+            combined_state = self.state_manager.get_combined_state()
+            combined_state["elapsed_time"] = time.time()
+            combined_state["last_motor_cmd"] = self.last_motor_torques
             
             # Compute motor commands
             motor_commands = active_controller.compute_torques(combined_state, {})
@@ -113,8 +114,11 @@ class LowLevelCmdPublisher(Node):
             # Update command structure
             for i in range(12):
                 motor = motor_commands[f'motor_{i}']
+                self.last_motor_torques[i] = motor['tau']
                 for attr in ['q', 'kp', 'dq', 'kd', 'tau']:
                     setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
+                    self.last_motor_torques
+                    
             
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
@@ -135,6 +139,7 @@ async def main_async(args=None):
     parser.add_argument("--task",  type=str, default="rl-velocity-sim-go2",  help="Task name to run")
     parser.add_argument("--log",  default="test", type=str,  help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
+    parser.add_argument("--sim", default=True, action="store_true", help="Run in simulation mode")
     
     args = parser.parse_args()
     
@@ -173,14 +178,25 @@ async def main_async(args=None):
         # state_manager.add_subscriber("low_state", ros2_low_state_sub)
 
         # comment out when not connected to vicon
-        # ros2_vicon_sub = ROS2StateSubscriber(
-        #     topic="/vicon/Go2/Go2", 
-        #     node_name="vicon",
-        #     msg_type=Position, 
-        #     handler_func=vicon_handler,
-        #     logger=logger
-        # )
-        # state_manager.add_subscriber("vicon", ros2_vicon_sub)
+        if args.sim:
+            # use sports state
+            dds_low_state_sub = DDSStateSubscriber(
+                topic="rt/sportmodestate", 
+                msg_type=SportModeState_, 
+                handler_func=sport_states_handler,
+                logger=logger
+            )
+            state_manager.add_subscriber("sport_state_sim", dds_low_state_sub)
+        else:
+            # use vicon
+            ros2_vicon_sub = ROS2StateSubscriber(
+                topic="/vicon/Go2/Go2", 
+                node_name="vicon",
+                msg_type=Position, 
+                handler_func=vicon_handler,
+                logger=logger
+            )
+            state_manager.add_subscriber("vicon", ros2_vicon_sub)
 
         # Create mode manager and register controllers
         mode_manager = ModeManager()
@@ -199,7 +215,7 @@ async def main_async(args=None):
         })
         
         mode_manager.register_mode('RL', {
-            'RL': RLController(configs['robot_config'], policy_path="policies/policy.pt") # provide path relative to DOOM directory
+            'RL': RLController(configs['robot_config'], policy_path="policies/policy.pt")
         })
         
         mode_manager.set_mode('IDLE')

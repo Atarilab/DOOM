@@ -226,11 +226,7 @@ class StateManager:
         
         :return: Merged state dictionary
         """
-        combined_state = {}
-        for name, subscriber in self._subscribers.items():
-            combined_state[name] = subscriber.get_latest_state()
-        
-        return combined_state
+        return {name: subscriber.get_latest_state() for name, subscriber in self._subscribers.items()}
     
     def spin_subscribers(self):
         """

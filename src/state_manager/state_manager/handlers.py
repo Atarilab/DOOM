@@ -29,6 +29,9 @@ def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
     # logger.debug(states)
     
     return states
+
+def sport_states_handler(msg: Dict[str, List], logger: logging.Logger):
+    return {key: msg[key] for key in ["body_height", "imu_state", "position", "yaw speed", "velocity"] if key in msg}
     
 def low_state_handler(msg: Dict[str, List], logger: logging.Logger):
     """Re-orders the joint and feet states [FL, FR, RL, RR], and returns the joint positions, joint velocities,
@@ -68,16 +71,15 @@ def low_state_handler(msg: Dict[str, List], logger: logging.Logger):
     
     # Construct and return the parsed states dictionary
     states = {
-        'joint_pos': joint_positions,
-        'joint_vel': joint_velocities,
-        'joint_acc': joint_accelerations,
-        'joint_tau_est': joint_tau_est,
+        'motor/joint_pos': joint_positions,
+        'motor/joint_vel': joint_velocities,
+        'motor/joint_acc': joint_accelerations,
+        'motor/joint_tau_est': joint_tau_est,
         'foot_forces': [msg['foot_force'][idx] for idx in [1, 0, 3, 2]],  # Reorder foot forces
         'foot_force_est': [msg['foot_force_est'][idx] for idx in [1, 0, 3, 2]],  # Reorder estimated foot forces
-        'quat': imu_state.quaternion,
-        'rpy': imu_state.rpy,
-        'gyroscope': imu_state.gyroscope,
-        'accelerometer': imu_state.accelerometer
+        'imu/quat': imu_state.quaternion,
+        'imu/rpy': imu_state.rpy,
+        'imu/gyroscope': imu_state.gyroscope,
+        'imu/accelerometer': imu_state.accelerometer
     }
-    # logger.debug(f"Received low state at {time.time()}")
     return states
