@@ -53,7 +53,7 @@ def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
         'ang_vel_w': angular_velocities.tolist()  # Angular velocities in world frame
     }
     
-    logger.debug(f"{states['lin_vel_w']}, {states['ang_vel_w']}")
+    # logger.debug(f"{states['lin_vel_w']}, {states['ang_vel_w']}")
     
     return states
     

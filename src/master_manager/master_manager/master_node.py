@@ -30,10 +30,10 @@ from controllers.stand_controller import (
 )
 from state_manager.state_manager import (
     StateManager, 
-    DDSStateSubscriber, 
+    DDSStateSubscriber,
     ROS2StateSubscriber
 )
-from state_manager.handlers import *
+from state_manager.msg_handlers import *
 
 
 class LowLevelCmdPublisher(Node):
@@ -87,7 +87,9 @@ class LowLevelCmdPublisher(Node):
         try:
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()
-            self.logger.debug(combined_state.keys())
+            combined_state["elapsed_time"] = time.time()
+            
+            self.logger.debug(combined_state)
 
             # Compute motor commands
             motor_commands = active_controller.compute_torques(combined_state, {})
@@ -156,13 +158,13 @@ async def main_async(args=None):
 
             
         ros2_vicon_sub = ROS2StateSubscriber(
-            topic="/vicon/Go2/Go2", 
-            node_name="vicon",
+            topic="/vicon/Go2with6markers/Go2with6markers", 
+            node_name="vicon_state",
             msg_type=Position, 
             handler_func=vicon_handler,
             logger=logger
         )
-        state_manager.add_subscriber("vicon", ros2_vicon_sub)
+        state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
 
         # Create mode manager and register controllers
         mode_manager = ModeManager()

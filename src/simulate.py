@@ -25,7 +25,7 @@ def main():
     robot_interface_config = load_config(task_configs["robot_interface"])
 
     # Setup logger with a more specific log file path
-    log_file = os.path.join('logs', f"{args.task}_simulate.log")
+    log_file = os.path.join('logs', args.log, f"{args.task}_simulate.log")
     logger = get_logger(f"{args.task}_simulate", log_file)
     logger.info(f"Task Name: {args.task}")
     logger.info(f"Robot Config: {task_configs['robot_interface']}")
