@@ -26,14 +26,27 @@ from controllers.stand_controller import (
     StayDownController, 
     StandUpController, 
     StandDownController, 
-    StanceController
+    StanceController,
 )
-from state_manager.state_manager import (
-    StateManager, 
-    DDSStateSubscriber, 
-    ROS2StateSubscriber
-)
-from state_manager.handlers import *
+from controllers.rl_controller import RLController
+
+
+# I require this try-catch to run in debugging and deployment mode.
+try:
+    from state_manager.state_manager import (
+        StateManager, 
+        DDSStateSubscriber, 
+        ROS2StateSubscriber
+    )
+    from state_manager.handlers import *
+except:
+    from state_manager.state_manager.state_manager import (
+        StateManager, 
+        DDSStateSubscriber, 
+        ROS2StateSubscriber
+    )
+    from state_manager.state_manager.handlers import *
+    
 
 
 class LowLevelCmdPublisher(Node):
@@ -119,8 +132,8 @@ async def main_async(args=None):
     
     # Parse arguments
     parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
-    parser.add_argument("--task", type=str, required=True, help="Task name to run")
-    parser.add_argument("--log", type=str, required=True, help="Experiment name to log information")
+    parser.add_argument("--task",  type=str, default="rl-velocity-sim-go2",  help="Task name to run")
+    parser.add_argument("--log",  default="test", type=str,  help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
     
     args = parser.parse_args()
@@ -185,6 +198,10 @@ async def main_async(args=None):
             'STANCE': StanceController(configs['robot_config'])
         })
         
+        mode_manager.register_mode('RL', {
+            'RL': RLController(configs['robot_config'], policy_path="policies/policy.pt") # provide path relative to DOOM directory
+        })
+        
         mode_manager.set_mode('IDLE')
         
         node = LowLevelCmdPublisher(dt=configs['controller_config']['control_dt'],
@@ -211,9 +228,13 @@ async def main_async(args=None):
         logger.exception(f"An error occurred: {e}")
         raise
     finally:
+        print("Shutting down node...")
         node.destroy_node()
         state_manager.stop_subscription()
         rclpy.shutdown()
         
 def main():
+    print("Starting node")
     asyncio.run(main_async())
+    
+main() # required for debugging
