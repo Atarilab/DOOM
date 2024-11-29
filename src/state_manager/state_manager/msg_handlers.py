@@ -1,32 +1,59 @@
+import time
+
 from typing import Dict, List
 from utils.logger import logging
 
-def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
+from state_manager.estimators import ViconVelocityEstimator
 
-    """Returns base position in the world frame and the base orientation in quaternions.
+def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
+    """
+    Vicon msg handler with velocity estimation.
 
     Args:
         msg (Dict): Vicon Position Message
         logger (logging.Logger): Logger for debugging
 
     Returns:
-        Dict: Base states from the Vicon Receiver
+        Dict: Base states from the Vicon Receiver including velocities
     """
+    # Offsets for position
+    x_offset = 0.0
+    y_offset = 62.5 
+    z_offset = -75.0  
+
+    # Singleton pattern for velocity estimator
+    if not hasattr(vicon_handler, 'velocity_estimator'):
+        vicon_handler.velocity_estimator = ViconVelocityEstimator()
+
+    # Base Position (in m)
+    base_pos = [
+        (msg['x_trans'] + x_offset)*0.001,
+        (msg['y_trans'] + y_offset)*0.001, 
+        (msg['z_trans'] + z_offset)*0.001
+    ]
+
+    # Base quaternion
+    base_quat = [
+        msg['x_rot'],
+        msg['y_rot'],
+        msg['z_rot'],
+        msg['w']
+    ]
+
+    # Estimate velocities using EKF
+    current_timestamp = time.time()
+    linear_velocities, angular_velocities = vicon_handler.velocity_estimator.ekf_update(
+        base_pos, base_quat, current_timestamp
+    )
+
     states = {
-        'base_pos_w': [
-            msg['x_trans'],
-            msg['y_trans'], 
-            msg['z_trans']
-        ],
-        'base_quat': [
-            msg['x_rot'],
-            msg['y_rot'],
-            msg['z_rot'],
-            msg['w']
-        ]
+        'base_pos_w': base_pos,
+        'base_quat': base_quat,
+        'lin_vel_w': linear_velocities.tolist(),  # Linear velocities in world frame
+        'ang_vel_w': angular_velocities.tolist()  # Angular velocities in world frame
     }
-    # logger.debug(f"Received Vicon data at {time.time()}")\
-    # logger.debug(states)
+    
+    logger.debug(f"{states['lin_vel_w']}, {states['ang_vel_w']}")
     
     return states
     
