@@ -3,7 +3,7 @@ import threading
 
 from utils.math import quaternion_to_euler
 
-class ViconVelocityEstimator:
+class VelocityEstimator:
     def __init__(self, alpha=0.1, position_noise=0.01, velocity_noise=0.1):
         """
         Initialize Extended Kalman Filter for velocity estimation.

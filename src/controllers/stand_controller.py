@@ -1,12 +1,14 @@
 import numpy as np
 from controllers.controller_base import ControllerBase
+from state_manager.observations import starting_time
+from state_manager.obs_manager import ObsTerm
 
 class IdleController(ControllerBase):
     """
     Used to set zero commands to the motor. This is particularly useful when exiting the controller to reset the torques to 0.
     """
 
-    def compute_torques(self, state, desired_goal):
+    def compute_torques(self, observations, desired_goal):
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -25,13 +27,26 @@ class StandUpController(ControllerBase):
     to the stand up joint positions which are constants.
     """
     def __init__(self, robot_config):
-        self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
-        self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
+        self.stand_up_joint_pos = robot_config["stand_up_joint_pos"]
+        self.stand_down_joint_pos = robot_config["stand_down_joint_pos"]
         self.start_time = 0.0
+        
+    def register_observations(self):
+        """
+        Register observations for this controller.
+        
+        :param configs: Optional configuration dictionary
+        """
+
+        # Register observations using the mode-specific obs_manager
+        self.obs_manager.register('time', ObsTerm(
+            starting_time, 
+            
+        ))
 
     def compute_torques(self, state, desired_goal=None):
-        elapsed_time = state["elapsed_time"]- self.start_time
-        phase = np.tanh(elapsed_time / 1.2)
+        time = state["time"]- self.start_time
+        phase = np.tanh(time / 1.2)
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -50,13 +65,26 @@ class StandDownController(ControllerBase):
     to the stand down joint positions which are constants.
     """
     def __init__(self, robot_config):
-        self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
-        self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
+        self.stand_up_joint_pos = robot_config["stand_up_joint_pos"]
+        self.stand_down_joint_pos = robot_config["stand_down_joint_pos"]
         self.start_time = 0.0
+        
+    def register_observations(self):
+        """
+        Register observations for this controller.
+        
+        :param configs: Optional configuration dictionary
+        """
+
+        # Register observations using the mode-specific obs_manager
+        self.obs_manager.register('time', ObsTerm(
+            starting_time, 
+            
+        ))
 
     def compute_torques(self, state, desired_goal=None):
-        elapsed_time = state["elapsed_time"]- self.start_time
-        phase = np.tanh(elapsed_time / 1.2)
+        time = state["time"]- self.start_time
+        phase = np.tanh(time / 1.2)
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -74,10 +102,23 @@ class StayDownController(ControllerBase):
     The Stay Down Controller is used to stay down close the ground, to prepare to get up.
     """
     def __init__(self, robot_config):
-        self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
+        self.stand_down_joint_pos = robot_config["stand_down_joint_pos"]
         self.start_time = 0.0
+        
+    def register_observations(self):
+        """
+        Register observations for this controller.
+        
+        :param configs: Optional configuration dictionary
+        """
 
-    def compute_torques(self, state, desired_goal):
+        # Register observations using the mode-specific obs_manager
+        self.obs_manager.register('time', ObsTerm(
+            starting_time, 
+            
+        ))
+
+    def compute_torques(self, observations, desired_goal):
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -95,10 +136,23 @@ class StanceController(ControllerBase):
     The Stance Controller is used to stay in stance. Used to prepare to go to rest from other controllers.
     """
     def __init__(self, robot_config):
-        self.stand_up_joint_pos = robot_config["STAND_UP_JOINT_POS"]
+        self.stand_up_joint_pos = robot_config["stand_up_joint_pos"]
         self.start_time = 0.0
+        
+    def register_observations(self):
+        """
+        Register observations for this controller.
+        
+        :param configs: Optional configuration dictionary
+        """
 
-    def compute_torques(self, state, desired_goal):
+        # Register observations using the mode-specific obs_manager
+        self.obs_manager.register('time', ObsTerm(
+            starting_time, 
+            
+        ))
+
+    def compute_torques(self, observations, desired_goal):
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {

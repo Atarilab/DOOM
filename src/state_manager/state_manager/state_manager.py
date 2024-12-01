@@ -10,7 +10,7 @@ class StateSubscriber(ABC):
     
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger
-     
+    
     @abstractmethod
     def start_subscription(self):
         """Start the state subscription."""
@@ -38,16 +38,14 @@ class DDSStateSubscriber(StateSubscriber):
     def __init__(self, 
                  topic: str, 
                  msg_type, 
-                 handler_func: Callable,
-                 logger: Optional[logging.Logger] = None,
-):
+                 handler_func: Optional[Callable] = None,
+                 logger: Optional[logging.Logger] = None):
         """
         Initialize DDS state subscriber.
         
         :param topic: DDS topic to subscribe to
         :param msg_type: Message type for the topic
-        :param handler_func: Function to process received messages
-
+        :param handler_func: Optional function to process received messages
         """
         from unitree_sdk2py.core.channel import ChannelSubscriber
         
@@ -62,12 +60,18 @@ class DDSStateSubscriber(StateSubscriber):
         self._lock = threading.Lock()
     
     def _message_callback(self, msg):
-        """Internal callback to store latest state."""
+        """Internal callback to store latest state with optional reordering."""
         with self._lock:
+            # Extract state from message
+            extracted_state = self._extract_state_from_message(msg)
+            
             # Call handler if exists
-            self._latest_state = self._extract_state_from_message(msg)
             if self.handler_func:
-                self._latest_state = self.handler_func(self._latest_state, self.logger)
+                extracted_state = self.handler_func(extracted_state, self.logger)
+            
+            # Save the final state
+            self._latest_state = extracted_state
+
                     
     def _extract_state_from_message(self, msg):
         """
@@ -96,9 +100,10 @@ class DDSStateSubscriber(StateSubscriber):
     def spin_once(self):
         """Spin the subscriber node once. This is not required for Unitree Cyclone DDS messages."""
         pass
+    
 
 class ROS2StateSubscriber(StateSubscriber):
-    """ROS2-based state subscriber."""
+    """ROS2-based state subscriber with optional state reordering."""
     
     def __init__(self, 
                  topic: str, 
@@ -110,10 +115,11 @@ class ROS2StateSubscriber(StateSubscriber):
         Initialize ROS2 state subscriber.
         
         :param topic: ROS2 topic to subscribe to
+        :param node_name: Name of the ROS2 node
         :param msg_type: Message type for the topic
         :param handler_func: Optional function to process received messages
+
         """
-        
         super().__init__(logger)
         
         self.topic = topic
@@ -126,12 +132,17 @@ class ROS2StateSubscriber(StateSubscriber):
         self.subscription = None
     
     def _message_callback(self, msg):
-        """Internal callback to store latest state."""
+        """Internal callback to store latest state """
         with self._lock:
+            # Extract state from message
+            extracted_state = self._extract_state_from_message(msg)
+            
             # Call handler if exists
-            self._latest_state = self._extract_state_from_message(msg)
             if self.handler_func:
-                self._latest_state = self.handler_func(self._latest_state, self.logger)
+                extracted_state = self.handler_func(extracted_state, self.logger)
+            
+            # Save the final state
+            self._latest_state = extracted_state
     
     def _extract_state_from_message(self, msg):
         """

@@ -11,10 +11,11 @@ from rclpy.node import Node
 
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportModeState_
 from unitree_sdk2py.utils.crc import CRC
 
 from unitree_go.msg._low_state import LowState
+from unitree_go.msg._sport_mode_state import SportModeState
 from vicon_receiver.msg import Position
 
 from utils.ui_interface import ModeManager, RobotControlUI
@@ -28,12 +29,15 @@ from controllers.stand_controller import (
     StandDownController, 
     StanceController
 )
+from controllers.rl_controller import RLLocomotionVelocityController
+
 from state_manager.state_manager import (
     StateManager, 
     DDSStateSubscriber,
     ROS2StateSubscriber
 )
 from state_manager.msg_handlers import *
+from utils.helpers import reorder_robot_states
 
 
 class LowLevelCmdPublisher(Node):
@@ -84,15 +88,19 @@ class LowLevelCmdPublisher(Node):
 
         # Get active controller and compute torques
         active_controller = self.mode_manager.get_active_controller()
+        active_obs_manager = self.mode_manager.get_active_obs_manager()
+
         try:
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()
-            combined_state["elapsed_time"] = time.time()
             
-            self.logger.debug(combined_state)
-
+            observations = active_obs_manager.compute_observations(combined_state)
+            
+            if observations != {}:
+                self.logger.debug(observations)
+            
             # Compute motor commands
-            motor_commands = active_controller.compute_torques(combined_state, {})
+            motor_commands = active_controller.compute_torques(observations, {})
             
             # Update command structure
             for i in range(12):
@@ -139,15 +147,14 @@ async def main_async(args=None):
         #######################################################
         # TODO: Move Individual State Handlers Inside its class and handle them properly
         #######################################################
-
+        
         dds_low_state_sub = DDSStateSubscriber(
             topic="rt/lowstate", 
             msg_type=LowState_, 
             handler_func=low_state_handler,
-            logger=logger
+            logger=logger,
         )
-        state_manager.add_subscriber("low_state", dds_low_state_sub)
-        
+
         # ros2_low_state_sub = ROS2StateSubscriber(
         #     topic="/lowstate", 
         #     node_name="low_state",
@@ -156,18 +163,38 @@ async def main_async(args=None):
         # )
         # state_manager.add_subscriber("low_state", ros2_low_state_sub)
 
-            
-        ros2_vicon_sub = ROS2StateSubscriber(
-            topic="/vicon/Go2with6markers/Go2with6markers", 
-            node_name="vicon_state",
-            msg_type=Position, 
-            handler_func=vicon_handler,
-            logger=logger
-        )
-        state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
+        
+        state_manager.add_subscriber("low_state", dds_low_state_sub)
+        
+        if "sim" in args.task:
+        #     ros2_sportsmode_state_sub = ROS2StateSubscriber(
+        #         topic="/sportmodestate", 
+        #         node_name="sportmodestate",
+        #         msg_type=SportModeState, 
+        #         handler_func=sport_mode_state_handler
+        #     )
+        #     state_manager.add_subscriber("sports_mode_state", ros2_sportsmode_state_sub)
+
+            dds_sportsmode_state_sub = DDSStateSubscriber(
+                topic="rt/sportmodestate", 
+                msg_type=SportModeState_, 
+                handler_func=sport_mode_state_handler,
+                logger=logger,
+            )
+            state_manager.add_subscriber("sports_mode_state", dds_sportsmode_state_sub)
+        else:  
+            ros2_vicon_sub = ROS2StateSubscriber(
+                topic="/vicon/Go2with6markers/Go2with6markers", 
+                node_name="vicon_state",
+                msg_type=Position, 
+                handler_func=vicon_handler,
+                logger=logger
+            )
+            state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
+        
 
         # Create mode manager and register controllers
-        mode_manager = ModeManager()
+        mode_manager = ModeManager(logger=logger)
         mode_manager.register_mode('IDLE', {
             'default': IdleController()
         })
@@ -180,6 +207,10 @@ async def main_async(args=None):
         
         mode_manager.register_mode('STANCE', {
             'STANCE': StanceController(configs['robot_config'])
+        })
+        
+        mode_manager.register_mode('RL-VELOCITY', {
+            'RL-VELOCITY': RLLocomotionVelocityController(configs)
         })
         
         mode_manager.set_mode('IDLE')
