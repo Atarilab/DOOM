@@ -9,23 +9,39 @@ from textual.reactive import reactive
 from controllers.stand_controller import ControllerBase
 from utils.logger import logging
 
+from state_manager.obs_manager import ObservationManager
+
+
 class ModeManager:
     """
     A flexible mode management system that allows dynamic registration of modes and controllers.
     """
-    def __init__(self):
+    def __init__(self, logger=None):
         self._modes: Dict[str, Dict[str, ControllerBase]] = {}
         self._current_mode: Optional[str] = None
         self._current_submode: Optional[str] = None
+        self._mode_obs_managers: Dict[str, ObservationManager] = {}
+        self.logger = logger
         
-    def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase]):
+    def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase], obs_manager: Optional[ObservationManager] = None):
         """
         Register a new mode with its associated controllers.
         
         :param mode_name: Name of the mode
         :param controllers: Dictionary of controllers for this mode
         """
+        # Create a default observation manager if not provided
+        if obs_manager is None:
+            obs_manager = ObservationManager(logger=self.logger)
+        
         self._modes[mode_name] = controllers
+        self._mode_obs_managers[mode_name] = obs_manager
+        
+        # If controllers accept obs_manager, pass it to them
+        for controller in controllers.values():
+            if hasattr(controller, 'set_obs_manager'):
+                controller.set_obs_manager(obs_manager)
+                
         
     def set_mode(self, mode_name: str, submode: Optional[str] = None):
         """
@@ -44,6 +60,11 @@ class ModeManager:
         self._current_mode = mode_name
         self._current_submode = submode
         
+        if submode is not None:
+            self.logger.debug(f"Mode set to: {self._current_mode} - {self._current_submode}")
+        else:
+            self.logger.debug(f"Mode set to: {self._current_mode}")
+        
     def get_active_controller(self) -> ControllerBase:
         """
         Get the active controller based on current mode and submode.
@@ -58,6 +79,18 @@ class ModeManager:
             return self._modes[self._current_mode][self._current_submode]
         
         return self._modes[self._current_mode].get('default', None)
+    
+    def get_active_obs_manager(self) -> ObservationManager:
+        """
+        Get the observation manager for the current mode.
+        
+        :return: Active observation manager
+        :raises ValueError: If no mode is set
+        """
+        if self._current_mode is None:
+            raise ValueError("No mode is currently set")
+        
+        return self._mode_obs_managers[self._current_mode]  
     
     def get_current_mode_info(self) -> Dict[str, Optional[str]]:
         """

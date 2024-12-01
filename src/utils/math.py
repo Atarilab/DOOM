@@ -1,6 +1,6 @@
 import numpy as np
 
-def quaternion_to_euler(q):
+def quaternion_to_euler(q) -> np.ndarray:
         """Convert quaternion to Euler angles (roll, pitch, yaw)."""
         x, y, z, w = q
         
@@ -19,3 +19,25 @@ def quaternion_to_euler(q):
         yaw = np.arctan2(siny_cosp, cosy_cosp)
         
         return [roll, pitch, yaw]
+
+
+def quat_rotate_inverse(q: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
+
+    Args:
+        q: The quaternion in (x, y, z, w). Shape is (4,).
+        v: The vector in (x, y, z). Shape is (3,).
+
+    Returns:
+        The rotated vector in (x, y, z). Shape is (3,).
+    """
+    # Extract quaternion components
+    q_w = q[-1]
+    q_vec = q[:-1]
+
+    # Compute the terms for the rotation
+    a = v * (2.0 * q_w**2 - 1.0)
+    b = np.cross(q_vec, v) * 2.0 * q_w
+    c = q_vec * np.dot(q_vec, v) * 2.0
+    
+    return a - b + c
