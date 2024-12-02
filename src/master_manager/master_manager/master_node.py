@@ -4,8 +4,6 @@ import asyncio
 import logging
 import argparse
 from typing import Optional
-from state_manager import state_manager
-import unitree_legged_const as go2
 import torch
 
 import rclpy
@@ -16,7 +14,6 @@ from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportModeState_
 from unitree_sdk2py.utils.crc import CRC
 
-from unitree_go.msg._low_state import LowState
 from vicon_receiver.msg import Position
 
 from utils.ui_interface import ModeManager, RobotControlUI
@@ -30,7 +27,7 @@ from controllers.stand_controller import (
     StandDownController, 
     StanceController,
 )
-from controllers.rl_controller import RLController
+from controllers.rl_controller import RLController, RLInitPosController
 
 
 # I require this try-catch to run in debugging and deployment mode.
@@ -73,7 +70,6 @@ class LowLevelCmdPublisher(Node):
         self.dt = dt
         self.running_time = 0.0
         
-        self.last_motor_torques = torch.zeros(12)
 
         # Create timer for periodic command publishing
         self.timer = self.create_timer(dt, self.low_level_cmd_callback)
@@ -106,18 +102,16 @@ class LowLevelCmdPublisher(Node):
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()
             combined_state["elapsed_time"] = time.time()
-            combined_state["last_motor_cmd"] = self.last_motor_torques
             
             # Compute motor commands
-            motor_commands = active_controller.compute_torques(combined_state, {})
+            with torch.no_grad():
+                motor_commands = active_controller.compute_torques(combined_state, {})
             
             # Update command structure
             for i in range(12):
                 motor = motor_commands[f'motor_{i}']
-                self.last_motor_torques[i] = motor['tau']
                 for attr in ['q', 'kp', 'dq', 'kd', 'tau']:
                     setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
-                    self.last_motor_torques
                     
             
             # Publish the command
@@ -215,8 +209,12 @@ async def main_async(args=None):
         })
         
         mode_manager.register_mode('RL', {
-            'RL': RLController(configs['robot_config'], policy_path="policies/policy.pt")
+            'RL': RLController(configs['robot_config'], policy_path="policies/policy.pt"),
+            'RLINITPOS': RLInitPosController(configs['robot_config']),
+            
         })
+
+        # NOTE There is a bug where lower-case submodes are not recognized due to https://github.com/Atarilab/DOOM/blob/9be6e3a0151ba4f6c634c1473940a9ebc19aa116/src/utils/ui_interface.py#L314
         
         mode_manager.set_mode('IDLE')
         

@@ -42,8 +42,8 @@ class StandUpController(ControllerBase):
                 'tau': 0.0,
             }
         return cmd
-
-
+    
+    
 class StandDownController(ControllerBase):
     """
     The Stand Down Controller is used to sit down from the nominal position. It is an interpolation from the stand up joint positions
