@@ -209,7 +209,7 @@ async def main_async(args=None):
         })
         
         mode_manager.register_mode('RL', {
-            'RL': RLController(configs['robot_config'], policy_path="policies/policy_full_2.pt"),
+            'RL': RLController(configs['robot_config'], policy_path="policies/unmodified_isaac_policy.pt"),
             'RLINITPOS': RLInitPosController(configs['robot_config']),
             
         })

@@ -94,7 +94,7 @@ class RLController(ControllerBase):
         self.obs_history_storage = ObservationHistoryStorage(
             num_envs=1,
             num_obs=48,
-            max_length=5,
+            max_length=1,
             device="cpu",
         )
 
@@ -153,9 +153,9 @@ class RLController(ControllerBase):
         for i in range(12):
             command[f"motor_{i}"] = {
                 "q": command_processed[i],
-                "kp":  self.KP,
+                "kp": self.KP,
                 "dq": 0.0,
-                "kd":  self.KD,
+                "kd": self.KD,
                 "tau": 0.0,
             }
         return command
