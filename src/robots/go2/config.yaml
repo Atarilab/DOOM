@@ -85,18 +85,6 @@ JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
     10,
   ] # VERIFIED IN SIMULATION
 
-# DEPRECATED
-# JOINT_ORDER_MUJOCO : [
-#         # FL leg: 3, 4, 5
-#         3, 4, 5,
-#         # FR leg: 0, 1, 2
-#         0, 1, 2,
-#         # RL leg: 9, 10, 11
-#         9, 10, 11,
-#         # RR leg: 6, 7, 8
-#         6, 7, 8
-#     ]
-
 HIGHLEVEL: 0xEE
 LOWLEVEL: 0xFF
 TRIGERLEVEL: 0xF0

@@ -24,13 +24,13 @@ class RLInitPosController(ControllerBase):
         isaac_default_joint_pos = torch.tensor(
             robot_config["ISAAC_LAB_DEFAULT_JOINT_POS"]
         )
-        
+
         self.rl_init_joint_pos = (
             isaac_default_joint_pos[self.joint_action_isaac_to_unitree_mapping]
             .detach()
             .numpy()
         )
-        
+
         self.stand_down_joint_pos = robot_config["STAND_DOWN_JOINT_POS"]
 
         self.start_time = 0.0
@@ -93,7 +93,7 @@ class RLController(ControllerBase):
 
         self.obs_history_storage = ObservationHistoryStorage(
             num_envs=1,
-            num_obs=240 // 5,
+            num_obs=48,
             max_length=5,
             device="cpu",
         )
@@ -112,9 +112,8 @@ class RLController(ControllerBase):
         _quat = torch.tensor(state["low_state"]["imu/quat"])
         self.projected_gravity = quat_rotate_inverse(
             _quat, self.gravity_dir
-        )  # dont know if this is correct computation - just copied from IsaacLab
-
-        self.velocity_commands = torch.zeros(3)
+        ) # seems right conversion after checking values
+        self.velocity_commands = torch.tensor([0.5, 0.0, 0.0])
 
         unitree_joint_pos = torch.tensor(state["low_state"]["motor/joint_pos"])
         self.joint_pos = (
@@ -135,14 +134,17 @@ class RLController(ControllerBase):
                 self.velocity_commands,
                 self.joint_pos,
                 self.joint_vel,
-                self.last_actions, # TODO
+                self.last_actions,
             ]
         ).unsqueeze(0)
         self.obs_history_storage.add(state)
         obs_history = self.obs_history_storage.get()
 
         command_raw = self.policy(obs_history)
-        command_processed = command_raw * self.scale + self.offset  # rescaling, offsetting
+        self.last_actions = command_raw[0]
+        command_processed = (
+            command_raw * self.scale + self.offset
+        )  # rescaling, offsetting
         command_processed = (
             command_processed[0][self.actions_isaac_to_unitree_mapping].detach().numpy()
         )  # re-ordering
@@ -151,9 +153,9 @@ class RLController(ControllerBase):
         for i in range(12):
             command[f"motor_{i}"] = {
                 "q": command_processed[i],
-                "kp": self.KP,
+                "kp":  self.KP,
                 "dq": 0.0,
-                "kd": self.KD,
+                "kd":  self.KD,
                 "tau": 0.0,
             }
         return command

@@ -11,8 +11,8 @@ from robot_interfaces.sim_robot_interface import SimRobotInterface
 def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description="ATARI DOOM Mujoco Simulator")
-    parser.add_argument("--task", type=str, required=True, help="Task name to run (e.g., rl-sim, mpc-real).")
-    parser.add_argument("--log", type=str, required=True, help="Experiment name to log information")
+    parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run (e.g., rl-sim, mpc-real).")
+    parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     args = parser.parse_args()
 
     # Load task-specific configurations
