@@ -88,6 +88,7 @@ idlc -l py -o output_dir file.idl
 ## TODO
 - [ ] Add support for AlienGo
 - [x] Get vicon frame from Vicon SDK and transform to robot base
+- [ ] Adds mechanism for state logger and plotter
 - [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Test Velocity-conditioned policy using joystick
 
