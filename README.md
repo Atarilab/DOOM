@@ -37,6 +37,7 @@ If the connection is not established, you might need to manually set the IP for 
 
 ## VS Code Workspace Setup
 Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container.
+Additionally, after the build, the debugger can also be setup using `Ctrl+Shift+D > Create launch.json`. `launch.json` can be setup using command line args for task and log.
 
 ## Running the scripts
 Once inside the container and the connection to the robot has been established, you can run the python scripts by:
