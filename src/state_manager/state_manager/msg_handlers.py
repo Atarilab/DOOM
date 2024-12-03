@@ -1,9 +1,54 @@
 import time
 
+import numpy as np
 from typing import Dict, List
 from utils.logger import logging
+from scipy.spatial.transform import Rotation as R
 
 from state_manager.estimators import VelocityEstimator
+
+def low_state_handler(msg: Dict[str, List], logger: logging.Logger):
+    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
+    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
+
+    Args:
+        msg (Dict): Low Level Unitree Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Low level states directly from the robot
+    """
+    # Extract motor states directly without reordering
+    motor_states = msg['motor_state'][:12] # 12 joint for the legs, the remaining 8 are unactuated
+    joint_positions = np.array([motor.q for motor in motor_states])
+    joint_velocities = np.array([motor.dq for motor in motor_states])
+    joint_accelerations = np.array([motor.ddq for motor in motor_states])
+    joint_tau_est = np.array([motor.tau_est for motor in motor_states])
+
+    # Extract foot forces directly without reordering
+    foot_forces = msg['foot_force']
+    foot_force_est = msg['foot_force_est']
+
+    # Extract IMU states
+    imu_state = msg['imu_state']
+
+    # Construct and return the parsed states dictionary
+    states = {
+        'joint_pos': joint_positions,
+        'joint_vel': joint_velocities,
+        'joint_acc': joint_accelerations,
+        'joint_tau_est': joint_tau_est,
+        'foot_forces': foot_forces,
+        'foot_force_est': foot_force_est,
+        'base_quat': imu_state.quaternion,
+        'rpy': imu_state.rpy,
+        'gyroscope': imu_state.gyroscope,
+        'accelerometer': imu_state.accelerometer
+    }
+
+    # logger.debug(f"Received low state at {time.time()}")
+    return states
+
 
 def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
     """
@@ -34,70 +79,34 @@ def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
 
     # Base quaternion
     base_quat = [
+        msg['w'],
         msg['x_rot'],
         msg['y_rot'],
         msg['z_rot'],
-        msg['w']
     ]
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
-    linear_velocities, angular_velocities = vicon_handler.velocity_estimator.ekf_update(
+    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.ekf_update(
         base_pos, base_quat, current_timestamp
     )
+    
+    # Convert quaternion to a rotation matrix
+    rotation_matrix = R.from_quat(base_quat).as_matrix()
+    # Transform linear velocity to base frame
+    lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w) 
 
     states = {
         'base_pos_w': base_pos,
-        'base_quat': base_quat,
-        'lin_vel_w': linear_velocities.tolist(),  # Linear velocities in world frame
-        'ang_vel_w': angular_velocities.tolist()  # Angular velocities in world frame
+        # 'base_quat': base_quat,
+        'lin_vel_w': lin_vel_w.tolist(),  # Linear velocities in world frame
+        'lin_vel_b': lin_vel_b,
+        # 'ang_vel_w': angular_velocities.tolist(),  # Angular velocities in world frame
     }
     
-    # logger.debug(f"{states['lin_vel_w']}, {states['ang_vel_w']}")
     
     return states
-    
-def low_state_handler(msg: Dict[str, List], logger: logging.Logger):
-    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
-    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
-    Args:
-        msg (Dict): Low Level Unitree Message
-        logger (logging.Logger): Logger for debugging
-
-    Returns:
-        Dict: Low level states directly from the robot
-    """
-    # Extract motor states directly without reordering
-    motor_states = msg['motor_state']
-    joint_positions = [motor.q for motor in motor_states]
-    joint_velocities = [motor.dq for motor in motor_states]
-    joint_accelerations = [motor.ddq for motor in motor_states]
-    joint_tau_est = [motor.tau_est for motor in motor_states]
-
-    # Extract foot forces directly without reordering
-    foot_forces = msg['foot_force']
-    foot_force_est = msg['foot_force_est']
-
-    # Extract IMU states
-    imu_state = msg['imu_state']
-
-    # Construct and return the parsed states dictionary
-    states = {
-        'joint_pos': joint_positions,
-        'joint_vel': joint_velocities,
-        'joint_acc': joint_accelerations,
-        'joint_tau_est': joint_tau_est,
-        'foot_forces': foot_forces,
-        'foot_force_est': foot_force_est,
-        'imu_quat': imu_state.quaternion,
-        'rpy': imu_state.rpy,
-        'gyroscope': imu_state.gyroscope,
-        'accelerometer': imu_state.accelerometer
-    }
-
-    # logger.debug(f"Received low state at {time.time()}")
-    return states
 
 def sport_mode_state_handler(msg: Dict[str, List], logger: logging.Logger):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
@@ -113,27 +122,14 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: logging.Logger):
     if not hasattr(sport_mode_state_handler, 'velocity_estimator'):
         sport_mode_state_handler.velocity_estimator = VelocityEstimator()
         
-    base_pos_w = msg['position']
-    # lin_vel_w = msg['velocity'] # NOTE: confirm if it is in world or base frame
-    
-    # Extract IMU states
-    imu_state = msg['imu_state']
-    base_quat = imu_state.quaternion
-    
-    # Estimate velocities using EKF
-    current_timestamp = time.time()
-    linear_velocities, angular_velocities = sport_mode_state_handler.velocity_estimator.ekf_update(
-        base_pos_w, base_quat, current_timestamp
-    )
+    base_pos_w = (msg['position'])    
     
     states = {
         'base_pos_w': base_pos_w,
-        'base_quat': base_quat,
-        'lin_vel_w': linear_velocities, 
-        'ang_vel_w': angular_velocities
+        'lin_vel_b': msg['velocity'], 
     }
     
-    logger.debug(states)
+    # logger.debug(states)
     
     return states
     

@@ -1,19 +1,19 @@
 import os
-import time
 import asyncio
 import logging
 import argparse
 from typing import Optional
-import unitree_legged_const as go2
 
 import rclpy
 from rclpy.node import Node
 
+# Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportModeState_
 from unitree_sdk2py.utils.crc import CRC
 
+# ROS Messages
 from unitree_go.msg._low_state import LowState
 from unitree_go.msg._sport_mode_state import SportModeState
 from vicon_receiver.msg import Position
@@ -37,7 +37,6 @@ from state_manager.state_manager import (
     ROS2StateSubscriber
 )
 from state_manager.msg_handlers import *
-from utils.helpers import reorder_robot_states
 
 
 class LowLevelCmdPublisher(Node):
@@ -92,15 +91,13 @@ class LowLevelCmdPublisher(Node):
 
         try:
             # Retrieve states from state manager
-            combined_state = self.state_manager.get_combined_state()
-            
-            observations = active_obs_manager.compute_observations(combined_state)
-            
-            if observations != {}:
-                self.logger.debug(observations)
+            combined_state = self.state_manager.get_combined_state()            
+            # observations = active_obs_manager.compute_observations(combined_state)
+            # if observations != {}:
+            #     self.logger.debug(observations)
             
             # Compute motor commands
-            motor_commands = active_controller.compute_torques(observations, {})
+            motor_commands = active_controller.compute_torques(combined_state, {})
             
             # Update command structure
             for i in range(12):
@@ -124,8 +121,8 @@ async def main_async(args=None):
     
     # Parse arguments
     parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
-    parser.add_argument("--task", type=str, required=True, help="Task name to run")
-    parser.add_argument("--log", type=str, required=True, help="Experiment name to log information")
+    parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run")
+    parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
     
     args = parser.parse_args()
@@ -144,9 +141,6 @@ async def main_async(args=None):
         await initialize_channel(args.task, configs['robot_interface_config'], logger)
         
         state_manager = StateManager(logger=logger)
-        #######################################################
-        # TODO: Move Individual State Handlers Inside its class and handle them properly
-        #######################################################
         
         dds_low_state_sub = DDSStateSubscriber(
             topic="rt/lowstate", 
@@ -162,7 +156,6 @@ async def main_async(args=None):
         #     handler_func=low_state_handler
         # )
         # state_manager.add_subscriber("low_state", ros2_low_state_sub)
-
         
         state_manager.add_subscriber("low_state", dds_low_state_sub)
         
@@ -245,3 +238,5 @@ async def main_async(args=None):
         
 def main():
     asyncio.run(main_async())
+    
+main() # For Debug

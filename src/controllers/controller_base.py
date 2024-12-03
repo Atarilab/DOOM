@@ -23,7 +23,7 @@ class ControllerBase(ABC):
         self.start_time = start_time
     
     @abstractmethod
-    def compute_torques(self, observations, desired_goal):
+    def compute_torques(self, state, desired_goal):
         """
         Compute control commands based on the current state and desired goal.
 

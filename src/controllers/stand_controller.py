@@ -8,7 +8,7 @@ class IdleController(ControllerBase):
     Used to set zero commands to the motor. This is particularly useful when exiting the controller to reset the torques to 0.
     """
 
-    def compute_torques(self, observations, desired_goal):
+    def compute_torques(self, state, desired_goal):
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -45,7 +45,9 @@ class StandUpController(ControllerBase):
         ))
 
     def compute_torques(self, state, desired_goal=None):
-        time = state["time"]- self.start_time
+        obs = self.obs_manager.compute_observations(state)
+        
+        time = obs["time"]- self.start_time
         phase = np.tanh(time / 1.2)
         cmd = {}
         for i in range(12):
@@ -83,7 +85,9 @@ class StandDownController(ControllerBase):
         ))
 
     def compute_torques(self, state, desired_goal=None):
-        time = state["time"]- self.start_time
+        obs = self.obs_manager.compute_observations(state)
+        
+        time = obs["time"]- self.start_time
         phase = np.tanh(time / 1.2)
         cmd = {}
         for i in range(12):
@@ -118,7 +122,8 @@ class StayDownController(ControllerBase):
             
         ))
 
-    def compute_torques(self, observations, desired_goal):
+    def compute_torques(self, state, desired_goal):
+        obs = self.obs_manager.compute_observations(state)
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
@@ -152,12 +157,12 @@ class StanceController(ControllerBase):
             
         ))
 
-    def compute_torques(self, observations, desired_goal):
+    def compute_torques(self, state, desired_goal):
         cmd = {}
         for i in range(12):
             cmd[f'motor_{i}'] = {
                 'q': self.stand_up_joint_pos[i],
-                'kp': 50.0,
+                'kp': 15.0,
                 'dq': 0.0,
                 'kd': 3.5,
                 'tau': 0.0,
