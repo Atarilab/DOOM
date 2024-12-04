@@ -18,10 +18,10 @@ from unitree_go.msg._low_state import LowState
 from unitree_go.msg._sport_mode_state import SportModeState
 from vicon_receiver.msg import Position
 
+# DOOM Imports
 from utils.ui_interface import ModeManager, RobotControlUI
 from utils.logger import get_logger 
 from utils.initialization import initialize_channel, initialize_robot_controller
-
 from controllers.stand_controller import (
     IdleController, 
     StayDownController, 
@@ -30,7 +30,6 @@ from controllers.stand_controller import (
     StanceController
 )
 from controllers.rl_controller import RLLocomotionVelocityController
-
 from state_manager.state_manager import (
     StateManager, 
     DDSStateSubscriber,
@@ -202,7 +201,8 @@ async def main_async(args=None):
             'STANCE': StanceController(configs['robot_config'])
         })
         
-        mode_manager.register_mode('RL-VELOCITY', {
+        mode_manager.register_mode('RL', {
+            'STANCE': StanceController(configs['robot_config']),
             'RL-VELOCITY': RLLocomotionVelocityController(configs)
         })
         
