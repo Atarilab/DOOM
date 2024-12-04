@@ -80,8 +80,14 @@ def last_action(states: Dict[str, Any], last_action: Callable) -> np.ndarray:
     """
     return last_action()
 
-def velocity_commands(states: Dict[str, Any]) -> np.ndarray:
-    return [0.2, 0, 0]
+def velocity_commands(states: Dict[str, Any], velocity_commands) -> np.ndarray:
+    """
+    The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
+    
+    :param states: State dictionary
+    :return: Velocity commands (Vx, Vy, Wz)
+    """
+    return velocity_commands()
 
 def starting_time(states: Dict[str, Any]):
     return time.time()
