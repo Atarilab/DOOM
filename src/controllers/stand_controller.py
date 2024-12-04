@@ -34,8 +34,6 @@ class StandUpController(ControllerBase):
     def register_observations(self):
         """
         Register observations for this controller.
-        
-        :param configs: Optional configuration dictionary
         """
 
         # Register observations using the mode-specific obs_manager
@@ -74,8 +72,6 @@ class StandDownController(ControllerBase):
     def register_observations(self):
         """
         Register observations for this controller.
-        
-        :param configs: Optional configuration dictionary
         """
 
         # Register observations using the mode-specific obs_manager
@@ -112,8 +108,6 @@ class StayDownController(ControllerBase):
     def register_observations(self):
         """
         Register observations for this controller.
-        
-        :param configs: Optional configuration dictionary
         """
 
         # Register observations using the mode-specific obs_manager
@@ -147,8 +141,6 @@ class StanceController(ControllerBase):
     def register_observations(self):
         """
         Register observations for this controller.
-        
-        :param configs: Optional configuration dictionary
         """
 
         # Register observations using the mode-specific obs_manager

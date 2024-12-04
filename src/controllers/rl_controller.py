@@ -46,7 +46,6 @@ class RLLocomotionVelocityController(ControllerBase):
     def register_observations(self):
         """
         Register observations for this controller. Maintain order to be passed directly to policy.
-        
         """
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register('lin_vel_b', ObsTerm(lin_vel_b))
