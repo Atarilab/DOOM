@@ -4,7 +4,7 @@ Repository for running the experiments on the real robots.
 ## Requirements 
 - docker (ros2 container with unitree_sdk)
 - unitree Go2
-- Nvidia Graphics card and required [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- nvidia Graphics card and [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   
 ## Installation Instructions
 For installation of the DOOM project, run:
