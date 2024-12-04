@@ -3,7 +3,8 @@ Repository for running the experiments on the real robots.
 
 ## Requirements 
 - docker (ros2 container with unitree_sdk)
-- unitree Go2 
+- unitree Go2
+- Nvidia Graphics card and required [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   
 ## Installation Instructions
 For installation of the DOOM project, run:
@@ -36,6 +37,7 @@ If the connection is not established, you might need to manually set the IP for 
 
 ## VS Code Workspace Setup
 Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container.
+Additionally, after the build, the debugger can also be setup using `Ctrl+Shift+D > Create launch.json`. `launch.json` can be setup using command line args for task and log.
 
 ## Running the scripts
 Once inside the container and the connection to the robot has been established, you can run the python scripts by:
@@ -88,7 +90,7 @@ idlc -l py -o output_dir file.idl
 ## TODO
 - [ ] Add support for AlienGo
 - [x] Get vicon frame from Vicon SDK and transform to robot base
-- [ ] Adds mechanism for state logger and plotter
+- [ ] Add mechanism for real-time state logger and plotter
 - [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Test Velocity-conditioned policy using joystick
 
