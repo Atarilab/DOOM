@@ -78,6 +78,12 @@ Once the simulator is up and running, you can try out the stand up controller us
 python3 stand_go2.py --task custom-task-name
 ```
 
+## Live Plotting using PlotJuggler
+```bash
+ros2 run plotjuggler plotjuggler
+```
+
+
 ## Convert IDL Messages to Python for DDS Communication
 idlc -l py -o output_dir file.idl
 
