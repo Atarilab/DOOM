@@ -145,6 +145,7 @@ async def main_async(args=None):
             topic="rt/lowstate", 
             msg_type=LowState_, 
             handler_func=low_state_handler,
+            handler_args={'pin_model': "HI"},
             logger=logger,
         )
 

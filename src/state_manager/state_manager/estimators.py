@@ -23,6 +23,7 @@ class VelocityEstimator:
         if method == 'ekf':
             # State vector: [x, y, z, vx, vy, vz, roll, pitch, yaw, wx, wy, wz]
             self.state = np.zeros(12)
+            self.last_quaternion = None
             self.covariance = np.eye(12) * 1000
             
             # Process noise covariance

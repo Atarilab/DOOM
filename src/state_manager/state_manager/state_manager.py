@@ -40,6 +40,7 @@ class DDSStateSubscriber(StateSubscriber):
                  topic: str, 
                  msg_type, 
                  handler_func: Optional[Callable] = None,
+                 handler_args: Optional[Dict[str, Any]] = None,
                  logger: Optional[logging.Logger] = None):
         """
         Initialize DDS state subscriber.
@@ -55,6 +56,7 @@ class DDSStateSubscriber(StateSubscriber):
         self.topic = topic
         self.msg_type = msg_type
         self.handler_func = handler_func
+        self.handler_args = handler_args or {}
         
         self.subscriber = ChannelSubscriber(topic, msg_type)
         self._latest_state = {}
@@ -68,7 +70,11 @@ class DDSStateSubscriber(StateSubscriber):
             
             # Call handler if exists
             if self.handler_func:
-                extracted_state = self.handler_func(extracted_state, self.logger)
+                extracted_state = self.handler_func(
+                    extracted_state, 
+                    **self.handler_args, 
+                    logger=self.logger
+                )
             
             # Save the final state
             self._latest_state = extracted_state
@@ -111,6 +117,7 @@ class ROS2StateSubscriber(StateSubscriber):
                  node_name: str,
                  msg_type,
                  handler_func: Optional[Callable] = None,
+                 handler_args: Optional[Dict[str, Any]] = None,
                  logger: Optional[logging.Logger] = None):
         """
         Initialize ROS2 state subscriber.
@@ -126,6 +133,7 @@ class ROS2StateSubscriber(StateSubscriber):
         self.topic = topic
         self.msg_type = msg_type
         self.handler_func = handler_func
+        self.handler_args = handler_args or {}
         
         self.node = rclpy.create_node(node_name)
         self._latest_state = {}
@@ -140,7 +148,11 @@ class ROS2StateSubscriber(StateSubscriber):
             
             # Call handler if exists
             if self.handler_func:
-                extracted_state = self.handler_func(extracted_state, self.logger)
+                extracted_state = self.handler_func(
+                    extracted_state, 
+                    **self.handler_args, 
+                    logger=self.logger
+                )
             
             # Save the final state
             self._latest_state = extracted_state

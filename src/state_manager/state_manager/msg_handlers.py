@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as R
 
 from state_manager.estimators import VelocityEstimator
 
-def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def low_state_handler(msg: Dict[str, List], pin_model=None, logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
