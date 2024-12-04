@@ -91,7 +91,7 @@ class LowLevelCmdPublisher(Node):
         try:
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()            
-            observations = active_obs_manager.compute_observations(combined_state)
+            # observations = active_obs_manager.compute_observations(combined_state)
             # if observations != {}:
             #     self.logger.debug(observations)
             

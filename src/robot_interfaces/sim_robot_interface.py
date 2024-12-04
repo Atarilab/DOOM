@@ -74,6 +74,19 @@ class SimRobotInterface(RobotInterfaceBase):
     def _physics_viewer_thread(self):
         while self.viewer.is_running():
             self.locker.acquire()
+            
+            # Find the robot body (might need adjustment based on your exact model)
+            robot_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
+            if robot_body_id >= 0:
+                robot_pos = self.mj_data.xpos[robot_body_id]
+                
+                # Set camera lookat point
+                self.viewer.cam.lookat[:] = robot_pos
+                
+                # Optional: soft zoom and angle
+                self.viewer.cam.distance = 3.0
+                self.viewer.cam.elevation = -20
+
             self.viewer.sync()
             self.locker.release()
             time.sleep(self.viewer_dt)

@@ -1,13 +1,13 @@
 import time
 
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Optional
 from utils.logger import logging
 from scipy.spatial.transform import Rotation as R
 
 from state_manager.estimators import VelocityEstimator
 
-def low_state_handler(msg: Dict[str, List], logger: logging.Logger):
+def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
@@ -50,7 +50,7 @@ def low_state_handler(msg: Dict[str, List], logger: logging.Logger):
     return states
 
 
-def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
+def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None):
     """
     Vicon msg handler with velocity estimation.
 
@@ -108,7 +108,7 @@ def vicon_handler(msg: Dict[str, List], logger: logging.Logger):
     return states
 
 
-def sport_mode_state_handler(msg: Dict[str, List], logger: logging.Logger):
+def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:
