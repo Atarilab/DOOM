@@ -1,41 +1,138 @@
 import numpy as np
 import threading
+from scipy.linalg import logm
 
 from utils.math import quaternion_to_euler
+from scipy.spatial.transform import Rotation as R
+
 
 class VelocityEstimator:
-    def __init__(self, alpha=0.1, position_noise=0.01, velocity_noise=0.1):
+    def __init__(self, alpha=0.1, position_noise=0.01, velocity_noise=0.1, method='finite_diff'):
         """
-        Initialize Extended Kalman Filter for velocity estimation.
+        Initialize velocity estimator with multiple estimation methods.
         
         :param alpha: Smoothing factor for velocity estimation
         :param position_noise: Process noise for position
         :param velocity_noise: Process noise for velocity
+        :param method: Estimation method ('ekf' or 'finite_diff')
         """
-        # State vector: [x, y, z, vx, vy, vz, roll, pitch, yaw, wx, wy, wz]
-        self.state = np.zeros(12)
-        self.covariance = np.eye(12) * 1000  # Large initial uncertainty
+        self.method = method
+        self.alpha = alpha
         
-        # Process noise covariance
-        self.Q = np.diag([
-            position_noise, position_noise, position_noise,  # position
-            velocity_noise, velocity_noise, velocity_noise,  # linear velocity
-            0.1, 0.1, 0.1,  # orientation
-            0.1, 0.1, 0.1   # angular velocity
-        ])
+        # EKF specific initialization
+        if method == 'ekf':
+            # State vector: [x, y, z, vx, vy, vz, roll, pitch, yaw, wx, wy, wz]
+            self.state = np.zeros(12)
+            self.covariance = np.eye(12) * 1000
+            
+            # Process noise covariance
+            self.Q = np.diag([
+                position_noise, position_noise, position_noise,  # position
+                velocity_noise, velocity_noise, velocity_noise,  # linear velocity
+                0.1, 0.1, 0.1,  # orientation
+                0.1, 0.1, 0.1   # angular velocity
+            ])
+            
+            # Measurement noise covariance
+            self.R = np.diag([
+                position_noise, position_noise, position_noise,  # position
+                0.1, 0.1, 0.1   # orientation
+            ])
         
-        # Measurement noise covariance
-        self.R = np.diag([
-            position_noise, position_noise, position_noise,  # position
-            0.1, 0.1, 0.1   # orientation
-        ])
+        # Finite differencing specific initialization
+        elif method == 'finite_diff':
+            self.last_position = None
+            self.last_quaternion = None
+            self.last_timestamp = None
+            self.smoothed_linear_velocity = np.zeros(3)
+            self.smoothed_angular_velocity = np.zeros(3)
         
-        self.last_timestamp = None
         self._lock = threading.Lock()
+    
+    def _compute_angular_velocity(self, q1, q2, dt):
+        """
+        Compute angular velocity using skew-symmetric matrix method.
+        
+        :param q1: Previous quaternion
+        :param q2: Current quaternion
+        :param dt: Time delta
+        :return: Angular velocity vector
+        """
+        # Convert quaternions to rotation matrices
+        R1 = R.from_quat(q1).as_matrix()
+        R2 = R.from_quat(q2).as_matrix()
+        
+        # Compute relative rotation matrix
+        R_diff = R2 @ R1.T
+        
+        # Extract angular velocity from skew-symmetric matrix
+        try:
+            omega_skew = logm(R_diff) / dt
+            angular_velocity = np.array([
+                omega_skew[2,1],
+                omega_skew[0,2],
+                omega_skew[1,0]
+            ])
+        except Exception:
+            # Fallback to zero angular velocity if computation fails
+            angular_velocity = np.zeros(3)
+        
+        return angular_velocity
+    
+    def finite_diff_update(self, position, quaternion, timestamp):
+        """
+        Finite differencing velocity estimation with smoothing.
+        
+        :param position: Current 3D position [x, y, z]
+        :param quaternion: Orientation quaternion [x, y, z, w]
+        :param timestamp: Current timestamp
+        :return: Estimated [linear_velocities, angular_velocities]
+        """
+        with self._lock:
+            # First measurement
+            if self.last_position is None:
+                self.last_position = position
+                self.last_quaternion = quaternion
+                self.last_timestamp = timestamp
+                return np.zeros(3), np.zeros(3)
+            
+            # Calculate time delta
+            dt = timestamp - self.last_timestamp
+            
+            if dt <= 0:
+                return self.smoothed_linear_velocity, self.smoothed_angular_velocity
+            
+            # Linear velocity using finite differencing
+            raw_linear_velocity = (position - self.last_position) / dt
+            
+            # Angular velocity calculation
+            raw_angular_velocity = self._compute_angular_velocity(
+                self.last_quaternion, 
+                quaternion, 
+                dt
+            )
+            
+            # Exponential smoothing for both linear and angular velocities
+            self.smoothed_linear_velocity = (
+                self.alpha * raw_linear_velocity + 
+                (1 - self.alpha) * self.smoothed_linear_velocity
+            )
+            
+            self.smoothed_angular_velocity = (
+                self.alpha * raw_angular_velocity + 
+                (1 - self.alpha) * self.smoothed_angular_velocity
+            )
+            
+            # Update last known state
+            self.last_position = position
+            self.last_quaternion = quaternion
+            self.last_timestamp = timestamp
+            
+            return self.smoothed_linear_velocity, self.smoothed_angular_velocity
     
     def ekf_update(self, position, quaternion, timestamp):
         """
-        Perform Extended Kalman Filter update step.
+        Extended Kalman Filter velocity estimation.
         
         :param position: Current 3D position [x, y, z]
         :param quaternion: Orientation quaternion [x, y, z, w]
@@ -48,7 +145,8 @@ class VelocityEstimator:
                 self.last_timestamp = timestamp
                 self.state[:3] = position
                 self.state[6:9] = quaternion_to_euler(quaternion)
-                return np.zeros(6)
+                self.last_quaternion = quaternion
+                return np.zeros(3), np.zeros(3)
             
             dt = timestamp - self.last_timestamp
             
@@ -72,6 +170,13 @@ class VelocityEstimator:
             # Compute Euler angles from current quaternion
             current_euler = quaternion_to_euler(quaternion)
             
+            # Angular velocity estimation
+            raw_angular_velocity = self._compute_angular_velocity(
+                self.last_quaternion, 
+                quaternion, 
+                dt
+            )
+            
             # Innovation
             innovation = np.concatenate([
                 position - predicted_state[:3],
@@ -86,9 +191,27 @@ class VelocityEstimator:
             
             # Update state and covariance
             self.state = predicted_state + K @ innovation
+            self.state[9:] = raw_angular_velocity  # Update angular velocity
             self.covariance = (np.eye(12) - K @ H) @ predicted_covariance
+            self.last_quaternion = quaternion
             
             # Update timestamp
             self.last_timestamp = timestamp
             
             return self.state[3:6], self.state[9:]
+    
+    def update(self, position, quaternion, timestamp):
+        """
+        Unified update method for velocity estimation.
+        
+        :param position: Current 3D position [x, y, z]
+        :param quaternion: Orientation quaternion [x, y, z, w]
+        :param timestamp: Current timestamp
+        :return: Estimated [linear_velocities, angular_velocities]
+        """
+        if self.method == 'ekf':
+            return self.ekf_update(position, quaternion, timestamp)
+        elif self.method == 'finite_diff':
+            return self.finite_diff_update(position, quaternion, timestamp)
+        else:
+            raise ValueError(f"Unknown estimation method: {self.method}")

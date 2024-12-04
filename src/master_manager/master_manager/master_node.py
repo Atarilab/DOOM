@@ -135,7 +135,7 @@ async def main_async(args=None):
 
         # Load configurations
         configs = await initialize_robot_controller(args.task, logger)
-        
+
         # Initialize communication channel
         await initialize_channel(args.task, configs['robot_interface_config'], logger)
         

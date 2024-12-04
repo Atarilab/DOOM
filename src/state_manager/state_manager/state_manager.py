@@ -231,7 +231,7 @@ class StateManager:
         """
         if subscriber_name not in self._subscribers:
             raise KeyError(f"No subscriber found with name {subscriber_name}")
-        
+
         return self._subscribers[subscriber_name].get_latest_state()
     
     def get_combined_state(self) -> Dict[str, Any]:

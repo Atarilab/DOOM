@@ -68,7 +68,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     # Singleton pattern for velocity estimator
     if not hasattr(vicon_handler, 'velocity_estimator'):
-        vicon_handler.velocity_estimator = VelocityEstimator()
+        vicon_handler.velocity_estimator = VelocityEstimator(method='finite_diff', alpha=0.2)
 
     # Base Position (in m)
     base_pos = [
@@ -87,7 +87,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
-    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.ekf_update(
+    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(
         base_pos, base_quat, current_timestamp
     )
     
@@ -120,7 +120,7 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
     """
     # Singleton pattern for velocity estimator
     if not hasattr(sport_mode_state_handler, 'velocity_estimator'):
-        sport_mode_state_handler.velocity_estimator = VelocityEstimator()
+        sport_mode_state_handler.velocity_estimator = VelocityEstimator(method='finite_diff')
         
     base_pos_w = (msg['position'])    
     
