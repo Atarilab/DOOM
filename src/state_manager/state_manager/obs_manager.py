@@ -4,7 +4,8 @@ import inspect
 
 class ObsTerm:
     """
-    A descriptor for defining state observations with flexible computation and parameter support.
+    A descriptor for defining state observations with flexible parameter support.
+    This is used to define an observation term for each mode/controller.
     """
     
     def __init__(self, 
@@ -79,6 +80,11 @@ class ObsTerm:
 class ObservationManager:
     """
     Manages a collection of state observations with dependency tracking.
+    This is responsible for computing the observations for each mode/controller from the states computed 
+    by the StateManager.
+    
+    Note that the order of the observations upon registrations matters as it will be maintained for computing the observations
+    and can be directly passed to your controller.
     """
     
     def __init__(self, logger: logging.Logger = None):

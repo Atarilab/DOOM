@@ -40,7 +40,7 @@ class RLLocomotionVelocityController(ControllerBase):
             device="cpu",
         )
         self.cmd = {}    
-        self.velocity_command = np.array([0.5, 0.0, 0.0])
+        self.velocity_commands = np.array([0.5, 0.0, 0.0])
         
         
     def register_observations(self):
@@ -50,8 +50,8 @@ class RLLocomotionVelocityController(ControllerBase):
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register('lin_vel_b', ObsTerm(lin_vel_b))
         self.obs_manager.register('ang_vel_b', ObsTerm(ang_vel_b))
-        self.obs_manager.register('projected_gravity', ObsTerm(projected_gravity_b, params={"logger": self.obs_manager.logger}))
-        self.obs_manager.register('velocity_commands', ObsTerm(velocity_commands, params={"velocity_command": lambda: self.velocity_command}))
+        self.obs_manager.register('projected_gravity', ObsTerm(projected_gravity_b))
+        self.obs_manager.register('velocity_commands', ObsTerm(velocity_commands, params={"velocity_commands": lambda: self.velocity_commands}))
         self.obs_manager.register('joint_pos', ObsTerm(
             joint_pos_rel, 
             params={
@@ -69,6 +69,7 @@ class RLLocomotionVelocityController(ControllerBase):
         
     def compute_torques(self, state, desired_goal):
         obs = self.obs_manager.compute_observations(state)
+        
         obs = torch.tensor(list(chain.from_iterable(obs.values())), dtype=torch.float32)      
         
         self.obs_history_storage.add(obs.unsqueeze(0))

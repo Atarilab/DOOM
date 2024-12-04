@@ -23,24 +23,26 @@ class ModeManager:
         self._mode_obs_managers: Dict[str, ObservationManager] = {}
         self.logger = logger
         
-    def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase], obs_manager: Optional[ObservationManager] = None):
+    def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase]):
         """
-        Register a new mode with its associated controllers.
+        Register a new mode with individual obs managers for each submode.
         
         :param mode_name: Name of the mode
         :param controllers: Dictionary of controllers for this mode
         """
-        # Create a default observation manager if not provided
-        if obs_manager is None:
-            obs_manager = ObservationManager(logger=self.logger)
+        # Create an observation manager for each submode
+        obs_managers = {
+            submode_name: ObservationManager(logger=self.logger) 
+            for submode_name in controllers.keys()
+        }
         
         self._modes[mode_name] = controllers
-        self._mode_obs_managers[mode_name] = obs_manager
+        self._mode_obs_managers[mode_name] = obs_managers
         
-        # If controllers accept obs_manager, pass it to them
-        for controller in controllers.values():
+        # Pass corresponding obs manager to each controller
+        for submode_name, controller in controllers.items():
             if hasattr(controller, 'set_obs_manager'):
-                controller.set_obs_manager(obs_manager)
+                controller.set_obs_manager(obs_managers[submode_name])
                 
         
     def set_mode(self, mode_name: str, submode: Optional[str] = None):
@@ -82,7 +84,7 @@ class ModeManager:
     
     def get_active_obs_manager(self) -> ObservationManager:
         """
-        Get the observation manager for the current mode.
+        Get the observation manager for the current submode.
         
         :return: Active observation manager
         :raises ValueError: If no mode is set
@@ -90,7 +92,12 @@ class ModeManager:
         if self._current_mode is None:
             raise ValueError("No mode is currently set")
         
-        return self._mode_obs_managers[self._current_mode]  
+        # If no submode, use 'default' for the mode
+        if self._current_submode is None:
+            return self._mode_obs_managers[self._current_mode]['default']
+        
+        return self._mode_obs_managers[self._current_mode][self._current_submode]
+      
     
     def get_current_mode_info(self) -> Dict[str, Optional[str]]:
         """

@@ -6,7 +6,8 @@ import threading
 from abc import ABC, abstractmethod
 
 class StateSubscriber(ABC):
-    """Abstract base class for state subscribers."""
+    """Abstract base class for state subscribers.
+    """
     
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger
@@ -184,6 +185,9 @@ class StateManager:
     """
     Centralized state management for robot controllers.
     Manages multiple state subscribers and provides unified state access.
+    
+    Note that the state here is the states coming from the subscribed topics which are further processed
+    by the ObservationManager to compute the observations for each mode/controller.
     """
     
     def __init__(self, logger=None):

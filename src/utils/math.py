@@ -2,6 +2,8 @@ from __future__ import annotations
 import numpy as np
 import torch
 
+GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
+
 def quaternion_to_euler(q) -> np.ndarray:
         """Convert quaternion to Euler angles (roll, pitch, yaw)."""
         w, x, y, z = q
