@@ -4,7 +4,7 @@ Repository for running the experiments on the real robots.
 ## Requirements 
 - docker (ros2 container with unitree_sdk)
 - unitree Go2
-- Nvidia Graphics card and required [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- nvidia Graphics card and [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   
 ## Installation Instructions
 For installation of the DOOM project, run:
@@ -78,6 +78,12 @@ Once the simulator is up and running, you can try out the stand up controller us
 python3 stand_go2.py --task custom-task-name
 ```
 
+## Live Plotting using PlotJuggler
+```bash
+ros2 run plotjuggler plotjuggler
+```
+
+
 ## Convert IDL Messages to Python for DDS Communication
 idlc -l py -o output_dir file.idl
 
@@ -90,7 +96,7 @@ idlc -l py -o output_dir file.idl
 ## TODO
 - [ ] Add support for AlienGo
 - [x] Get vicon frame from Vicon SDK and transform to robot base
-- [ ] Add mechanism for real-time state logger and plotter
+- [x] Add mechanism for real-time state logger and plotter
 - [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Test Velocity-conditioned policy using joystick
 
