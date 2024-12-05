@@ -3,7 +3,7 @@ import time
 import numpy as np
 from typing import Dict, List, Optional
 from utils.logger import logging
-from scipy.spatial.transform import Rotation as R
+from utils.math import quat_to_rotmatrix
 
 from state_manager.estimators import VelocityEstimator
 
@@ -71,28 +71,28 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
         vicon_handler.velocity_estimator = VelocityEstimator(method='finite_diff', alpha=0.2)
 
     # Base Position (in m)
-    base_pos = [
+    base_pos = np.array([
         (msg['x_trans'] + x_offset)*0.001,
         (msg['y_trans'] + y_offset)*0.001, 
         (msg['z_trans'] + z_offset)*0.001
-    ]
+    ])
 
-    # Base quaternion
-    base_quat = [
+    # Base quaternion (w, x, y, z)
+    base_quat = np.array([
         msg['w'],
         msg['x_rot'],
         msg['y_rot'],
         msg['z_rot'],
-    ]
+    ])
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
     lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(
-        base_pos, base_quat, current_timestamp
+        base_pos, base_quat, current_timestamp, logger
     )
     
     # Convert quaternion to a rotation matrix
-    rotation_matrix = R.from_quat(base_quat).as_matrix()
+    rotation_matrix = quat_to_rotmatrix(base_quat, order='wxyz')
     # Transform linear velocity to base frame
     lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w) 
 

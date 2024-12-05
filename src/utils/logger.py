@@ -9,6 +9,7 @@ def get_logger(name, log_file="system.log", debug=False, file_level=logging.DEBU
         logger.handlers.clear()
 
     log_format = '[%(levelname)s] [%(filename)s:%(lineno)d]: %(message)s'
+    # log_format = '[%(asctime)s] : %(message)s'
 
     # File Logs
     try:

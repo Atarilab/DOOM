@@ -1,12 +1,17 @@
 from __future__ import annotations
 import numpy as np
 import torch
+from scipy.spatial.transform import Rotation as R
+
 
 GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
 
-def quaternion_to_euler(q) -> np.ndarray:
+def quaternion_to_euler(q, order='wxyz') -> np.ndarray:
         """Convert quaternion to Euler angles (roll, pitch, yaw)."""
-        w, x, y, z = q
+        if order == 'wxyz':
+            w, x, y, z = q
+        else:
+            x, y, z, w = q
         
         # Roll (x-axis rotation)
         sinr_cosp = 2 * (w * x + y * z)
@@ -24,7 +29,7 @@ def quaternion_to_euler(q) -> np.ndarray:
         
         return [roll, pitch, yaw]
 
-def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order='wxyz') -> torch.Tensor:
     """Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
 
     Args:
@@ -34,8 +39,13 @@ def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
     Returns:
         The rotated vector in (x, y, z). Shape is (..., 3).
     """
-    q_w = q[..., 0]
-    q_vec = q[..., 1:]
+    if order == 'wxyz':
+        q_w = q[..., 0]
+        q_vec = q[..., 1:]
+    else:
+        q_w = q[..., -1]
+        q_vec = q[..., :-1]
+        
     a = v * (2.0 * q_w**2 - 1.0).unsqueeze(-1)
     
     b = torch.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
@@ -45,3 +55,11 @@ def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
     else:
         c = q_vec * torch.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
     return a - b + c
+
+def quat_to_rotmatrix(q: np.ndarray, order='wxyz') -> np.ndarray:
+    """Convert quaternion to rotation matrix"""
+    if order == 'wxyz':
+        q = q[[1, 2, 3, 0]]
+    
+    rot_matrix = R.from_quat(q).as_matrix()
+    return rot_matrix

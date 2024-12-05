@@ -2,7 +2,7 @@ import numpy as np
 import threading
 from scipy.linalg import logm
 
-from utils.math import quaternion_to_euler
+from utils.math import quaternion_to_euler, quat_to_rotmatrix
 from scipy.spatial.transform import Rotation as R
 
 
@@ -44,10 +44,10 @@ class VelocityEstimator:
         elif method == 'finite_diff':
             self.last_position = None
             self.last_quaternion = None
-            self.last_timestamp = None
             self.smoothed_linear_velocity = np.zeros(3)
             self.smoothed_angular_velocity = np.zeros(3)
         
+        self.last_timestamp = None
         self._lock = threading.Lock()
     
     def _compute_angular_velocity(self, q1, q2, dt):
@@ -60,8 +60,9 @@ class VelocityEstimator:
         :return: Angular velocity vector
         """
         # Convert quaternions to rotation matrices
-        R1 = R.from_quat(q1).as_matrix()
-        R2 = R.from_quat(q2).as_matrix()
+        
+        R1 = quat_to_rotmatrix(q1)
+        R2 = quat_to_rotmatrix(q2)
         
         # Compute relative rotation matrix
         R_diff = R2 @ R1.T
@@ -80,12 +81,12 @@ class VelocityEstimator:
         
         return angular_velocity
     
-    def finite_diff_update(self, position, quaternion, timestamp):
+    def finite_diff_update(self, position, quaternion, timestamp, logger=None):
         """
         Finite differencing velocity estimation with smoothing.
         
         :param position: Current 3D position [x, y, z]
-        :param quaternion: Orientation quaternion [x, y, z, w]
+        :param quaternion: Orientation quaternion [w, x, y, z]
         :param timestamp: Current timestamp
         :return: Estimated [linear_velocities, angular_velocities]
         """
@@ -105,7 +106,6 @@ class VelocityEstimator:
             
             # Linear velocity using finite differencing
             raw_linear_velocity = (position - self.last_position) / dt
-            
             # Angular velocity calculation
             raw_angular_velocity = self._compute_angular_velocity(
                 self.last_quaternion, 
@@ -131,21 +131,22 @@ class VelocityEstimator:
             
             return self.smoothed_linear_velocity, self.smoothed_angular_velocity
     
-    def ekf_update(self, position, quaternion, timestamp):
+    def ekf_update(self, position, quaternion, timestamp, logger=None):
         """
         Extended Kalman Filter velocity estimation.
         
         :param position: Current 3D position [x, y, z]
-        :param quaternion: Orientation quaternion [x, y, z, w]
+        :param quaternion: Orientation quaternion [w, x, y, z]
         :param timestamp: Current timestamp
         :return: Estimated [linear_velocities, angular_velocities]
         """
+        logger.debug("EKF UPDATE")
         with self._lock:
             # Calculate time delta
             if self.last_timestamp is None:
                 self.last_timestamp = timestamp
                 self.state[:3] = position
-                self.state[6:9] = quaternion_to_euler(quaternion)
+                self.state[6:9] = quaternion_to_euler(quaternion, order='wxyz')
                 self.last_quaternion = quaternion
                 return np.zeros(3), np.zeros(3)
             
@@ -167,9 +168,9 @@ class VelocityEstimator:
             H = np.zeros((6, 12))
             H[:3, :3] = np.eye(3)  # Position
             H[3:6, 6:9] = np.eye(3)  # Orientation
-            
+            logger.debug(quaternion)
             # Compute Euler angles from current quaternion
-            current_euler = quaternion_to_euler(quaternion)
+            current_euler = quaternion_to_euler(quaternion, order='wxyz')
             
             # Angular velocity estimation
             raw_angular_velocity = self._compute_angular_velocity(
@@ -201,7 +202,7 @@ class VelocityEstimator:
             
             return self.state[3:6], self.state[9:]
     
-    def update(self, position, quaternion, timestamp):
+    def update(self, position, quaternion, timestamp, logger=None):
         """
         Unified update method for velocity estimation.
         
@@ -211,8 +212,8 @@ class VelocityEstimator:
         :return: Estimated [linear_velocities, angular_velocities]
         """
         if self.method == 'ekf':
-            return self.ekf_update(position, quaternion, timestamp)
+            return self.ekf_update(position, quaternion, timestamp, logger)
         elif self.method == 'finite_diff':
-            return self.finite_diff_update(position, quaternion, timestamp)
+            return self.finite_diff_update(position, quaternion, timestamp, logger)
         else:
             raise ValueError(f"Unknown estimation method: {self.method}")
