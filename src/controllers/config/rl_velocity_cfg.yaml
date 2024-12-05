@@ -1,4 +1,4 @@
-policy_path: "policies/unmodified_isaac_policy.pt"
+policy_path: "policies/policy.pt"
 control_dt: 0.02
 action_dim: 12
 action_scale: 0.25
