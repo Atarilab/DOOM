@@ -24,7 +24,7 @@ For more helpful functions from `./doom.sh`, run:
 ./doom.sh -h
 ```
 
-> **Warning:** Before you run the example scripts provided by Unitree from unitree_sdk, make sure to turn off the sports mode using the Go2 app. Log in to the app using the ATARI Gmail credentials and toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot. 
+> **Warning:** Before you run anything on the robot, make sure to turn off the sports mode using the Go2 app. Log in to the app using the ATARI Gmail credentials and toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot. 
 
 ## Testing Robot Connection
 Once inside the docker container, you can access the Robot's IP address via `$ROBOT_IP`. You can test the connection using:
@@ -38,26 +38,24 @@ If the connection is not established, you might need to manually set the IP for 
 ## VS Code Workspace Setup
 Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container.
 Additionally, after the build, the debugger can also be setup using `Ctrl+Shift+D > Create launch.json`. `launch.json` can be setup using command line args for task and log.
+"""
 
-## Running the scripts
-Once inside the container and the connection to the robot has been established, you can run the python scripts by:
+## How to use DOOM to control your robot
+The various tasks are defined in `tasks/task_configs.json`. Currently, the following tasks are defined and tested:
+- `rl-velocity-sim-go2` (Status: ✅ )
+- `rl-velocity-real-go2` (Status: ✅ )
+  
+Once you've chosen the task you want to run, you can launch the user interface to control the robot using:
 ```bash
-python3 filename.py $NETWORK_INTERFACE
+ros2 run master_manager master_node --task custom-task-name --log log_name
 ```
-For example,
+This repository also has a simulation mode which allows you to run the same scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. Note that MuJoCo is not used as a visualizer for your real robot interface but rather as a sanity test of the same script that you might run on the real robot.
+To launch the simulator, run:
 ```bash
-python3 read_lowstate.py $NETWORK_INTERFACE
+python3 simulate.py --task custom-task-name --log log_name
 ```
+Example Workflow: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > `RL-Velocity` > `RL-Velocity`
 
-and the C++ scripts by:
-```bash
-sudo ./filename $NETWORK_INTERFACE
-```
-Note that `$NETWORK_INTERFACE` is already setup when you install using `./doom.sh -i` and is necessary to identify the robot through the network.
-
-#### Tested example scripts from `unitree_sdk2_python`
-`read_lowstate.py`
-`go2_stand_example.py`
 
 ## Vicon State Estimation
 The vicon receiver client is already installed in the docker container. You can simply launch it using:
@@ -65,28 +63,10 @@ The vicon receiver client is already installed in the docker container. You can 
 ros2 launch vicon_receiver client.launch.py
 ```
 
-## Simulation Tests
-This repository also has a simulation mode which allows you to run your scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. 
-To launch the simulator, run:
-```bash
-python3 simulate.py --task custom-task-name --log test
-```
-The various tasks are defined in `tasks/task_configs.json`.
-
-Once the simulator is up and running, you can try out the stand up controller using:
-```bash
-python3 stand_go2.py --task custom-task-name
-```
-
 ## Live Plotting using PlotJuggler
 ```bash
 ros2 run plotjuggler plotjuggler
 ```
-
-
-## Convert IDL Messages to Python for DDS Communication
-idlc -l py -o output_dir file.idl
-
 
 ## Installed ROS2 Packages
 - [unitree_sdk](https://github.com/unitreerobotics/unitree_sdk2)
@@ -95,10 +75,11 @@ idlc -l py -o output_dir file.idl
 
 ## TODO
 - [ ] Add support for AlienGo
+- [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
+- [ ] Implement joystick control for velocity commands
 - [x] Get vicon frame from Vicon SDK and transform to robot base
 - [x] Add mechanism for real-time state logger and plotter
-- [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
-- [ ] Test Velocity-conditioned policy using joystick
+- [x] Test Velocity-conditioned policy
 
 
 ## Resources
