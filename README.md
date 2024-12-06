@@ -74,6 +74,8 @@ ros2 run plotjuggler plotjuggler
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
+- [ ] Implement a real-time High-Level Contact Planner 
+- [ ] Integrate Pinocchio for additional states such as feet positions
 - [ ] Add support for AlienGo
 - [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Implement joystick control for velocity commands
