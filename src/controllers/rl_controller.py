@@ -50,11 +50,11 @@ class BaseRLLocomotionController(ControllerBase):
           
     def compute_torques(self, state, desired_goal):
         
-        q_pin = np.concatenate([state['base_pos_w'], state['base_quat'],
-                                state['joint_pos'][np.array(self.unitree_pin_joint_mappings)]])
-        v_pin = state['joint_vel'][np.array(self.unitree_pin_joint_mappings)]
+        # q_pin = np.concatenate([state['base_pos_w'], state['base_quat'],
+        #                         state['joint_pos'][np.array(self.unitree_pin_joint_mappings)]])
+        # v_pin = state['joint_vel'][np.array(self.unitree_pin_joint_mappings)]
         
-        self.pin_model_wrapper.update(q_pin, v_pin)
+        # self.pin_model_wrapper.update(q_pin, v_pin)
         
         # Compute observations
         obs = self.obs_manager.compute_observations(state)        
