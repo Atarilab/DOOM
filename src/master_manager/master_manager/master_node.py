@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 from typing import Optional
 
+
 import rclpy
 from rclpy.node import Node
 
@@ -23,6 +24,8 @@ from vicon_receiver.msg import Position
 from utils.ui_interface import ModeManager, RobotControlUI
 from utils.logger import get_logger 
 from utils.initialization import initialize_channel, initialize_robot_controller
+from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
+
 from controllers.stand_controller import (
     IdleController, 
     StayDownController, 
@@ -188,25 +191,27 @@ async def main_async(args=None):
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
         
 
+        pin_model_wrapper = PinQuadRobotWrapper(configs['robot_config']['pinocchio_urdf'])
+        
         # Create mode manager and register controllers
         mode_manager = ModeManager(logger=logger)
         mode_manager.register_mode('IDLE', {
-            'default': IdleController()
+            'default': IdleController(pin_model_wrapper, configs)
         })
         
         mode_manager.register_mode('STANDING', {
-            'STAY_DOWN': StayDownController(configs['robot_config']),
-            'STAND_UP': StandUpController(configs['robot_config']),
-            'STAND_DOWN': StandDownController(configs['robot_config']),
+            'STAY_DOWN': StayDownController(pin_model_wrapper, configs),
+            'STAND_UP': StandUpController(pin_model_wrapper, configs),
+            'STAND_DOWN': StandDownController(pin_model_wrapper, configs),
         })
         
         mode_manager.register_mode('STANCE', {
-            'STANCE': StanceController(configs['robot_config'])
+            'STANCE': StanceController(pin_model_wrapper, configs)
         })
         
         mode_manager.register_mode('RL-VELOCITY', {
-            'STANCE': StanceController(configs['robot_config']),
-            'RL-VELOCITY': RLLocomotionVelocityController(configs)
+            'STANCE': StanceController(pin_model_wrapper, configs),
+            'RL-VELOCITY': RLLocomotionVelocityController(pin_model_wrapper, configs)
         })
         
         mode_manager.set_mode('IDLE')

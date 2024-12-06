@@ -10,16 +10,19 @@ class ObsTerm:
     
     def __init__(self, 
                  func: Callable = None, 
-                 params: Optional[Dict[str, Any]] = None):
+                 params: Optional[Dict[str, Any]] = None,
+                 include: bool = True):
         """
         Initialize an observation term.
         
         :param func: Function to compute the observation
         :param params: Optional dictionary of parameters to pass to the function
+        :param include: Whether to include the observation in the method compute_observations()
         """
         self._func = func
         self._params = params or {}
         self._dependencies = None
+        self._include = include
         
         # Analyze function signature to determine dependencies
         if func:
@@ -94,6 +97,7 @@ class ObservationManager:
         :param logger: Optional logger for tracking observations
         """
         self._observations: Dict[str, ObsTerm] = {}
+        self._all_observations: Dict[str, Any] = {}
         self.logger = logger or logging.getLogger(__name__)
     
     def register(self, name: str, obs_term: ObsTerm):
@@ -115,12 +119,27 @@ class ObservationManager:
         :param combined_state: Complete state dictionary
         :return: Dictionary of computed observations
         """
+        self._all_observations.clear()
         observations = {}
         
         for name, obs_term in self._observations.items():
             try:
-                observations[name] = obs_term(combined_state)
+                computed_obs = obs_term(combined_state)
+                self._all_observations[name] = computed_obs
+                
+                # Only include in returned observations if include is True
+                if obs_term._include:
+                    observations[name] = computed_obs
             except Exception as e:
                 self.logger.error(f"Error computing observation {name}: {e}")
                         
         return observations
+    
+    def get_observation(self, name: str) -> Any:
+        """
+        Retrieve a specific observation, including those not returned by compute_observations().
+        
+        :param name: Name of the observation
+        :return: The computed observation
+        """
+        return self._all_observations.get(name)

@@ -11,12 +11,13 @@ from utils.helpers import ObservationHistoryStorage
 
 
 from state_manager.obs_manager import ObsTerm
-from state_manager.observations import joint_pos_rel, joint_vel, lin_vel_b, ang_vel_b, last_action, projected_gravity_b, velocity_commands
+from state_manager.observations import joint_pos_rel, joint_vel, lin_vel_b, ang_vel_b, last_action, projected_gravity_b, velocity_commands, \
+                                        feet_pos
 
 class BaseRLLocomotionController(ControllerBase):
-    def __init__(self, configs: Dict[str, Any]):
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
         
-        super().__init__(configs)
+        super().__init__(pin_model_wrapper, configs)
         
         model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
                                   configs['controller_config']['policy_path'])
@@ -25,7 +26,6 @@ class BaseRLLocomotionController(ControllerBase):
         
         self.action_scale = configs['controller_config']['action_scale']
         self.offset = configs['robot_config']['stand_up_joint_pos']
-        self.effort_limit = configs['robot_config']['effort_limit']
         self.Kp = configs['controller_config']['stiffness']
         self.Kd = configs['controller_config']['damping']
         self.joint_obs_unitree_to_isaac_mapping = torch.tensor(
@@ -47,11 +47,17 @@ class BaseRLLocomotionController(ControllerBase):
         self.cmd = {}    
         self.velocity_commands = np.array([0.5, 0.0, 0.0])
         
-        
-        
+          
     def compute_torques(self, state, desired_goal):
+        
+        q_pin = np.concatenate([state['base_pos_w'], state['base_quat'],
+                                state['joint_pos'][np.array(self.unitree_pin_joint_mappings)]])
+        v_pin = state['joint_vel'][np.array(self.unitree_pin_joint_mappings)]
+        
+        self.pin_model_wrapper.update(q_pin, v_pin)
+        
         # Compute observations
-        obs = self.obs_manager.compute_observations(state)
+        obs = self.obs_manager.compute_observations(state)        
         obs = torch.tensor(list(chain.from_iterable(obs.values())), dtype=torch.float32)      
         
         # Process observation history
@@ -66,12 +72,12 @@ class BaseRLLocomotionController(ControllerBase):
         
         # Compute joint position targets from raw actions
         joint_pos_targets = (raw_action * self.action_scale + self.default_joint_pos)[0]
-        joint_pos_targets = joint_pos_targets[self.actions_isaac_to_unitree_mapping]
-        joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
+        joint_pos_targets = joint_pos_targets[self.actions_isaac_to_unitree_mapping].detach().numpy()
+        # joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
         # Prepare motor commands with joint position control    
         for i in range(12):
             self.cmd[f'motor_{i}'] = {
-                'q': joint_pos_targets[i].detach().numpy(),
+                'q': joint_pos_targets[i],
                 'kp': self.Kp,
                 'dq': 0.0,
                 'kd': self.Kd,
@@ -105,8 +111,8 @@ class BaseRLLocomotionController(ControllerBase):
 class RLLocomotionVelocityController(BaseRLLocomotionController):
     """Velocity-conditioned (contact-implicit) RL Locomotion Controller"""
     
-    def __init__(self, configs: Dict[str, Any]):
-        super().__init__(configs)
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+        super().__init__(pin_model_wrapper, configs)
         
         
     def register_observations(self):
@@ -132,14 +138,14 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
             }
         ))
         self.obs_manager.register('last_action', ObsTerm(last_action, params={"last_action": lambda: self.last_action}))
-
+        self.obs_manager.register('feet_pos', ObsTerm(feet_pos, params={"pin_model_wrapper": self.pin_model_wrapper}, include=False))
     
         
 class RLLocomotionContactController(BaseRLLocomotionController):
     """Contact-conditioned (contact-explicit) RL Locomotion Controller"""
     
-    def __init__(self, configs: Dict[str, Any]):
-        super().__init__(configs)
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+        super().__init__(pin_model_wrapper, configs)
         
         
     def register_observations(self):

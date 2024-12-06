@@ -2,30 +2,32 @@ import threading
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
-from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 from state_manager.obs_manager import ObservationManager
 
 
 class ControllerBase(ABC):
-    def __init__(self, configs: Dict[str, Any]):
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
         self.start_time = 0.0
         self.obs_manager: Optional[ObservationManager] = None
-        
         # Build Pinocchio Model for Forward Kinematics
-        self.pin_model_wrapper = PinQuadRobotWrapper(configs['robot_config']['pinocchio_urdf'])
-        self.unitree_pin_joint_mappings = configs['robot_config']['unitree_pin_joint_mappings']
+        self.pin_model_wrapper = pin_model_wrapper
+        self.unitree_pin_joint_mappings = np.array(configs['robot_config']['unitree_pin_joint_mappings'])
         
         self.dof_pos_limit = np.array([self.pin_model_wrapper.model.lowerPositionLimit[7:][self.unitree_pin_joint_mappings], 
                                             self.pin_model_wrapper.model.upperPositionLimit[7:][self.unitree_pin_joint_mappings]]) # first 7 correspond to floating base position and quat (ignore)
         
         # DOF Pos Conservative Limits 
+        soft_limit_factor = 0.95
+        self.effort_limit = configs['robot_config']['effort_limit'] # instead get from pin, currently the values from pin don't seem right
         joint_pos_mean = (self.dof_pos_limit[0] + self.dof_pos_limit[1])/2
         joint_pos_range = self.dof_pos_limit[1] - self.dof_pos_limit[0]
-        soft_limit_factor = 0.95
         self.soft_dof_pos_limit = [joint_pos_mean - 0.5 * joint_pos_range * soft_limit_factor,
                                     joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor]
         
         self._lock = threading.Lock()
+        
+    def set_soft_dof_pos_limits(self, soft_lower_limit, soft_upper_limit):
+        self.soft_dof_pos_limit = [soft_lower_limit, soft_upper_limit]
     
     def set_obs_manager(self, obs_manager: ObservationManager):
         """
@@ -48,14 +50,14 @@ class ControllerBase(ABC):
         self.start_time = start_time
         
     
-    def _clip_effort(self, effort: torch.Tensor) -> torch.Tensor:
+    def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """
         Clip the desired torques based on the motor limits.
 
         :param effort: The desired torques to clip.
         :return : The clipped torques.
         """
-        return torch.clip(effort, min=-self.effort_limit, max=self.effort_limit)
+        return effort.clip(min=-self.effort_limit, max=self.effort_limit)
     
 
     def _clip_dof_pos(self, joint_pos_targets: np.ndarray) -> np.ndarray:
@@ -70,7 +72,7 @@ class ControllerBase(ABC):
 
     
     @abstractmethod
-    def compute_torques(self, state, desired_goal):
+    def compute_torques(self, state, desired_goal) -> Dict[str, np.ndarray]:
         """
         Compute control commands based on the current state and desired goal.
 

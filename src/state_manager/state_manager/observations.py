@@ -92,8 +92,18 @@ def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> np
     :param states: State dictionary
     :return: Velocity commands (Vx, Vy, Wz)
     """
-    print("Hi")
     return velocity_commands()
+
+def feet_pos(states: Dict[str, Any], pin_model_wrapper) -> np.ndarray:
+    """
+    The feet positions of the robot. Calculated from the pinocchio wrapper
+    
+    :param states: State dictionary
+    :return: Feet pos (4, 3)
+    """
+    feet_pos_ = pin_model_wrapper.get_foot_pos_base()
+    
+    return feet_pos_
 
 def starting_time(states: Dict[str, Any]):
     return time.time()
