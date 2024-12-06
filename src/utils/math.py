@@ -7,7 +7,14 @@ from scipy.spatial.transform import Rotation as R
 GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
 
 def quaternion_to_euler(q, order='wxyz') -> np.ndarray:
-        """Convert quaternion to Euler angles (roll, pitch, yaw)."""
+        """
+        Convert quaternion to Euler angles (roll, pitch, yaw).
+        
+        :param q: The quaternion. Shape is (4,).
+        :param order: The convention/order of the quaternion in the arguments. Defaults to 'wxyz'.
+        
+        :return : The corresponding euler angles. Shape is (3,)
+        """
         if order == 'wxyz':
             w, x, y, z = q
         else:
@@ -27,17 +34,17 @@ def quaternion_to_euler(q, order='wxyz') -> np.ndarray:
         cosy_cosp = 1 - 2 * (y * y + z * z)
         yaw = np.arctan2(siny_cosp, cosy_cosp)
         
-        return [roll, pitch, yaw]
+        return np.array([roll, pitch, yaw])
 
 def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order='wxyz') -> torch.Tensor:
-    """Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
+    """
+    Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
 
-    Args:
-        q: The quaternion in (w, x, y, z). Shape is (..., 4).
-        v: The vector in (x, y, z). Shape is (..., 3).
-
-    Returns:
-        The rotated vector in (x, y, z). Shape is (..., 3).
+    :param q: The quaternion. Shape is (..., 4).
+    :param v: The vector in (x, y, z). Shape is (..., 3).
+    :param order: The convention/order of the quaternion in the arguments. Defaults to 'wxyz'
+    
+    :return : The rotated vector in (x, y, z). Shape is (..., 3).        
     """
     if order == 'wxyz':
         q_w = q[..., 0]
@@ -57,7 +64,13 @@ def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order='wxyz') -> torch
     return a - b + c
 
 def quat_to_rotmatrix(q: np.ndarray, order='wxyz') -> np.ndarray:
-    """Convert quaternion to rotation matrix"""
+    """
+    Convert quaternion to rotation matrix.
+    :param q: The quaternion. Shape is (4,).
+    :param order: The convention/order of the quaternion in the arguments. Defaults to 'wxyz'
+    
+    :return : The corresponding rotation matrix. Shape is (3,3)
+    """
     if order == 'wxyz':
         q = q[[1, 2, 3, 0]]
     
