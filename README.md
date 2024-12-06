@@ -83,6 +83,9 @@ ros2 run plotjuggler plotjuggler
 - [x] Add mechanism for real-time state logger and plotter
 - [x] Test Velocity-conditioned policy
 
+## Known Issues
+When using torque control for low-level control, there is a delay (latency), which causes the robot to behave unexpectedly. This could be resolved by training with delayed actuation of joints. However, position control generally seems to be a more stable and recommended approach to sending low-level commands to the robot.
+
 
 ## Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
