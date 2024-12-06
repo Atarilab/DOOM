@@ -3,4 +3,4 @@
 	url = https://github.com/Atarilab/unitree_mujoco_container.git
 [submodule "src/utils/mj_pin_wrapper"]
 	path = src/utils/mj_pin_wrapper
-	url = https://github.com/Atarilab/mj_pin_wrapper.git
+	url = git@github.com:Atarilab/mj_pin_wrapper.git
