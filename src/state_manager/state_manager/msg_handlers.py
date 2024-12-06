@@ -4,10 +4,11 @@ import numpy as np
 from typing import Dict, List, Optional
 from utils.logger import logging
 from utils.math import quat_to_rotmatrix
+import pinocchio as pin
 
 from state_manager.estimators import VelocityEstimator
 
-def low_state_handler(msg: Dict[str, List], pin_model=None, logger: Optional[logging.Logger] = None):
+def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
@@ -31,15 +32,20 @@ def low_state_handler(msg: Dict[str, List], pin_model=None, logger: Optional[log
 
     # Extract IMU states
     imu_state = msg['imu_state']
-
+    
+    # # Get feet positions from Pinocchio Wrapper
+    # pin_model_wrapper.update(joint_positions[np.array(joint_mappings['unitree_pin'])], joint_velocities[np.array(joint_mappings['unitree_pin'])])
+   
     # Construct and return the parsed states dictionary
     states = {
         'joint_pos': joint_positions,
         'joint_vel': joint_velocities,
         'joint_acc': joint_accelerations,
         'joint_tau_est': joint_tau_est,
-        'foot_forces': foot_forces,
-        'foot_force_est': foot_force_est,
+        # 'foot_forces': foot_forces,
+        # 'foot_force_est': foot_force_est,
+        # 'feet_pos': dict(zip([f'{name}_foot' for name in pin_model_wrapper.foot_names], 
+        #                         pin_model_wrapper.get_foot_pos_base())),
         'base_quat': imu_state.quaternion,
         'rpy': imu_state.rpy,
         'gyroscope': imu_state.gyroscope,

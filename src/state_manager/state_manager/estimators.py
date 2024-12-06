@@ -52,11 +52,12 @@ class VelocityEstimator:
     
     def _compute_angular_velocity(self, q1, q2, dt):
         """
-        Compute angular velocity using skew-symmetric matrix method.
+        Compute angular velocity using skew-symmetric matrix method. Better than finite differencing for calculating angular velocity.
         
         :param q1: Previous quaternion
         :param q2: Current quaternion
         :param dt: Time delta
+        
         :return: Angular velocity vector
         """
         # Convert quaternions to rotation matrices
@@ -83,11 +84,13 @@ class VelocityEstimator:
     
     def finite_diff_update(self, position, quaternion, timestamp, logger=None):
         """
-        Finite differencing velocity estimation with smoothing.
+        Finite differencing method for linear velocity estimation with smoothing. Skew-symmetric method for angular
+        velocity estimation with smoothing
         
         :param position: Current 3D position [x, y, z]
         :param quaternion: Orientation quaternion [w, x, y, z]
         :param timestamp: Current timestamp
+        
         :return: Estimated [linear_velocities, angular_velocities]
         """
         with self._lock:

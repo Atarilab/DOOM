@@ -70,6 +70,7 @@ class DDSStateSubscriber(StateSubscriber):
             
             # Call handler if exists
             if self.handler_func:
+                
                 extracted_state = self.handler_func(
                     extracted_state, 
                     **self.handler_args, 
@@ -110,7 +111,7 @@ class DDSStateSubscriber(StateSubscriber):
     
 
 class ROS2StateSubscriber(StateSubscriber):
-    """ROS2-based state subscriber with optional state reordering."""
+    """ROS2-based state subscriber."""
     
     def __init__(self, 
                  topic: str, 
