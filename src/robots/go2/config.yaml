@@ -1,3 +1,6 @@
+effort_limit: 23.5
+pinocchio_urdf: "/home/atari/workspace/DOOM/src/robots/go2/go2_description/urdf/go2_description.urdf"
+
 stand_up_joint_pos:
   - 0.1
   - 0.8
@@ -26,3 +29,17 @@ stand_down_joint_pos:
   - 1.22187
   - -2.44375
 
+unitree_pin_joint_mappings: [ # [FR, FL, RR, RL] -> [FL, FR, RL, RR] or [FL, FR, RL, RR] -> [FR, FL, RR, RL]
+  3,
+  4,
+  5,
+  0,
+  1,
+  2,
+  9,
+  10,
+  11,
+  6,
+  7,
+  8,
+]

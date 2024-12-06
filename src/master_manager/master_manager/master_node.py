@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 import argparse
+import numpy as np
 from typing import Optional
 
 import rclpy
@@ -90,7 +91,8 @@ class LowLevelCmdPublisher(Node):
 
         try:
             # Retrieve states from state manager
-            combined_state = self.state_manager.get_combined_state()            
+            combined_state = self.state_manager.get_combined_state()    
+            # self.logger.debug(combined_state['feet_pos'])     
             # observations = active_obs_manager.compute_observations(combined_state)
             # if observations != {}:
             #     self.logger.debug(observations)
@@ -145,7 +147,7 @@ async def main_async(args=None):
             topic="rt/lowstate", 
             msg_type=LowState_, 
             handler_func=low_state_handler,
-            handler_args={'pin_model': "HI"},
+            # handler_args={"pin_model_wrapper": pin_model_wrapper, "joint_mappings": configs['robot_config']['joint_mappings']},
             logger=logger,
         )
 

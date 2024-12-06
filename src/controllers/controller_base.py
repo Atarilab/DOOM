@@ -1,11 +1,31 @@
+import threading
+import numpy as np
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 from state_manager.obs_manager import ObservationManager
 
+
 class ControllerBase(ABC):
-    def __init__(self):
+    def __init__(self, configs: Dict[str, Any]):
         self.start_time = 0.0
         self.obs_manager: Optional[ObservationManager] = None
+        
+        # Build Pinocchio Model for Forward Kinematics
+        self.pin_model_wrapper = PinQuadRobotWrapper(configs['robot_config']['pinocchio_urdf'])
+        self.unitree_pin_joint_mappings = configs['robot_config']['unitree_pin_joint_mappings']
+        
+        self.dof_pos_limit = np.array([self.pin_model_wrapper.model.lowerPositionLimit[7:][self.unitree_pin_joint_mappings], 
+                                            self.pin_model_wrapper.model.upperPositionLimit[7:][self.unitree_pin_joint_mappings]]) # first 7 correspond to floating base position and quat (ignore)
+        
+        # DOF Pos Conservative Limits 
+        joint_pos_mean = (self.dof_pos_limit[0] + self.dof_pos_limit[1])/2
+        joint_pos_range = self.dof_pos_limit[1] - self.dof_pos_limit[0]
+        soft_limit_factor = 0.95
+        self.soft_dof_pos_limit = [joint_pos_mean - 0.5 * joint_pos_range * soft_limit_factor,
+                                    joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor]
+        
+        self._lock = threading.Lock()
     
     def set_obs_manager(self, obs_manager: ObservationManager):
         """
@@ -18,20 +38,51 @@ class ControllerBase(ABC):
         # Optional: Register observations if the controller knows its requirements
         if hasattr(self, 'register_observations'):
             self.register_observations()
-        
+            
+            
     def set_start_time(self, start_time):
+        """
+        Set the start time of the current mode/controller
+        :param start_time: The start time.
+        """
         self.start_time = start_time
+        
+    
+    def _clip_effort(self, effort: torch.Tensor) -> torch.Tensor:
+        """
+        Clip the desired torques based on the motor limits.
+
+        :param effort: The desired torques to clip.
+        :return : The clipped torques.
+        """
+        return torch.clip(effort, min=-self.effort_limit, max=self.effort_limit)
+    
+
+    def _clip_dof_pos(self, joint_pos_targets: np.ndarray) -> np.ndarray:
+        """
+        Clip the joint position based on the soft joint limits.
+
+        :param pos_targets: The desired joint position targets to clip.
+
+        :return : The clipped torques.
+        """
+        return joint_pos_targets.clip(self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
+
     
     @abstractmethod
     def compute_torques(self, state, desired_goal):
         """
         Compute control commands based on the current state and desired goal.
 
-        Args:
-            state (dict): Current state of the robot/environment.
-            desired_goal (dict): Desired state or task goal.
-        
-        Returns:
-            dict: Control command to be sent to the robot/environment.
+        :param state (dict): Current state of the robot/environment.
+        :param desired_goal (dict): Desired state or task goal.
+        :return : Control command to be sent to the robot/environment.
+        """
+        pass
+    
+    @abstractmethod
+    def register_observations(self):
+        """
+        Register observations for each mode/controller. Maintain order to be passed directly to policy.
         """
         pass
