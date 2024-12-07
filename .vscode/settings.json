@@ -2,13 +2,36 @@
     "python.analysis.typeCheckingMode": "basic",
     "python.autoComplete.extraPaths": [
         "/opt/ros/humble/lib/python3.10/site-packages",
-        "/home/atari/workspace/DOOM/install/lib/python3.10/site-packages"
+        "/home/atari/workspace/DOOM/install/master_manager/lib/python3.10/site-packages",
+        "/home/atari/workspace/DOOM/install/state_manager/lib/python3.10/site-packages",
     ],
     "ros.distro": "humble",
+    // We use "black" as a formatter:
     "python.formatting.provider": "black",
     "editor.formatOnSave": true,
     "python.formatting.blackArgs": [
         "--line-length",
-        "88"
-    ]
+        "120"
+    ],
+    // Use flake8 for linting
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=120"
+    ],
+    "autoDocstring.guessTypes": true,
+    // files to be ignored by the linter
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/install/**": true,
+        "**/build/**": true,
+        "**/share/**": true,
+        "**/_compiler/**": true
+    },
+    // Configuration for spelling checker
+    "spellright.language": [
+        "en-US-10-1."
+    ],
 }
