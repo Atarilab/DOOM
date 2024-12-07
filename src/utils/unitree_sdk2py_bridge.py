@@ -31,6 +31,7 @@ MOTOR_SENSOR_NUM = 3
 NUM_MOTOR_IDL_GO = 20
 NUM_MOTOR_IDL_HG = 35
 
+
 class UnitreeSdk2Bridge:
 
     def __init__(self, mj_model, mj_data):
@@ -42,7 +43,9 @@ class UnitreeSdk2Bridge:
         self.have_imu = False
         self.have_frame_sensor = False
         self.dt = self.mj_model.opt.timestep
-        self.idl_type = (self.num_motor > NUM_MOTOR_IDL_GO) # 0: unitree_go, 1: unitree_hg
+        self.idl_type = (
+            self.num_motor > NUM_MOTOR_IDL_GO
+        )  # 0: unitree_go, 1: unitree_hg
 
         self.joystick = None
 
@@ -196,12 +199,12 @@ class UnitreeSdk2Bridge:
                             for key in [
                                 int(self.joystick.get_hat(0)[0] < 0),  # left
                                 int(self.joystick.get_hat(0)[1] < 0),  # down
-                                int(self.joystick.get_hat(0)[0] > 0), # right
-                                int(self.joystick.get_hat(0)[1] > 0),    # up
-                                int(self.joystick.get_button(self.button_id["Y"])),     # Y
-                                int(self.joystick.get_button(self.button_id["X"])),     # X
-                                int(self.joystick.get_button(self.button_id["B"])),     # B
-                                int(self.joystick.get_button(self.button_id["A"])),     # A
+                                int(self.joystick.get_hat(0)[0] > 0),  # right
+                                int(self.joystick.get_hat(0)[1] > 0),  # up
+                                int(self.joystick.get_button(self.button_id["Y"])),  # Y
+                                int(self.joystick.get_button(self.button_id["X"])),  # X
+                                int(self.joystick.get_button(self.button_id["B"])),  # B
+                                int(self.joystick.get_button(self.button_id["A"])),  # A
                             ]
                         ]
                     ),

@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 import torch
 
+
 class ObservationHistoryStorage:
     def __init__(
         self, num_envs: int, num_obs: int, max_length: int, device: torch.device = "cpu"
@@ -62,42 +63,46 @@ class ObservationHistoryStorage:
 
         done_indices = torch.nonzero(done == 1)
         self.buffer[done_indices] = 0.0
-        
 
-def reorder_robot_states(states: np.ndarray, 
-                          origin_order: List[str], 
-                          target_order: List[str]) -> np.ndarray:
+
+def reorder_robot_states(
+    states: np.ndarray, origin_order: List[str], target_order: List[str]
+) -> np.ndarray:
     """
     Reorder robot states based on origin and target leg orders.
-    
+
     Args:
         states (np.ndarray): Input states to be reordered
         origin_order (List[str]): Original leg order
         target_order (List[str]): Desired leg order
-    
+
     Returns:
         np.ndarray: Reordered states
     """
     # Convert input to NumPy array if it's not already
     states = np.asarray(states)
-    
+
     # Validate input lengths (4 for feet states and 12 for joint states)
     if states.size not in {4, 12}:
         raise ValueError(f"Expected 4 or 12 states, got {states.size}")
-    
+
     if len(origin_order) != 4 or len(target_order) != 4:
         raise ValueError("Both origin and target orders must be lists of 4 legs")
-    
+
     num_legs = 4
     # Determine number of entries per leg
     entries_per_leg = states.size // num_legs
-    
+
     # Create reordering indices using NumPy
-    reorder_indices = np.concatenate([
-        np.arange(origin_order.index(leg) * entries_per_leg, 
-                  origin_order.index(leg) * entries_per_leg + entries_per_leg)
-        for leg in target_order
-    ])
-    
+    reorder_indices = np.concatenate(
+        [
+            np.arange(
+                origin_order.index(leg) * entries_per_leg,
+                origin_order.index(leg) * entries_per_leg + entries_per_leg,
+            )
+            for leg in target_order
+        ]
+    )
+
     # Reorder states using advanced NumPy indexing
     return states[reorder_indices]

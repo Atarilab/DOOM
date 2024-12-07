@@ -6,4 +6,7 @@
 """
 
 from . import msg
-__all__ = ["msg", ]
+
+__all__ = [
+    "msg",
+]

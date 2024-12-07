@@ -6,14 +6,12 @@ from vicon_receiver.msg import Position
 # Script for testing the Vicon Subscriber ROS Node. In reality, this is not used..
 #####################################################################################
 
+
 class ViconSubscriber(Node):
     def __init__(self):
-        super().__init__('vicon_debug_subscriber')
+        super().__init__("vicon_debug_subscriber")
         self.subscription = self.create_subscription(
-            Position,
-            '/vicon/Go2/Go2',
-            self.listener_callback,
-            10
+            Position, "/vicon/Go2/Go2", self.listener_callback, 10
         )
         print("Subscriber initialized!")
 
@@ -27,10 +25,11 @@ class ViconSubscriber(Node):
         except Exception as e:
             print(f"Error accessing fields: {e}")
 
+
 def main(args=None):
     rclpy.init(args=args)
     vicon_subscriber = ViconSubscriber()
-    
+
     try:
         print("Spinning...")
         rclpy.spin(vicon_subscriber)
@@ -40,5 +39,6 @@ def main(args=None):
         vicon_subscriber.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

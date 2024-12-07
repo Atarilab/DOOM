@@ -11,7 +11,7 @@ import unitree_legged_const as go2
 
 
 def LowStateHandler(msg: LowState_):
-    
+
     # print front right hip motor states
     print("FR_0 motor state: ", msg.motor_state[go2.LegID["FR_0"]].q)
     # print("IMU state: ", msg.imu_state)

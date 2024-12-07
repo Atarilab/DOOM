@@ -2,6 +2,7 @@
 import unittest
 from robot_interfaces.sim_robot_interface import SimRobotInterface
 
+
 class TestSimRobotInterface(unittest.TestCase):
     def setUp(self):
         self.sim_interface = SimRobotInterface("path/to/mujoco/model.xml")

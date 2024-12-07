@@ -5,11 +5,12 @@ from typing import Dict, Any, Optional
 
 from state_manager.obs_manager import ObservationManager
 
+
 class ControllerBase(ABC):
     """
-    Abstract base class for robot controllers, providing a standardized interface 
+    Abstract base class for robot controllers, providing a standardized interface
     and common utilities for robot control implementations.
-    
+
     Manages joint limits, observation tracking, and provides core control infrastructure.
     """
 
@@ -37,30 +38,34 @@ class ControllerBase(ABC):
 
         :param configs: Configuration dictionary
         """
-        # Extract joint mappings 
+        # Extract joint mappings
         self.unitree_pin_joint_mappings = np.array(
-            configs['robot_config']['unitree_pin_joint_mappings']
+            configs["robot_config"]["unitree_pin_joint_mappings"]
         )
-        
+
         # Position limits (excluding first 7 DOFs for floating base)
         base_offset = 7
-        lower_limits = self.pin_model_wrapper.model.lowerPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
-        upper_limits = self.pin_model_wrapper.model.upperPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
-        
+        lower_limits = self.pin_model_wrapper.model.lowerPositionLimit[base_offset:][
+            self.unitree_pin_joint_mappings
+        ]
+        upper_limits = self.pin_model_wrapper.model.upperPositionLimit[base_offset:][
+            self.unitree_pin_joint_mappings
+        ]
+
         # Conservative limit settings
         soft_limit_factor = 0.95
         self.dof_pos_limit = np.array([lower_limits, upper_limits])
-        
+
         # Effort limits
-        self.effort_limit = configs['robot_config']['effort_limit']
+        self.effort_limit = configs["robot_config"]["effort_limit"]
 
         # Soft joint position limits
         joint_pos_mean = (lower_limits + upper_limits) / 2
         joint_pos_range = upper_limits - lower_limits
-        
+
         self.soft_dof_pos_limit = [
             joint_pos_mean - 0.5 * joint_pos_range * soft_limit_factor,
-            joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor
+            joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor,
         ]
 
     def set_obs_manager(self, obs_manager: ObservationManager):
@@ -70,9 +75,9 @@ class ControllerBase(ABC):
         :param obs_manager: Observation manager instance
         """
         self.obs_manager = obs_manager
-        
+
         # Automatically register observations if method exists
-        if hasattr(self, 'register_observations'):
+        if hasattr(self, "register_observations"):
             self.register_observations()
 
     def set_start_time(self, start_time: float):
@@ -87,11 +92,11 @@ class ControllerBase(ABC):
         """
         Sets the latest state received from the subscribers. This is done such that the mode-specific
         observations can be computed in real-time.
-        
+
         :param state: The states directly subscribed from available topics.
         """
         self.latest_state = state
-            
+
     def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """
         Enforce motor torque limits.
@@ -109,13 +114,13 @@ class ControllerBase(ABC):
         :return: Positions constrained within soft limits
         """
         return np.clip(
-            joint_pos_targets, 
-            self.soft_dof_pos_limit[0], 
-            self.soft_dof_pos_limit[1]
+            joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1]
         )
 
     @abstractmethod
-    def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    def compute_torques(
+        self, state: Dict[str, Any], desired_goal: Dict[str, Any]
+    ) -> Dict[str, np.ndarray]:
         """
         Compute control torques based on current state and desired goal.
 

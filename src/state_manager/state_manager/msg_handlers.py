@@ -8,6 +8,7 @@ import pinocchio as pin
 
 from state_manager.estimators import VelocityEstimator
 
+
 def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
@@ -20,36 +21,38 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         Dict: Low level states directly from the robot
     """
     # Extract motor states directly without reordering
-    motor_states = msg['motor_state'][:12] # 12 joint for the legs, the remaining 8 are unactuated
+    motor_states = msg["motor_state"][
+        :12
+    ]  # 12 joint for the legs, the remaining 8 are unactuated
     joint_positions = np.array([motor.q for motor in motor_states])
     joint_velocities = np.array([motor.dq for motor in motor_states])
     joint_accelerations = np.array([motor.ddq for motor in motor_states])
     joint_tau_est = np.array([motor.tau_est for motor in motor_states])
 
     # Extract foot forces directly without reordering
-    foot_forces = msg['foot_force']
-    foot_force_est = msg['foot_force_est']
+    foot_forces = msg["foot_force"]
+    foot_force_est = msg["foot_force_est"]
 
     # Extract IMU states
-    imu_state = msg['imu_state']
-    
+    imu_state = msg["imu_state"]
+
     # # Get feet positions from Pinocchio Wrapper
     # pin_model_wrapper.update(joint_positions[np.array(joint_mappings['unitree_pin'])], joint_velocities[np.array(joint_mappings['unitree_pin'])])
-   
+
     # Construct and return the parsed states dictionary
     states = {
-        'joint_pos': joint_positions,
-        'joint_vel': joint_velocities,
-        'joint_acc': joint_accelerations,
-        'joint_tau_est': joint_tau_est,
+        "joint_pos": joint_positions,
+        "joint_vel": joint_velocities,
+        "joint_acc": joint_accelerations,
+        "joint_tau_est": joint_tau_est,
         # 'foot_forces': foot_forces,
         # 'foot_force_est': foot_force_est,
-        # 'feet_pos': dict(zip([f'{name}_foot' for name in pin_model_wrapper.foot_names], 
+        # 'feet_pos': dict(zip([f'{name}_foot' for name in pin_model_wrapper.foot_names],
         #                         pin_model_wrapper.get_foot_pos_base())),
-        'base_quat': imu_state.quaternion,
-        'rpy': imu_state.rpy,
-        'gyroscope': imu_state.gyroscope,
-        'accelerometer': imu_state.accelerometer
+        "base_quat": imu_state.quaternion,
+        "rpy": imu_state.rpy,
+        "gyroscope": imu_state.gyroscope,
+        "accelerometer": imu_state.accelerometer,
     }
 
     return states
@@ -68,52 +71,59 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     """
     # Offsets for position of the robot base from the vicon frame
     x_offset = 0.0
-    y_offset = 62.5 
-    z_offset = -75.0  
+    y_offset = 62.5
+    z_offset = -75.0
 
     # Singleton pattern for velocity estimator
-    if not hasattr(vicon_handler, 'velocity_estimator'):
-        vicon_handler.velocity_estimator = VelocityEstimator(method='finite_diff', alpha=0.2)
+    if not hasattr(vicon_handler, "velocity_estimator"):
+        vicon_handler.velocity_estimator = VelocityEstimator(
+            method="finite_diff", alpha=0.2
+        )
 
     # Base Position (in m)
-    base_pos = np.array([
-        (msg['x_trans'] + x_offset)*0.001,
-        (msg['y_trans'] + y_offset)*0.001, 
-        (msg['z_trans'] + z_offset)*0.001
-    ])
+    base_pos = np.array(
+        [
+            (msg["x_trans"] + x_offset) * 0.001,
+            (msg["y_trans"] + y_offset) * 0.001,
+            (msg["z_trans"] + z_offset) * 0.001,
+        ]
+    )
 
     # Base quaternion (w, x, y, z)
-    base_quat = np.array([
-        msg['w'],
-        msg['x_rot'],
-        msg['y_rot'],
-        msg['z_rot'],
-    ])
+    base_quat = np.array(
+        [
+            msg["w"],
+            msg["x_rot"],
+            msg["y_rot"],
+            msg["z_rot"],
+        ]
+    )
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
     lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(
         base_pos, base_quat, current_timestamp, logger
     )
-    
+
     # Convert quaternion to a rotation matrix
-    rotation_matrix = quat_to_rotmatrix(base_quat, order='wxyz')
+    rotation_matrix = quat_to_rotmatrix(base_quat, order="wxyz")
     # Transform linear velocity to base frame
-    lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w) 
+    lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w)
 
     states = {
-        'base_pos_w': base_pos,
+        "base_pos_w": base_pos,
         # 'base_quat': base_quat,
-        'lin_vel_w': lin_vel_w.tolist(),  # Linear velocities in world frame
-        'lin_vel_b': lin_vel_b,
+        "lin_vel_w": lin_vel_w.tolist(),  # Linear velocities in world frame
+        "lin_vel_b": lin_vel_b,
         # 'ang_vel_w': angular_velocities.tolist(),  # Angular velocities in world frame
     }
-    
-    
+
     return states
 
 
-def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def sport_mode_state_handler(
+    msg: Dict[str, List], logger: Optional[logging.Logger] = None
+):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:
@@ -124,16 +134,16 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
         Dict: High level states directly from the robot
     """
     # Singleton pattern for velocity estimator
-    if not hasattr(sport_mode_state_handler, 'velocity_estimator'):
-        sport_mode_state_handler.velocity_estimator = VelocityEstimator(method='finite_diff')
-        
-    base_pos_w = (msg['position'])    
-    
+    if not hasattr(sport_mode_state_handler, "velocity_estimator"):
+        sport_mode_state_handler.velocity_estimator = VelocityEstimator(
+            method="finite_diff"
+        )
+
+    base_pos_w = msg["position"]
+
     states = {
-        'base_pos_w': base_pos_w,
-        'lin_vel_b': msg['velocity'], 
+        "base_pos_w": base_pos_w,
+        "lin_vel_b": msg["velocity"],
     }
-    
+
     return states
-    
-    

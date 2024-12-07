@@ -1,4 +1,3 @@
-
 TASK_CONFIG = {
     "rl-velocity-sim-go2": {
         "controller": "controllers/config/rl_velocity_cfg.yaml",

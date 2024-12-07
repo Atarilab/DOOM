@@ -33,5 +33,3 @@ class Position(idl.IdlStruct, typename="vicon_receiver.msg.Position"):
     subject_name: str
     frame_number: types.int32
     translation_type: str
-
-

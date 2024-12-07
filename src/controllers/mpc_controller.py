@@ -1,6 +1,7 @@
 import numpy as np
 from controllers.controller_base import ControllerBase
 
+
 class ModelPredictiveController(ControllerBase):
     def __init__(self, model, horizon, cost_function):
         """

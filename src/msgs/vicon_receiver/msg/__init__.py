@@ -6,4 +6,7 @@
 """
 
 from ._ViconReceiver import Position
-__all__ = ["Position", ]
+
+__all__ = [
+    "Position",
+]

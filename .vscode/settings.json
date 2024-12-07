@@ -4,5 +4,11 @@
         "/opt/ros/humble/lib/python3.10/site-packages",
         "/home/atari/workspace/DOOM/install/lib/python3.10/site-packages"
     ],
-    "ros.distro": "humble"
+    "ros.distro": "humble",
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "88"
+    ]
 }
