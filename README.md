@@ -75,17 +75,17 @@ ros2 run plotjuggler plotjuggler
 
 ## TODO
 - [ ] Implement a real-time High-Level Contact Planner 
-- [ ] Integrate Pinocchio for additional states such as feet positions
 - [ ] Add support for AlienGo
-- [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Implement joystick control for velocity commands
+- [ ] Implement interface to change commands from UI
+- [x] Implement safety mechanisms (soft dof pos limits, dof torque limits)
+- [x] Integrate Pinocchio for additional states such as feet positions
 - [x] Get vicon frame from Vicon SDK and transform to robot base
-- [x] Add mechanism for real-time state logger and plotter
+- [x] Add mechanism for real-time state logger and plotter (debug logger in console and file, plotjuggler for ros topics)
 - [x] Test Velocity-conditioned policy
 
 ## Known Issues
 - When using torque control for low-level control, there is a delay (latency), which causes the robot to behave unexpectedly. This could be resolved by training with delayed actuation of joints. However, position control generally seems to be a more stable and recommended approach to sending low-level commands to the robot.
-- Because of the Python GIL, we are runnning into performance issues at the moment. An example of this is the pinocchio update in RL controller which works better without it.
 
 ## Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
