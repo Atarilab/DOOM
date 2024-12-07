@@ -96,7 +96,7 @@ class BaseRLLocomotionController(ControllerBase):
         # Initial state and commands
         self.latest_state = None
         self.cmd = {}
-        self.velocity_commands = np.array([0.5, 0.0, 0.0])
+        self.velocity_commands = np.array([0.35, 0.0, 0.0])
 
     def _configure_processing_infrastructure(self, configs: Dict[str, Any]):
         """

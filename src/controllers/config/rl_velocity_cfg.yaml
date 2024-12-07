@@ -1,5 +1,5 @@
 policy_path: "policies/policy.pt"
-control_dt: 0.02
+control_dt: 0.001
 action_dim: 12
 action_scale: 0.25
 stiffness: 25.0
