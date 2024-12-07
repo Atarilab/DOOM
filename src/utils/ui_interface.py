@@ -62,6 +62,7 @@ class ModeManager:
         self._current_mode = mode_name
         self._current_submode = submode
         
+        
         if submode is not None:
             self.logger.debug(f"Mode set to: {self._current_mode} - {self._current_submode}")
         else:

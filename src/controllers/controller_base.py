@@ -2,89 +2,133 @@ import threading
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+
 from state_manager.obs_manager import ObservationManager
 
-
 class ControllerBase(ABC):
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
-        self.start_time = 0.0
-        self.obs_manager: Optional[ObservationManager] = None
-        # Build Pinocchio Model for Forward Kinematics
-        self.pin_model_wrapper = pin_model_wrapper
-        self.unitree_pin_joint_mappings = np.array(configs['robot_config']['unitree_pin_joint_mappings'])
-        
-        self.dof_pos_limit = np.array([self.pin_model_wrapper.model.lowerPositionLimit[7:][self.unitree_pin_joint_mappings], 
-                                            self.pin_model_wrapper.model.upperPositionLimit[7:][self.unitree_pin_joint_mappings]]) # first 7 correspond to floating base position and quat (ignore)
-        
-        # DOF Pos Conservative Limits 
-        soft_limit_factor = 0.95
-        self.effort_limit = configs['robot_config']['effort_limit'] # instead get from pin, currently the values from pin don't seem right
-        joint_pos_mean = (self.dof_pos_limit[0] + self.dof_pos_limit[1])/2
-        joint_pos_range = self.dof_pos_limit[1] - self.dof_pos_limit[0]
-        self.soft_dof_pos_limit = [joint_pos_mean - 0.5 * joint_pos_range * soft_limit_factor,
-                                    joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor]
-        
-        self._lock = threading.Lock()
-        
-    def set_soft_dof_pos_limits(self, soft_lower_limit, soft_upper_limit):
-        self.soft_dof_pos_limit = [soft_lower_limit, soft_upper_limit]
+    """
+    Abstract base class for robot controllers, providing a standardized interface 
+    and common utilities for robot control implementations.
     
+    Manages joint limits, observation tracking, and provides core control infrastructure.
+    """
+
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+        """
+        Initialize the base controller with model wrapper and configuration.
+
+        :param pin_model_wrapper: Pinocchio model wrapper for kinematics
+        :param configs: Configuration dictionary containing robot-specific parameters
+        """
+        # Timing and synchronization
+        self.start_time = 0.0
+        self._lock = threading.Lock()
+
+        # Model and configuration
+        self.pin_model_wrapper = pin_model_wrapper
+        self.obs_manager: Optional[ObservationManager] = None
+
+        # Joint mapping and limits
+        self._setup_joint_limits(configs)
+
+    def _setup_joint_limits(self, configs: Dict[str, Any]):
+        """
+        Set up joint position and effort limits with conservative safety margins.
+
+        :param configs: Configuration dictionary
+        """
+        # Extract joint mappings 
+        self.unitree_pin_joint_mappings = np.array(
+            configs['robot_config']['unitree_pin_joint_mappings']
+        )
+        
+        # Position limits (excluding first 7 DOFs for floating base)
+        base_offset = 7
+        lower_limits = self.pin_model_wrapper.model.lowerPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
+        upper_limits = self.pin_model_wrapper.model.upperPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
+        
+        # Conservative limit settings
+        soft_limit_factor = 0.95
+        self.dof_pos_limit = np.array([lower_limits, upper_limits])
+        
+        # Effort limits
+        self.effort_limit = configs['robot_config']['effort_limit']
+
+        # Soft joint position limits
+        joint_pos_mean = (lower_limits + upper_limits) / 2
+        joint_pos_range = upper_limits - lower_limits
+        
+        self.soft_dof_pos_limit = [
+            joint_pos_mean - 0.5 * joint_pos_range * soft_limit_factor,
+            joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor
+        ]
+
     def set_obs_manager(self, obs_manager: ObservationManager):
         """
-        Set the observation manager for this controller.
-        
-        :param obs_manager: Observation manager to use
+        Configure observation manager for the controller.
+
+        :param obs_manager: Observation manager instance
         """
         self.obs_manager = obs_manager
-
-        # Optional: Register observations if the controller knows its requirements
+        
+        # Automatically register observations if method exists
         if hasattr(self, 'register_observations'):
             self.register_observations()
-            
-            
-    def set_start_time(self, start_time):
+
+    def set_start_time(self, start_time: float):
         """
-        Set the start time of the current mode/controller
-        :param start_time: The start time.
+        Record the start time for the current controller mode.
+
+        :param start_time: Controller start timestamp
         """
         self.start_time = start_time
+
+    def update_state(self, state):
+        """
+        Sets the latest state received from the subscribers. This is done such that the mode-specific
+        observations can be computed in real-time.
         
-    
+        :param state: The states directly subscribed from available topics.
+        """
+        self.latest_state = state
+            
     def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """
-        Clip the desired torques based on the motor limits.
+        Enforce motor torque limits.
 
-        :param effort: The desired torques to clip.
-        :return : The clipped torques.
+        :param effort: Desired motor torques
+        :return: Torques constrained within motor limits
         """
-        return effort.clip(min=-self.effort_limit, max=self.effort_limit)
-    
+        return np.clip(effort, -self.effort_limit, self.effort_limit)
 
     def _clip_dof_pos(self, joint_pos_targets: np.ndarray) -> np.ndarray:
         """
-        Clip the joint position based on the soft joint limits.
+        Enforce soft joint position limits.
 
-        :param pos_targets: The desired joint position targets to clip.
-
-        :return : The clipped torques.
+        :param joint_pos_targets: Desired joint positions
+        :return: Positions constrained within soft limits
         """
-        return joint_pos_targets.clip(self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
+        return np.clip(
+            joint_pos_targets, 
+            self.soft_dof_pos_limit[0], 
+            self.soft_dof_pos_limit[1]
+        )
 
-    
     @abstractmethod
-    def compute_torques(self, state, desired_goal) -> Dict[str, np.ndarray]:
+    def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, np.ndarray]:
         """
-        Compute control commands based on the current state and desired goal.
+        Compute control torques based on current state and desired goal.
 
-        :param state (dict): Current state of the robot/environment.
-        :param desired_goal (dict): Desired state or task goal.
-        :return : Control command to be sent to the robot/environment.
+        :param state: Current robot/environment state
+        :param desired_goal: Target state or task objective
+        :return: Control torques for robot actuation
         """
         pass
-    
+
     @abstractmethod
     def register_observations(self):
         """
-        Register observations for each mode/controller. Maintain order to be passed directly to policy.
+        Register required observations for the specific controller mode.
+        Implementations should maintain a consistent observation order.
         """
         pass

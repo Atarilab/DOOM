@@ -1,8 +1,8 @@
 import os
+import time
 import asyncio
 import logging
 import argparse
-import numpy as np
 from typing import Optional
 
 
@@ -83,22 +83,24 @@ class LowLevelCmdPublisher(Node):
             motor_cmd = self.dds_cmd.motor_cmd[i]
             motor_cmd.mode = 0x01  # PMSM mode
             motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
+            
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
         self.running_time += self.dt
-
         # Get active controller and compute torques
         active_controller = self.mode_manager.get_active_controller()
         active_obs_manager = self.mode_manager.get_active_obs_manager()
-
+        
         try:
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()    
+            active_controller.update_state(combined_state)
+            
             # self.logger.debug(combined_state['feet_pos'])     
             # observations = active_obs_manager.compute_observations(combined_state)
             # if observations != {}:
-            #     self.logger.debug(observations)
+            #     self.logger.debug(active_obs_manager.get_observation('feet_pos'))
             
             # Compute motor commands
             motor_commands = active_controller.compute_torques(combined_state, {})

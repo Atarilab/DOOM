@@ -52,7 +52,6 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         'accelerometer': imu_state.accelerometer
     }
 
-    # logger.debug(f"Received low state at {time.time()}")
     return states
 
 
@@ -134,8 +133,6 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
         'base_pos_w': base_pos_w,
         'lin_vel_b': msg['velocity'], 
     }
-    
-    # logger.debug(states)
     
     return states
     

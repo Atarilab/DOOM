@@ -143,7 +143,6 @@ class VelocityEstimator:
         :param timestamp: Current timestamp
         :return: Estimated [linear_velocities, angular_velocities]
         """
-        logger.debug("EKF UPDATE")
         with self._lock:
             # Calculate time delta
             if self.last_timestamp is None:
@@ -171,7 +170,6 @@ class VelocityEstimator:
             H = np.zeros((6, 12))
             H[:3, :3] = np.eye(3)  # Position
             H[3:6, 6:9] = np.eye(3)  # Orientation
-            logger.debug(quaternion)
             # Compute Euler angles from current quaternion
             current_euler = quaternion_to_euler(quaternion, order='wxyz')
             
