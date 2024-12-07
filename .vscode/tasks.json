@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build ROS2 Workspace",
+            "type": "shell",
+            "command": "colcon build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Source ROS2 Workspace",
+            "type": "shell",
+            "command": "source install/setup.bash",
+            "problemMatcher": []
+        }
+    ]
+}

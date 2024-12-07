@@ -1,3 +1,8 @@
 {
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "basic",
+    "python.autoComplete.extraPaths": [
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/home/atari/workspace/DOOM/install/lib/python3.10/site-packages"
+    ],
+    "ros.distro": "humble"
 }
