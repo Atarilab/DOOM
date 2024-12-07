@@ -75,12 +75,13 @@ ros2 run plotjuggler plotjuggler
 
 ## TODO
 - [ ] Implement a real-time High-Level Contact Planner 
-- [ ] Integrate Pinocchio for additional states such as feet positions
 - [ ] Add support for AlienGo
-- [ ] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [ ] Implement joystick control for velocity commands
+- [ ] Implement interface to change commands from UI
+- [x] Implement safety mechanisms (soft dof pos limits, dof torque limits)
+- [x] Integrate Pinocchio for additional states such as feet positions
 - [x] Get vicon frame from Vicon SDK and transform to robot base
-- [x] Add mechanism for real-time state logger and plotter
+- [x] Add mechanism for real-time state logger and plotter (debug logger in console and file, plotjuggler for ros topics)
 - [x] Test Velocity-conditioned policy
 
 ## Known Issues
