@@ -85,7 +85,6 @@ ros2 run plotjuggler plotjuggler
 
 ## Known Issues
 - When using torque control for low-level control, there is a delay (latency), which causes the robot to behave unexpectedly. This could be resolved by training with delayed actuation of joints. However, position control generally seems to be a more stable and recommended approach to sending low-level commands to the robot.
-- Because of the Python GIL, we are runnning into performance issues at the moment. An example of this is the pinocchio update in RL controller which works better without it.
 
 ## Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
