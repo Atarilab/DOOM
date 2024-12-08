@@ -1,13 +1,19 @@
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List, Tuple
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical
-from textual.widgets import Header, Button, Static
+from textual.containers import Container, Vertical, Horizontal
+from textual.widgets import Header, Button, Static, Input, Label
 from textual.reactive import reactive
+from textual.validation import Number
+
 
 from controllers.stand_controller import ControllerBase
+from commands.command_manager import CommandManager
 from utils.logger import logging
+
+from textual.widget import Widget
+
 
 from state_manager.obs_manager import ObservationManager
 
@@ -108,26 +114,111 @@ class ModeManager:
         """
         return {"mode": self._current_mode, "submode": self._current_submode}
 
+class CommandWidget(Vertical):
+    """
+    A widget for configuring robot controller commands with dynamic input fields.
+    
+    Args:
+        controller: The active robot controller
+        command_specs: List of command specifications 
+            Each spec is a tuple of (command_name, label, min_value, max_value)
+        command_config_manager: Optional manager for handling command configurations
+    """
+    
+    def __init__(
+        self, 
+        controller: Any, 
+        command_specs: List[Tuple[str, str, float, float]], 
+        command_config_manager=None,
+        *args, 
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.controller = controller
+        self.command_specs = command_specs
+        self.command_config_manager = command_config_manager
+        self.logger = logging.getLogger(__name__)
 
+    def compose(self):
+        """Dynamically create input fields based on command specifications."""
+        # Title for command configuration
+        yield Label("Configure Robot Commands", classes="section-header")
+
+        # Create a container for input fields to group them
+        with Vertical(classes="command-inputs-container"):
+            
+            yield Button(
+                "Update Commands", 
+                variant="success",
+                classes="update-button", 
+                id="update-commands-btn"
+            )
+            # Create input fields for each command specification
+            for command_name, label, min_val, max_val in self.command_specs:
+                with Horizontal(classes="command-input-row"):
+                    # Label for the input
+                    yield Label(label, classes="command-label")
+                    
+                    # Numeric input with validation
+                    input_field = Input(
+                        placeholder=f"Enter {label}",
+                        validators=[
+                            Number(minimum=min_val, maximum=max_val)
+                        ],
+                        classes="command-input",
+                        id=f"input-{command_name}"
+                    )
+                    yield input_field
+
+            
+            
 class RobotControlUI(App):
     """
     A Generic Textual UI to control robots.
     """
 
     CSS = """
+    
         Screen {
-            background: rgb(0, 0, 0);  /* Deep dark background */
-            color: rgb(220, 220, 240);    /* Soft light text */
+            background: rgb(0, 0, 0);
+            color: rgb(220, 220, 240);
             align: center middle;
         }
 
+        #main-container {
+            width: 100%;
+            height: 100%;
+            layout: horizontal;
+            padding: 1;
+        }
+
+        #menu-container {
+            width: 2fr;
+            height: 100%;
+            margin-right: 1;
+        }
+
+        #command-container {
+            width: 1fr;
+            height: 100%;
+            background: rgb(40, 40, 60);
+            border: round $background;
+            padding: 1;
+            display: none;  /* Hidden by default */
+        }
+
+        #command-container.visible {
+            display: block;
+        }
+
         #control-container {
-            width: 90%;
+            width: 100%;
             height: 80%;
             border: round $primary;
-            background: rgb(30, 30, 45);    /* Slightly lighter than screen background */
+            background: rgb(30, 30, 45);
             padding: 2;
         }
+        
 
         #title {
             text-align: center;
@@ -198,16 +289,63 @@ class RobotControlUI(App):
             background: rgb(100, 50, 50);
             color: rgb(255, 180, 180);
         }
+
+        .section-header {
+            text-align: center;
+            text-style: bold;
+            color: rgb(150, 180, 255);
+            margin-bottom: 1;
+            padding: 1;
+            border-bottom: tall $background;
+        }
+
+        .command-input-row {
+            margin: 1;  /* Reduced margin */
+            layout: horizontal;
+            align: left middle;
+            height: 3;  /* Consistent height */
+        }
+
+        .command-label {
+            width: 40%;
+            text-align: right;
+            padding-right: 1;
+            margin-right: 1;
+        }
+
+       .command-input {
+            width: 40%;
+            margin-right: 1;
+        }
+
+        .update-button {
+            width: 50%;
+            margin: 1;  /* Reduced margin */
+            align: center middle;
+            background: rgb(50, 100, 50);  /* Green background */
+            color: white;
+        }
+
+        .update-button:hover {
+            background: rgb(60, 120, 60);  /* Lighter green on hover */
+        }
+
+        #command-placeholder {
+            width: 100%;
+            display: block;
+            align: center middle;
+    }
     """
 
     current_mode = reactive(None)
     current_submode = reactive(None)
 
     def __init__(
-        self, mode_manager: ModeManager, logger: Optional[logging.Logger] = None
+        self, mode_manager: ModeManager, command_manager: Optional[CommandManager] = None, logger: Optional[logging.Logger] = None
     ):
         super().__init__()
         self.mode_manager = mode_manager
+        self.command_manager = command_manager
         self.logger = logger or logging.getLogger(__name__)
         self.mode_structure = self._build_mode_structure()
 
@@ -224,49 +362,59 @@ class RobotControlUI(App):
 
     def compose(self) -> ComposeResult:
         """Create dynamic UI based on mode structure."""
+
         yield Header(show_clock=True)
 
-        with Container(id="control-container"):
-            yield Static("ATARI DOOM Robot Control Interface", id="title")
-            yield Static("Current Status: IDLE", id="status")
+        with Container(id="main-container"):
+            # Left side: Menu and Controls
+            with Container(id="menu-container"):
+                with Container(id="control-container"):
+                    yield Static("ATARI DOOM Robot Control Interface", id="title")
+                    yield Static("Current Status: IDLE", id="status")
 
-            # Main menu with mode buttons
-            with Vertical(id="main-menu", classes="menu"):
-                yield Static("Robot Modes", classes="section-header")
+                    # Main menu with mode buttons
+                    with Vertical(id="main-menu", classes="menu"):
+                        yield Static("Robot Modes", classes="section-header")
 
-                # Always include IDLE button in main menu
-                yield Button("IDLE", classes="mode-button", id="mode-idle")
+                        # Always include IDLE button in main menu
+                        yield Button("IDLE", classes="mode-button", id="mode-idle")
 
-                # Generate other mode-level buttons dynamically
-                for mode in self.mode_structure.keys():
-                    if mode.upper() != "IDLE":
-                        yield Button(
-                            mode, classes="mode-button", id=f"mode-{mode.lower()}"
-                        )
+                        # Generate other mode-level buttons dynamically
+                        for mode in self.mode_structure.keys():
+                            if mode.upper() != "IDLE":
+                                yield Button(
+                                    mode, classes="mode-button", id=f"mode-{mode.lower()}"
+                                )
 
-            # Dynamically generate submode menus
-            for mode, submodes in self.mode_structure.items():
-                with Vertical(id=f"{mode.lower()}-menu", classes="menu"):
-                    yield Static(f"{mode} Submodes", classes="section-header")
+                    # Dynamically generate submode menus
+                    for mode, submodes in self.mode_structure.items():
+                        with Vertical(id=f"{mode.lower()}-menu", classes="menu"):
+                            yield Static(f"{mode} Submodes", classes="section-header")
 
-                    # Always add IDLE button to each submode menu
-                    yield Button("IDLE", classes="mode-button", id="mode-idle")
+                            # Always add IDLE button to each submode menu
+                            yield Button("IDLE", classes="mode-button", id="mode-idle")
 
-                    # Add submodes if applicable
-                    if submodes:
-                        for submode in submodes:
+                            # Add submodes if applicable
+                            if submodes:
+                                for submode in submodes:
+                                    yield Button(
+                                        submode,
+                                        classes="mode-button",
+                                        id=f"{mode.lower()}-{submode.lower()}",
+                                    )
+
+                            # Add a back button to return to main menu
                             yield Button(
-                                submode,
-                                classes="mode-button",
-                                id=f"{mode.lower()}-{submode.lower()}",
+                                "← Back to Main Menu",
+                                classes="back-button",
+                                id=f"back-{mode.lower()}",
                             )
 
-                    # Add a back button to return to main menu
-                    yield Button(
-                        "← Back to Main Menu",
-                        classes="back-button",
-                        id=f"back-{mode.lower()}",
-                    )
+            # Right side: Command Configuration Container
+            with Container(id="command-container"):
+                yield Static("Command Configuration", classes="section-header")
+                yield Static(id="command-placeholder")
+                    
 
     def on_mount(self):
         """
@@ -275,6 +423,9 @@ class RobotControlUI(App):
         # Set initial mode if not already set
         if not self.mode_manager.get_current_mode_info()["mode"]:
             self.mode_manager.set_mode("IDLE")
+            
+        # self.extend_ui_with_command()
+        self.update_command_widget()
 
     def on_button_pressed(self, event: Button.Pressed):
         """
@@ -328,6 +479,8 @@ class RobotControlUI(App):
                     active_controller.set_start_time(time.time())
 
                 break
+            
+        self.update_command_widget()
 
         # Signal the robot controller about mode change
         if hasattr(self.app, "robot_controller"):
@@ -338,6 +491,128 @@ class RobotControlUI(App):
 
         current_mode_info = self.mode_manager.get_current_mode_info()
         self.logger.info(f"Mode changed via UI: {current_mode_info}")
+        
+        # self.extend_ui_with_command()
+        self.logger.info(f"Button Pressed: {event.button.id}")
+        if event.button.id == "update-commands-btn":
+            self.logger.info("Update Commands button pressed")
+            active_controller = self.mode_manager.get_active_controller()
+            self.update_commands(active_controller)
+        
+        
+        
+    def update_commands(self, active_controller: ControllerBase):
+        """
+        Validate and apply command configurations to the controller.
+        """
+        print("Updating commands...")
+        updates = {}
+        is_valid = True
+
+        # Validate and collect input values
+        command_specs = active_controller.command_manager.get_controller_command_specs(type(active_controller).__name__)
+        for command_name, label, min_val, max_val in command_specs:
+            input_field = self.query_one(f"#input-{command_name}")
+            
+            # Skip empty inputs
+            if not input_field.value:
+                continue
+
+            try:
+                # Convert and validate input
+                value = float(input_field.value)
+                
+                # Validate against min and max
+                if min_val <= value <= max_val:
+                    updates[command_name] = value
+                else:
+                    input_field.styles.background = "red"
+                    is_valid = False
+            except ValueError:
+                input_field.styles.background = "red"
+                is_valid = False
+
+        # Apply updates if all inputs are valid
+        if is_valid:
+            try:
+
+                if hasattr(active_controller, "update_commands"):
+                    active_controller.update_commands(updates)
+
+                # Provide visual feedback
+                update_button = self.query_one("#update-commands-btn")
+                update_button.styles.background = "green"
+                self.logger.info("Commands updated successfully!")  # Debug print
+            
+            except Exception as e:
+                # Log and handle any update errors
+                self.logger.info(f"Error updating commands: {e}")  # Debug print
+                update_button = self.query_one("#update-commands-btn")
+                update_button.styles.background = "red"
+        else:
+            # Indicate validation failure
+            update_button = self.query_one("#update-commands-btn")
+            update_button.styles.background = "red"
+        
+    def update_command_widget(self):
+        """
+        Update the visibility and content of command configuration based on current mode.
+        """
+        # Get current mode information
+        current_mode_info = self.mode_manager.get_current_mode_info()
+        mode = current_mode_info.get('mode', 'IDLE')
+        submode = current_mode_info.get('submode')
+
+        # Get the command configuration container
+        command_config_container = self.query_one("#command-container")
+        config_placeholder = self.query_one("#command-placeholder")
+
+        # Remove any existing configuration widgets
+        for existing_widget in config_placeholder.query(".command"):
+            existing_widget.remove()
+
+        # Determine if command configuration should be shown
+        should_show_config = False
+
+        try:
+            # Get the active controller
+            active_controller = self.mode_manager.get_active_controller()
+            
+            # Check if the controller has command specifications
+            if (self.command_manager and 
+                type(active_controller).__name__ in {
+                    "RLLocomotionVelocityController",
+                    # Add other controllers that support command configuration
+                }):
+                # Predefined command specifications
+                command_specs = {
+                    "RLLocomotionVelocityController": [
+                        ("x_velocity", "X Velocity (m/s)", -1.0, 1.0),
+                        ("y_velocity", "Y Velocity (m/s)", -1.0, 1.0),
+                        ("yaw_rate", "Yaw Rate (rad/s)", -3.14, 3.14)
+                    ]
+                }
+
+                # Create command configuration widget
+                command_config_widget = CommandWidget(
+                    controller=active_controller,
+                    command_specs=command_specs[type(active_controller).__name__],
+                    command_config_manager=self.command_manager,
+                    classes="command"
+                )
+
+                # Mount the widget
+                config_placeholder.mount(command_config_widget)
+                should_show_config = True
+
+        except Exception as e:
+            self.logger.error(f"Error setting up command configuration: {e}")
+
+        # Toggle visibility of command configuration container
+        if should_show_config:
+            command_config_container.add_class("visible")
+        else:
+            command_config_container.remove_class("visible")
 
     def switch_to_menu(self, menu_id: str):
         """
@@ -365,6 +640,32 @@ class RobotControlUI(App):
 
         self.query_one("#status").update(status_text)
 
+                
+    def extend_ui_with_command(self):
+        """
+        Dynamically add command configuration widget based on active controller.
+        """
+        # Remove any existing configuration widgets
+        config_placeholder = self.query_one("#command-placeholder")
+        for existing_widget in config_placeholder.query(".command"):
+            existing_widget.remove()
+
+        # Get the active controller and its type
+        active_controller = self.mode_manager.get_active_controller()
+        controller_type = type(active_controller).__name__
+
+        if self.command_manager:
+            command_specs = self.command_manager.get_controller_command_specs(controller_type)
+            
+            config_widget = CommandWidget(
+                active_controller, 
+                command_specs, 
+                id="command"
+            )
+            self.query_one("#control-container").mount(config_widget)
+            config_placeholder.mount(config_widget)
+
     def on_unmount(self) -> None:
         """Set robot to IDLE mode when UI is closed."""
         self.mode_manager.set_mode("IDLE")
+

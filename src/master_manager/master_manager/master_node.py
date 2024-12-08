@@ -25,6 +25,7 @@ from utils.ui_interface import ModeManager, RobotControlUI
 from utils.logger import get_logger
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
+from commands.command_manager import CommandManager, CommandParameter
 
 from controllers.stand_controller import (
     IdleController,
@@ -106,13 +107,13 @@ class LowLevelCmdPublisher(Node):
             # Calculate actual time since last callback
             time_since_last_callback = current_time - self.last_callback_time
 
-            # Log significant deviations
-            if (
-                abs(time_since_last_callback - self.dt) > 0.001
-            ):  # More than 1ms deviation
-                self.logger.warning(
-                    f"Timing deviation: {time_since_last_callback:.6f} vs expected {self.dt}"
-                )
+            # # Log significant deviations
+            # if (
+            #     abs(time_since_last_callback - self.dt) > 0.001
+            # ):  # More than 1ms deviation
+            #     self.logger.warning(
+            #         f"Timing deviation: {time_since_last_callback:.6f} vs expected {self.dt}"
+            #     )
 
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()
@@ -191,6 +192,39 @@ async def main_async(args=None):
         # state_manager.add_subscriber("low_state", ros2_low_state_sub)
 
         state_manager.add_subscriber("low_state", dds_low_state_sub)
+        
+        
+        ##
+        # Command Configuration
+        ##
+        # Create command configuration manager
+        command_manager = CommandManager(logger=logger)
+        command_manager.register_controller_commands(
+            "RLLocomotionVelocityController", 
+            [
+                CommandParameter(
+                    name="x_velocity", 
+                    description="X Velocity (m/s)", 
+                    min_value=-1.0, 
+                    max_value=1.0, 
+                    default_value=0.35
+                ),
+                CommandParameter(
+                    name="y_velocity", 
+                    description="Y Velocity (m/s)", 
+                    min_value=-1.0, 
+                    max_value=1.0, 
+                    default_value=0.0
+                ),
+                CommandParameter(
+                    name="yaw_rate", 
+                    description="Yaw Rate (rad/s)", 
+                    min_value=-3.14, 
+                    max_value=3.14, 
+                    default_value=0.0
+                )
+            ]
+        )
 
         if "sim" in args.task:
             #     ros2_sportsmode_state_sub = ROS2StateSubscriber(
@@ -246,7 +280,9 @@ async def main_async(args=None):
             {
                 "STANCE": StanceController(pin_model_wrapper, configs),
                 "RL-VELOCITY": RLLocomotionVelocityController(
-                    pin_model_wrapper, configs
+                    pin_model_wrapper=pin_model_wrapper, 
+                    configs=configs,
+                    command_manager=command_manager
                 ),
             },
         )
@@ -263,7 +299,7 @@ async def main_async(args=None):
         async def run():
             logger.info("Starting concurrent tasks")
 
-            app_task = asyncio.create_task(RobotControlUI(mode_manager).run_async())
+            app_task = asyncio.create_task(RobotControlUI(mode_manager, command_manager).run_async())
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
