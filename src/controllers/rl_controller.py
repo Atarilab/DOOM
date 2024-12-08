@@ -10,6 +10,8 @@ from typing import Dict, Any
 from controllers.controller_base import ControllerBase
 from utils.helpers import ObservationHistoryStorage
 from state_manager.obs_manager import ObsTerm
+from commands.command_manager import CommandTerm
+
 from state_manager.observations import (
     joint_pos_rel,
     joint_vel,
@@ -30,16 +32,14 @@ class BaseRLLocomotionController(ControllerBase):
     with concurrent observation processing and policy inference.
     """
 
-    def __init__(self, pin_model_wrapper, command_manager, configs: Dict[str, Any]):
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
         """
         Initialize the RL locomotion controller with model and configuration.
 
         :param pin_model_wrapper: Pinocchio model wrapper for kinematics
         :param configs: Configuration dictionary
         """
-        super().__init__(pin_model_wrapper=pin_model_wrapper, 
-                         command_manager=command_manager, 
-                         configs=configs)
+        super().__init__(pin_model_wrapper=pin_model_wrapper, configs=configs)
 
         # Load and prepare policy model
         self._load_policy_model(configs)
@@ -207,6 +207,8 @@ class BaseRLLocomotionController(ControllerBase):
                 .cpu()
                 .numpy()[self.actions_isaac_to_unitree_mapping]
             )
+            
+            joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
             # Prepare motor commands
             self.cmd = {
@@ -236,16 +238,13 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     Uses contact-implicit reinforcement learning policy
     """
     
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any], command_manager):
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
         super().__init__(pin_model_wrapper=pin_model_wrapper, 
-                         command_manager=command_manager, 
                          configs=configs)
+
         
         # Default velocity commands
         self.velocity_commands = np.array([0.0, 0.0, 0.0])
-        
-        # command manager
-        self.command_manager = command_manager
         
     def update_commands(self, new_commands: Dict[str, Any]):
         """
@@ -253,25 +252,48 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         
         :param new_commands: Dictionary of new command values
         """
-        print("HI")
-        print(self.velocity_commands)
-        if self.command_manager:
-            try:
-                self.velocity_commands = self.command_manager.validate_and_update_commands(
-                    "RLLocomotionVelocityController", 
-                    self.velocity_commands, 
-                    new_commands
-                )
-            except ValueError as e:
-                # Log error or handle validation failure
-                if self.obs_manager.logger:
-                    self.obs_manager.logger.error(f"Command update failed: {e}")
-        print(self.velocity_commands)
+
+        try:
+            self.velocity_commands = self.command_manager.validate_and_update_commands(
+                self.velocity_commands, 
+                new_commands
+            )
+            self.command_manager.logger.debug(f"Command Updated: {new_commands}")
+        except ValueError as e:
+            # Log error or handle validation failure
+            if self.command_manager.logger:
+                self.command_manager.logger.error(f"Command update failed: {e}")
+                    
+    def register_commands(self):
+        self.command_manager.register("x_velocity", CommandTerm(
+                    name="x_velocity", 
+                    description="X Velocity (m/s)", 
+                    min_value=-1.0, 
+                    max_value=1.0, 
+                    default_value=0.0
+                ))
+        
+        self.command_manager.register("y_velocity", CommandTerm(
+                    name="y_velocity", 
+                    description="Y Velocity (m/s)", 
+                    min_value=-1.0, 
+                    max_value=1.0, 
+                    default_value=0.0
+                ))
+        
+        self.command_manager.register("yaw", CommandTerm(
+                    name="yaw_rate", 
+                    description="Yaw Rate (rad/s)", 
+                    min_value=-3.14, 
+                    max_value=3.14, 
+                    default_value=0.0
+                ))
+        
 
     def register_observations(self):
         """
-        Register observations for velocity-conditioned locomotion.
-        Maintains a specific order for direct policy input.
+        Register observations for velocity-conditioned locomotion. Maintains a specific order for direct policy input. 
+        Lambda is used to get the latest value from the class variables.
         """
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))

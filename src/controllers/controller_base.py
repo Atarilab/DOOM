@@ -16,8 +16,7 @@ class ControllerBase(ABC):
     """
 
     def __init__(self, pin_model_wrapper, 
-                 configs: Dict[str, Any],
-                 command_manager: Optional[CommandManager] = None):
+                 configs: Dict[str, Any]):
         """
         Initialize the base controller with model wrapper and configuration.
 
@@ -30,7 +29,7 @@ class ControllerBase(ABC):
 
         # Model and manager initialization
         self.pin_model_wrapper = pin_model_wrapper
-        self.command_manager = command_manager
+        self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
 
         # Joint mapping and limits
@@ -83,6 +82,18 @@ class ControllerBase(ABC):
         # Automatically register observations if method exists
         if hasattr(self, "register_observations"):
             self.register_observations()
+            
+    def set_cmd_manager(self, cmd_manager: CommandManager):
+        """
+        Configure command manager for the controller.
+
+        :param obs_manager: Command manager instance
+        """
+        self.command_manager = cmd_manager
+
+        # Automatically register observations if method exists
+        if hasattr(self, "register_commands"):
+            self.register_commands()
 
     def set_start_time(self, start_time: float):
         """
@@ -101,7 +112,6 @@ class ControllerBase(ABC):
         """
         self.latest_state = state
     
-
     def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """
         Enforce motor torque limits.
@@ -121,6 +131,7 @@ class ControllerBase(ABC):
         return np.clip(
             joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1]
         )
+        
 
     @abstractmethod
     def register_observations(self):
@@ -140,14 +151,5 @@ class ControllerBase(ABC):
         :param state: Current robot/environment state
         :param desired_goal: Target state or task objective
         :return: Control torques for robot actuation
-        """
-        pass
-    
-    @abstractmethod   
-    def update_commands(self, command):
-        """
-        Sets the latest command
-
-        :param command: The command.
         """
         pass

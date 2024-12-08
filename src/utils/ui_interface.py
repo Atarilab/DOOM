@@ -28,6 +28,7 @@ class ModeManager:
         self._current_mode: Optional[str] = None
         self._current_submode: Optional[str] = None
         self._mode_obs_managers: Dict[str, ObservationManager] = {}
+        self._submode_cmd_managers: Dict[str, CommandManager] = {}
         self.logger = logger
 
     def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase]):
@@ -42,6 +43,7 @@ class ModeManager:
             submode_name: ObservationManager(logger=self.logger)
             for submode_name in controllers.keys()
         }
+        command_managers = {}
 
         self._modes[mode_name] = controllers
         self._mode_obs_managers[mode_name] = obs_managers
@@ -50,7 +52,11 @@ class ModeManager:
         for submode_name, controller in controllers.items():
             if hasattr(controller, "set_obs_manager"):
                 controller.set_obs_manager(obs_managers[submode_name])
-
+                
+            if hasattr(controller, "register_commands"):
+                self._submode_cmd_managers[submode_name] = CommandManager(logger=self.logger)
+                controller.set_cmd_manager(self._submode_cmd_managers[submode_name])
+                
     def set_mode(self, mode_name: str, submode: Optional[str] = None):
         """
         Set the current mode and optional submode.
@@ -122,21 +128,18 @@ class CommandWidget(Vertical):
         controller: The active robot controller
         command_specs: List of command specifications 
             Each spec is a tuple of (command_name, label, min_value, max_value)
-        command_config_manager: Optional manager for handling command configurations
     """
     
     def __init__(
         self, 
         controller: Any, 
         command_specs: List[Tuple[str, str, float, float]], 
-        command_config_manager=None,
         *args, 
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.controller = controller
         self.command_specs = command_specs
-        self.command_config_manager = command_config_manager
         self.logger = logging.getLogger(__name__)
 
     def compose(self):
@@ -480,7 +483,6 @@ class RobotControlUI(App):
 
                 break
             
-        self.update_command_widget()
 
         # Signal the robot controller about mode change
         if hasattr(self.app, "robot_controller"):
@@ -492,25 +494,23 @@ class RobotControlUI(App):
         current_mode_info = self.mode_manager.get_current_mode_info()
         self.logger.info(f"Mode changed via UI: {current_mode_info}")
         
-        # self.extend_ui_with_command()
         self.logger.info(f"Button Pressed: {event.button.id}")
-        if event.button.id == "update-commands-btn":
-            self.logger.info("Update Commands button pressed")
-            active_controller = self.mode_manager.get_active_controller()
+        active_controller = self.mode_manager.get_active_controller()
+        if event.button.id == "update-commands-btn" and hasattr(active_controller, "update_commands"):
             self.update_commands(active_controller)
-        
+            
+        self.show_widgets()
         
         
     def update_commands(self, active_controller: ControllerBase):
         """
         Validate and apply command configurations to the controller.
         """
-        print("Updating commands...")
         updates = {}
         is_valid = True
 
         # Validate and collect input values
-        command_specs = active_controller.command_manager.get_controller_command_specs(type(active_controller).__name__)
+        command_specs = active_controller.command_manager.get_command_specs()
         for command_name, label, min_val, max_val in command_specs:
             input_field = self.query_one(f"#input-{command_name}")
             
@@ -542,11 +542,11 @@ class RobotControlUI(App):
                 # Provide visual feedback
                 update_button = self.query_one("#update-commands-btn")
                 update_button.styles.background = "green"
-                self.logger.info("Commands updated successfully!")  # Debug print
+                self.logger.info("Commands updated successfully!")
             
             except Exception as e:
                 # Log and handle any update errors
-                self.logger.info(f"Error updating commands: {e}")  # Debug print
+                self.logger.info(f"Error updating commands: {e}")
                 update_button = self.query_one("#update-commands-btn")
                 update_button.styles.background = "red"
         else:
@@ -554,14 +554,10 @@ class RobotControlUI(App):
             update_button = self.query_one("#update-commands-btn")
             update_button.styles.background = "red"
         
-    def update_command_widget(self):
+    def show_widgets(self):
         """
         Update the visibility and content of command configuration based on current mode.
         """
-        # Get current mode information
-        current_mode_info = self.mode_manager.get_current_mode_info()
-        mode = current_mode_info.get('mode', 'IDLE')
-        submode = current_mode_info.get('submode')
 
         # Get the command configuration container
         command_config_container = self.query_one("#command-container")
@@ -579,25 +575,11 @@ class RobotControlUI(App):
             active_controller = self.mode_manager.get_active_controller()
             
             # Check if the controller has command specifications
-            if (self.command_manager and 
-                type(active_controller).__name__ in {
-                    "RLLocomotionVelocityController",
-                    # Add other controllers that support command configuration
-                }):
-                # Predefined command specifications
-                command_specs = {
-                    "RLLocomotionVelocityController": [
-                        ("x_velocity", "X Velocity (m/s)", -1.0, 1.0),
-                        ("y_velocity", "Y Velocity (m/s)", -1.0, 1.0),
-                        ("yaw_rate", "Yaw Rate (rad/s)", -3.14, 3.14)
-                    ]
-                }
-
-                # Create command configuration widget
+            if (active_controller.command_manager):
+                # Creaactive_controller = self.mode_manager.get_active_controller()te command configuration widget
                 command_config_widget = CommandWidget(
                     controller=active_controller,
-                    command_specs=command_specs[type(active_controller).__name__],
-                    command_config_manager=self.command_manager,
+                    command_specs=active_controller.command_manager.get_command_specs(),
                     classes="command"
                 )
 
@@ -640,30 +622,6 @@ class RobotControlUI(App):
 
         self.query_one("#status").update(status_text)
 
-                
-    def extend_ui_with_command(self):
-        """
-        Dynamically add command configuration widget based on active controller.
-        """
-        # Remove any existing configuration widgets
-        config_placeholder = self.query_one("#command-placeholder")
-        for existing_widget in config_placeholder.query(".command"):
-            existing_widget.remove()
-
-        # Get the active controller and its type
-        active_controller = self.mode_manager.get_active_controller()
-        controller_type = type(active_controller).__name__
-
-        if self.command_manager:
-            command_specs = self.command_manager.get_controller_command_specs(controller_type)
-            
-            config_widget = CommandWidget(
-                active_controller, 
-                command_specs, 
-                id="command"
-            )
-            self.query_one("#control-container").mount(config_widget)
-            config_placeholder.mount(config_widget)
 
     def on_unmount(self) -> None:
         """Set robot to IDLE mode when UI is closed."""
