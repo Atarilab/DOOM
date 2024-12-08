@@ -30,14 +30,16 @@ class BaseRLLocomotionController(ControllerBase):
     with concurrent observation processing and policy inference.
     """
 
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+    def __init__(self, pin_model_wrapper, command_manager, configs: Dict[str, Any]):
         """
         Initialize the RL locomotion controller with model and configuration.
 
         :param pin_model_wrapper: Pinocchio model wrapper for kinematics
         :param configs: Configuration dictionary
         """
-        super().__init__(pin_model_wrapper, configs)
+        super().__init__(pin_model_wrapper=pin_model_wrapper, 
+                         command_manager=command_manager, 
+                         configs=configs)
 
         # Load and prepare policy model
         self._load_policy_model(configs)
@@ -96,7 +98,6 @@ class BaseRLLocomotionController(ControllerBase):
         # Initial state and commands
         self.latest_state = None
         self.cmd = {}
-        self.velocity_commands = np.array([0.35, 0.0, 0.0])
 
     def _configure_processing_infrastructure(self, configs: Dict[str, Any]):
         """
@@ -234,6 +235,38 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     Velocity-conditioned RL Locomotion Controller
     Uses contact-implicit reinforcement learning policy
     """
+    
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any], command_manager):
+        super().__init__(pin_model_wrapper=pin_model_wrapper, 
+                         command_manager=command_manager, 
+                         configs=configs)
+        
+        # Default velocity commands
+        self.velocity_commands = np.array([0.0, 0.0, 0.0])
+        
+        # command manager
+        self.command_manager = command_manager
+        
+    def update_commands(self, new_commands: Dict[str, Any]):
+        """
+        Update velocity commands with validation.
+        
+        :param new_commands: Dictionary of new command values
+        """
+        print("HI")
+        print(self.velocity_commands)
+        if self.command_manager:
+            try:
+                self.velocity_commands = self.command_manager.validate_and_update_commands(
+                    "RLLocomotionVelocityController", 
+                    self.velocity_commands, 
+                    new_commands
+                )
+            except ValueError as e:
+                # Log error or handle validation failure
+                if self.obs_manager.logger:
+                    self.obs_manager.logger.error(f"Command update failed: {e}")
+        print(self.velocity_commands)
 
     def register_observations(self):
         """

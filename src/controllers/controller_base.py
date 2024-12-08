@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 
 from state_manager.obs_manager import ObservationManager
+from commands.command_manager import CommandManager
 
 
 class ControllerBase(ABC):
@@ -14,7 +15,9 @@ class ControllerBase(ABC):
     Manages joint limits, observation tracking, and provides core control infrastructure.
     """
 
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+    def __init__(self, pin_model_wrapper, 
+                 configs: Dict[str, Any],
+                 command_manager: Optional[CommandManager] = None):
         """
         Initialize the base controller with model wrapper and configuration.
 
@@ -25,8 +28,9 @@ class ControllerBase(ABC):
         self.start_time = 0.0
         self._lock = threading.Lock()
 
-        # Model and configuration
+        # Model and manager initialization
         self.pin_model_wrapper = pin_model_wrapper
+        self.command_manager = command_manager
         self.obs_manager: Optional[ObservationManager] = None
 
         # Joint mapping and limits
@@ -96,6 +100,7 @@ class ControllerBase(ABC):
         :param state: The states directly subscribed from available topics.
         """
         self.latest_state = state
+    
 
     def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """
@@ -118,6 +123,14 @@ class ControllerBase(ABC):
         )
 
     @abstractmethod
+    def register_observations(self):
+        """
+        Register required observations for the specific controller mode.
+        Implementations should maintain a consistent observation order.
+        """
+        pass
+    
+    @abstractmethod
     def compute_torques(
         self, state: Dict[str, Any], desired_goal: Dict[str, Any]
     ) -> Dict[str, np.ndarray]:
@@ -129,11 +142,12 @@ class ControllerBase(ABC):
         :return: Control torques for robot actuation
         """
         pass
-
-    @abstractmethod
-    def register_observations(self):
+    
+    @abstractmethod   
+    def update_commands(self, command):
         """
-        Register required observations for the specific controller mode.
-        Implementations should maintain a consistent observation order.
+        Sets the latest command
+
+        :param command: The command.
         """
         pass

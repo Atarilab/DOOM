@@ -17,6 +17,14 @@ class IdleController(ControllerBase):
         Register observations for this controller.
         """
         pass
+    
+    def update_commands(self, command):
+        """
+        Sets the latest command
+
+        :param command: The command.
+        """
+        pass
 
     def compute_torques(self, state, desired_goal):
         cmd = {}
@@ -56,6 +64,14 @@ class StandUpController(ControllerBase):
                 starting_time,
             ),
         )
+        
+    def update_commands(self, command):
+        """
+        Sets the latest command
+
+        :param command: The command.
+        """
+        pass
 
     def compute_torques(self, state, desired_goal=None):
         obs = self.obs_manager.compute_observations(state)
@@ -101,6 +117,14 @@ class StandDownController(ControllerBase):
             ),
         )
 
+    def update_commands(self, command):
+        """
+        Sets the latest command
+
+        :param command: The command.
+        """
+        pass
+    
     def compute_torques(self, state, desired_goal=None):
         obs = self.obs_manager.compute_observations(state)
 
@@ -129,6 +153,14 @@ class StayDownController(ControllerBase):
 
         self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
         self.start_time = 0.0
+        
+    def update_commands(self, command):
+        """
+        Sets the latest command
+
+        :param command: The command.
+        """
+        pass
 
     def register_observations(self):
         """
@@ -180,6 +212,14 @@ class StanceController(ControllerBase):
                 starting_time,
             ),
         )
+        
+    def update_commands(self, command):
+        """
+        Sets the latest command
+
+        :param command: The command.
+        """
+        pass
 
     def compute_torques(self, state, desired_goal):
         cmd = {}
