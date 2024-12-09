@@ -73,9 +73,9 @@ class RobotStatePublisher(Node):
             base_twist_msg.twist.linear.x = float(current_state.get('lin_vel_b', [0,0,0])[0]) if 'lin_vel_b' in current_state.keys() else 0.0
             base_twist_msg.twist.linear.y = float(current_state.get('lin_vel_b', [0,0,0])[1]) if 'lin_vel_b' in current_state.keys() else 0.0
             base_twist_msg.twist.linear.z = float(current_state.get('lin_vel_b', [0,0,0])[2]) if 'lin_vel_b' in current_state.keys() else 0.0
-            base_twist_msg.twist.angular.x = float(current_state.get('ang_vel_b', [0,0,0])[0]) if 'ang_vel_b' in current_state.keys() else 0.0
-            base_twist_msg.twist.angular.y = float(current_state.get('ang_vel_b', [0,0,0])[1]) if 'ang_vel_b' in current_state.keys() else 0.0
-            base_twist_msg.twist.angular.z = float(current_state.get('ang_vel_b', [0,0,0])[2]) if 'ang_vel_b' in current_state.keys() else 0.0
+            base_twist_msg.twist.angular.x = float(current_state.get('gyroscope', [0,0,0])[0]) if 'gyroscope' in current_state.keys() else 0.0
+            base_twist_msg.twist.angular.y = float(current_state.get('gyroscope', [0,0,0])[1]) if 'gyroscope' in current_state.keys() else 0.0
+            base_twist_msg.twist.angular.z = float(current_state.get('gyroscope', [0,0,0])[2]) if 'gyroscope' in current_state.keys() else 0.0
             
             
             # Publish messages
