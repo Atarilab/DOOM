@@ -1,4 +1,5 @@
 import argparse
+import threading
 import asyncio
 import logging
 import os
@@ -35,6 +36,8 @@ from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 # DOOM Imports
 from utils.ui_interface import ModeManager, RobotControlUI
 
+from controllers.state_publsiher import RobotStatePublisher
+
 
 class LowLevelCmdPublisher(Node):
     """Manages low-level robot command publishing."""
@@ -51,6 +54,9 @@ class LowLevelCmdPublisher(Node):
         self.mode_manager = mode_manager
         self.state_manager = state_manager
         self.logger = logger or logging.getLogger(__name__)
+        
+        # Initialize ROS state publisher
+        self.state_publisher = RobotStatePublisher()
 
         # DDS Publisher setup
         self.dds_pub = ChannelPublisher("rt/lowcmd", LowCmd_)
@@ -89,7 +95,7 @@ class LowLevelCmdPublisher(Node):
         # Get active controller and compute torques
         active_controller = self.mode_manager.get_active_controller()
         active_obs_manager = self.mode_manager.get_active_obs_manager()
-
+        
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
 
@@ -107,6 +113,7 @@ class LowLevelCmdPublisher(Node):
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()
             active_controller.update_state(combined_state)
+            self.state_publisher.update_latest_state(combined_state)
 
             # self.logger.debug(combined_state['feet_pos'])
             # observations = active_obs_manager.get_observation('feet_pos')
@@ -248,6 +255,8 @@ async def main_async(args=None):
                 while rclpy.ok():
                     rclpy.spin_once(node)
                     state_manager.spin_subscribers()
+                    rclpy.spin_once(node.state_publisher)
+                    
 
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
             await asyncio.gather(app_task, node_task)
