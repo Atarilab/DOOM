@@ -1,18 +1,16 @@
 import time
-from typing import Dict, Optional, Any, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Horizontal
-from textual.widgets import Header, Button, Static, Input, Label
+from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.validation import Number
+from textual.widgets import Button, Header, Input, Label, Static
 
-
-from controllers.stand_controller import ControllerBase
 from commands.command_manager import CommandManager
-from utils.logger import logging
-
+from controllers.stand_controller import ControllerBase
 from state_manager.obs_manager import ObservationManager
+from utils.logger import logging
 
 
 class ModeManager:

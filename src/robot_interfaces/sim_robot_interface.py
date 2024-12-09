@@ -1,14 +1,15 @@
 # robot_interfaces/sim_robot_interface.py
 import os
+import threading
+from threading import Thread
 import time
+
 import mujoco
 import mujoco.viewer
-from threading import Thread
-import threading
-
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-from utils.unitree_sdk2py_bridge import UnitreeSdk2Bridge
+
 from robot_interfaces.robot_interface_base import RobotInterfaceBase
+from utils.unitree_sdk2py_bridge import UnitreeSdk2Bridge
 
 
 class SimRobotInterface(RobotInterfaceBase):

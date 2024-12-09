@@ -1,12 +1,11 @@
 import argparse
-import time
 import os
+import time
 
+from robot_interfaces.sim_robot_interface import SimRobotInterface
 from tasks.task_configs import TASK_CONFIG
 from utils.config_loader import load_config
 from utils.logger import get_logger
-
-from robot_interfaces.sim_robot_interface import SimRobotInterface
 
 
 def main():

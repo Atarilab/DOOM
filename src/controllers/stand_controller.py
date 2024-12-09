@@ -1,7 +1,8 @@
 import numpy as np
+
 from controllers.controller_base import ControllerBase
-from state_manager.observations import starting_time
 from state_manager.obs_manager import ObsTerm
+from state_manager.observations import starting_time
 
 
 class IdleController(ControllerBase):

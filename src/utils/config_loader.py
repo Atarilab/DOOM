@@ -1,6 +1,7 @@
 # utils/config_loader.py
-import yaml
 import os
+
+import yaml
 
 
 def load_config(file_name: str):

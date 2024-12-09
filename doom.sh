@@ -95,6 +95,7 @@ while [[ $# -gt 0 ]]; do
                     -v $PWD/src:/home/atari/workspace/DOOM/src \
                     -v $HOME/.Xauthority:/root/.Xauthority \
                     -v $PWD/.vscode:/home/atari/workspace/.vscode \
+                    -v $PWD/pyproject.toml:/home/atari/workspace/pyproject.toml \
                     --env XAUTHORITY=/root/.Xauthority \
                     --name $CONTAINER_NAME mujuni-image
             else

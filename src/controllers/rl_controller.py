@@ -1,27 +1,26 @@
-import os
-import time
-import torch
-import threading
-import numpy as np
 from itertools import chain
-from typing import Dict, Any
+import os
+import threading
+import time
+from typing import Any, Dict
 
+import numpy as np
+import torch
 
-from controllers.controller_base import ControllerBase
-from utils.helpers import ObservationHistoryStorage
-from state_manager.obs_manager import ObsTerm
 from commands.command_manager import CommandTerm
-
+from controllers.controller_base import ControllerBase
+from state_manager.obs_manager import ObsTerm
 from state_manager.observations import (
+    ang_vel_b,
+    feet_pos,
     joint_pos_rel,
     joint_vel,
-    lin_vel_b,
-    ang_vel_b,
     last_action,
+    lin_vel_b,
     projected_gravity_b,
     velocity_commands,
-    feet_pos,
 )
+from utils.helpers import ObservationHistoryStorage
 
 
 class BaseRLLocomotionController(ControllerBase):

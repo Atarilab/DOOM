@@ -1,7 +1,8 @@
 import dataclasses
-from typing import Dict, Any, List, Tuple, Optional, Callable
-import numpy as np
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 
 # TODO: Extend to other types other than float commands

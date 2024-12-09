@@ -2,14 +2,14 @@
 This file is used to define the functions that process the states to compute individual observation terms.
 """
 
-from typing import Callable, Dict, Any
+import time
+from typing import Any, Callable, Dict
+
 import numpy as np
 import torch
-import time
-
 
 from utils.helpers import reorder_robot_states
-from utils.math import quat_rotate_inverse, GRAVITY_DIR
+from utils.math import GRAVITY_DIR, quat_rotate_inverse
 
 
 def joint_pos(states: Dict[str, Any]) -> np.ndarray:

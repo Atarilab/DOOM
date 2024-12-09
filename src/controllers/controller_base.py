@@ -1,10 +1,11 @@
-import threading
-import numpy as np
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+import threading
+from typing import Any, Dict, Optional
 
-from state_manager.obs_manager import ObservationManager
+import numpy as np
+
 from commands.command_manager import CommandManager
+from state_manager.obs_manager import ObservationManager
 
 
 class ControllerBase(ABC):

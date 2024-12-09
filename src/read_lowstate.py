@@ -1,10 +1,10 @@
 # Simple DDS Read Subscriber
 
-import time
 import sys
-from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
+import time
 
+from unitree_sdk2py.core.channel import ChannelFactoryInitialize, ChannelSubscriber
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
 
 import unitree_legged_const as go2
 
