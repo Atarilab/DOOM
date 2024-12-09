@@ -3,7 +3,6 @@ import threading
 from scipy.linalg import logm
 
 from utils.math import quaternion_to_euler, quat_to_rotmatrix
-from scipy.spatial.transform import Rotation as R
 
 
 class VelocityEstimator:
@@ -68,7 +67,8 @@ class VelocityEstimator:
 
     def _compute_angular_velocity(self, q1, q2, dt):
         """
-        Compute angular velocity using skew-symmetric matrix method. Better than finite differencing for calculating angular velocity.
+        Compute angular velocity using skew-symmetric matrix method. Better than finite differencing 
+        for calculating angular velocity.
 
         :param q1: Previous quaternion
         :param q2: Current quaternion

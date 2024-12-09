@@ -20,7 +20,10 @@
             "label": "Format & Lint",
             "type": "shell",
             "command": "black . --line-length 120 --exclude 'build|install|share' && python3 -m flake8 --exclude build,install,share --max-line-length=120",
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "problemMatcher": []
         },
         {
