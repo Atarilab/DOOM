@@ -419,7 +419,7 @@ class RobotControlUI(App):
             self.mode_manager.set_mode("IDLE")
 
         # self.extend_ui_with_command()
-        self.update_command_widget()
+        self.show_widgets()
 
     def on_button_pressed(self, event: Button.Pressed):
         """
@@ -530,7 +530,6 @@ class RobotControlUI(App):
                 # Provide visual feedback
                 update_button = self.query_one("#update-commands-btn")
                 update_button.styles.background = "green"
-                self.logger.info("Commands updated successfully!")
 
             except Exception as e:
                 # Log and handle any update errors
