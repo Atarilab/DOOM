@@ -185,7 +185,7 @@ class StateManager:
     Centralized state management for robot controllers.
     Manages multiple state subscribers and provides unified state access.
 
-    Note that the state here is the states coming from the subscribed topics which are further processed
+    Note that the state here is the states coming from the subscribed topics. They are further processed
     by the ObservationManager to compute the observations for each mode/controller.
     """
 

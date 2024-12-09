@@ -19,7 +19,7 @@ class ObsTerm:
 
         :param func: Function to compute the observation
         :param params: Optional dictionary of parameters to pass to the function
-        :param include: Whether to include the observation in the method compute_observations()
+        :param include: Whether to include the observation in the method compute()
         """
         self._func = func
         self._params = params or {}
@@ -111,7 +111,7 @@ class ObservationManager:
 
         self._observations[name] = obs_term
 
-    def compute_observations(self, combined_state: Dict[str, Any]) -> Dict[str, Any]:
+    def compute(self, combined_state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Compute all registered observations from the combined state.
 
@@ -136,7 +136,7 @@ class ObservationManager:
 
     def get_observation(self, name: str) -> Any:
         """
-        Retrieve a specific observation, including those not returned by compute_observations().
+        Retrieve a specific observation, including those not returned by compute().
 
         :param name: Name of the observation
         :return: The computed observation

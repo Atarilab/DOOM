@@ -59,7 +59,7 @@ class StandUpController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal=None):
-        obs = self.obs_manager.compute_observations(state)
+        obs = self.obs_manager.compute(state)
 
         time = obs["time"] - self.start_time
         phase = np.tanh(time / 1.2)
@@ -102,7 +102,7 @@ class StandDownController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal=None):
-        obs = self.obs_manager.compute_observations(state)
+        obs = self.obs_manager.compute(state)
 
         time = obs["time"] - self.start_time
         phase = np.tanh(time / 1.2)

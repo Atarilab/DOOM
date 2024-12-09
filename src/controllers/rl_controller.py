@@ -141,7 +141,7 @@ class BaseRLLocomotionController(ControllerBase):
 
                 # Compute and store observations
                 with torch.no_grad():
-                    obs = self.obs_manager.compute_observations(current_state)
+                    obs = self.obs_manager.compute(current_state)
                     obs_tensor = torch.tensor(
                         list(chain.from_iterable(obs.values())),
                         dtype=torch.float32,
