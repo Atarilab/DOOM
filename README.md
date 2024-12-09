@@ -77,7 +77,8 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
-- [ ] Implement a real-time High-Level Contact Planner 
+- [ ] Implement a real-time High-Level Contact Planner
+- [ ] Run the state publisher on a seperate thread for better performance
 - [ ] Add support for AlienGo
 - [ ] Implement joystick control for velocity commands
 - [x] Implement interface to change commands from UI
