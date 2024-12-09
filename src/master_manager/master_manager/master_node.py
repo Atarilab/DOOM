@@ -36,7 +36,7 @@ from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 # DOOM Imports
 from utils.ui_interface import ModeManager, RobotControlUI
 
-from controllers.state_publsiher import RobotStatePublisher
+from controllers.state_publisher import RobotStatePublisher
 
 
 class LowLevelCmdPublisher(Node):
@@ -56,7 +56,7 @@ class LowLevelCmdPublisher(Node):
         self.logger = logger or logging.getLogger(__name__)
         
         # Initialize ROS state publisher
-        self.state_publisher = RobotStatePublisher()
+        # self.state_publisher = RobotStatePublisher()
 
         # DDS Publisher setup
         self.dds_pub = ChannelPublisher("rt/lowcmd", LowCmd_)
@@ -113,7 +113,7 @@ class LowLevelCmdPublisher(Node):
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()
             active_controller.update_state(combined_state)
-            self.state_publisher.update_latest_state(combined_state)
+            # self.state_publisher.update_latest_state(combined_state)
 
             # self.logger.debug(combined_state['feet_pos'])
             # observations = active_obs_manager.get_observation('feet_pos')
@@ -139,9 +139,12 @@ class LowLevelCmdPublisher(Node):
 
         self.last_callback_time = current_time
 
-
+node = None
+state_manager = None
 async def main_async(args=None):
     """Main asynchronous entry point for robot controller."""
+    global node
+    global state_manager
     rclpy.init(args=args)
 
     # Parse arguments
@@ -255,20 +258,25 @@ async def main_async(args=None):
                 while rclpy.ok():
                     rclpy.spin_once(node)
                     state_manager.spin_subscribers()
-                    rclpy.spin_once(node.state_publisher)
+                    # rclpy.spin_once(node.state_publisher)
                     
 
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
-            await asyncio.gather(app_task, node_task)
+            try:
+                await asyncio.gather(app_task, node_task)
+            except asyncio.CancelledError:
+                logger.info("Tasks were cancelled")
+                raise
 
         await run()
-
+    except KeyboardInterrupt:
+        logger.info("Received KeyboardInterrupt. Shutting down...")
     except Exception as e:
         logger.exception(f"An error occurred: {e}")
         raise
     finally:
         node.destroy_node()
-        state_manager.stop_subscription()
+        state_manager.destroy_subscribers()
         rclpy.shutdown()
 
 
