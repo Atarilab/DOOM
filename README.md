@@ -58,7 +58,7 @@ Example Workflow: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > 
 
 
 ## Vicon State Estimation
-The vicon receiver client is already installed in the docker container. You can simply launch it using:
+The vicon receiver client is already installed in the docker container. You can simply launch it in a new terminal inside existing container (`./doom -a`) using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
