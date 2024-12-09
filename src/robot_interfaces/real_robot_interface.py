@@ -11,12 +11,8 @@ class RealRobotInterface(RobotInterfaceBase):
         self.node = Node(node_name)
 
         # Publishers and subscribers
-        self.command_pub = self.node.create_publisher(
-            Float64MultiArray, "/robot/command", 10
-        )
-        self.state_sub = self.node.create_subscription(
-            Float64MultiArray, "/robot/state", self.state_callback, 10
-        )
+        self.command_pub = self.node.create_publisher(Float64MultiArray, "/robot/command", 10)
+        self.state_sub = self.node.create_subscription(Float64MultiArray, "/robot/state", self.state_callback, 10)
         self.current_state = {}
 
     def state_callback(self, msg):

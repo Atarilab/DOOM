@@ -1,5 +1,4 @@
 import os
-import time
 import asyncio
 import logging
 import argparse
@@ -16,8 +15,8 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportMode
 from unitree_sdk2py.utils.crc import CRC
 
 # ROS Messages
-from unitree_go.msg._low_state import LowState
-from unitree_go.msg._sport_mode_state import SportModeState
+# from unitree_go.msg._low_state import LowState
+# from unitree_go.msg._sport_mode_state import SportModeState
 from vicon_receiver.msg import Position
 
 # DOOM Imports
@@ -25,7 +24,6 @@ from utils.ui_interface import ModeManager, RobotControlUI
 from utils.logger import get_logger
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
-from commands.command_manager import CommandManager, CommandTerm
 
 from controllers.stand_controller import (
     IdleController,
@@ -40,7 +38,7 @@ from state_manager.state_manager import (
     DDSStateSubscriber,
     ROS2StateSubscriber,
 )
-from state_manager.msg_handlers import *
+from state_manager.msg_handlers import low_state_handler, vicon_handler, sport_mode_state_handler
 
 
 class LowLevelCmdPublisher(Node):
@@ -68,9 +66,7 @@ class LowLevelCmdPublisher(Node):
         self.running_time = 0.0
 
         # Create timer for periodic command publishing
-        self.timer = self.create_timer(
-            dt, self.low_level_cmd_callback, clock=self.get_clock()
-        )
+        self.timer = self.create_timer(dt, self.low_level_cmd_callback, clock=self.get_clock())
 
         # Initialize command message
         self.dds_cmd = unitree_go_msg_dds__LowCmd_()
@@ -89,9 +85,7 @@ class LowLevelCmdPublisher(Node):
         for i in range(20):
             motor_cmd = self.dds_cmd.motor_cmd[i]
             motor_cmd.mode = 0x01  # PMSM mode
-            motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = (
-                0.0
-            )
+            motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
@@ -150,12 +144,8 @@ async def main_async(args=None):
 
     # Parse arguments
     parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
-    parser.add_argument(
-        "--task", type=str, default="rl-velocity-sim-go2", help="Task name to run"
-    )
-    parser.add_argument(
-        "--log", type=str, default="test", help="Experiment name to log information"
-    )
+    parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run")
+    parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
 
     args = parser.parse_args()
@@ -219,15 +209,11 @@ async def main_async(args=None):
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
 
-        pin_model_wrapper = PinQuadRobotWrapper(
-            configs["robot_config"]["pinocchio_urdf"]
-        )
+        pin_model_wrapper = PinQuadRobotWrapper(configs["robot_config"]["pinocchio_urdf"])
 
         # Create mode manager and register controllers
         mode_manager = ModeManager(logger=logger)
-        mode_manager.register_mode(
-            "IDLE", {"default": IdleController(pin_model_wrapper, configs)}
-        )
+        mode_manager.register_mode("IDLE", {"default": IdleController(pin_model_wrapper, configs)})
 
         mode_manager.register_mode(
             "STANDING",
@@ -238,18 +224,13 @@ async def main_async(args=None):
             },
         )
 
-        mode_manager.register_mode(
-            "STANCE", {"STANCE": StanceController(pin_model_wrapper, configs)}
-        )
+        mode_manager.register_mode("STANCE", {"STANCE": StanceController(pin_model_wrapper, configs)})
 
         mode_manager.register_mode(
             "RL-VELOCITY",
             {
                 "STANCE": StanceController(pin_model_wrapper, configs),
-                "RL-VELOCITY": RLLocomotionVelocityController(
-                    pin_model_wrapper=pin_model_wrapper, 
-                    configs=configs
-                ),
+                "RL-VELOCITY": RLLocomotionVelocityController(pin_model_wrapper=pin_model_wrapper, configs=configs),
             },
         )
 

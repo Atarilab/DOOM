@@ -25,9 +25,7 @@ class SimRobotInterface(RobotInterfaceBase):
         self.mj_model.opt.timestep = config["SIMULATION_DT"]
 
         # Initialize the viewer based on configuration
-        self.viewer = mujoco.viewer.launch_passive(
-            self.mj_model, self.mj_data, show_left_ui=False, show_right_ui=False
-        )
+        self.viewer = mujoco.viewer.launch_passive(self.mj_model, self.mj_data, show_left_ui=False, show_right_ui=False)
 
         # Running flag for thread control
         self.running = True
@@ -69,9 +67,7 @@ class SimRobotInterface(RobotInterfaceBase):
 
             self.locker.release()
 
-            time_until_next_step = self.mj_model.opt.timestep - (
-                time.perf_counter() - step_start
-            )
+            time_until_next_step = self.mj_model.opt.timestep - (time.perf_counter() - step_start)
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
 
@@ -79,9 +75,7 @@ class SimRobotInterface(RobotInterfaceBase):
         while self.viewer.is_running():
             self.locker.acquire()
             # Find the robot body (might need adjustment based on your exact model)
-            robot_body_id = mujoco.mj_name2id(
-                self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "base_link"
-            )
+            robot_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
             if robot_body_id >= 0:
                 robot_pos = self.mj_data.xpos[robot_body_id]
 

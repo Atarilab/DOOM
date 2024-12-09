@@ -60,13 +60,7 @@ def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order="wxyz") -> torch
     b = torch.cross(q_vec, v, dim=-1) * q_w.unsqueeze(-1) * 2.0
     # for two-dimensional tensors, bmm is faster than einsum
     if q_vec.dim() == 2:
-        c = (
-            q_vec
-            * torch.bmm(q_vec.view(q.shape[0], 1, 3), v.view(q.shape[0], 3, 1)).squeeze(
-                -1
-            )
-            * 2.0
-        )
+        c = q_vec * torch.bmm(q_vec.view(q.shape[0], 1, 3), v.view(q.shape[0], 3, 1)).squeeze(-1) * 2.0
     else:
         c = q_vec * torch.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
     return a - b + c

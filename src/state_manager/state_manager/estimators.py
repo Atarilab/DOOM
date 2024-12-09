@@ -7,9 +7,7 @@ from scipy.spatial.transform import Rotation as R
 
 
 class VelocityEstimator:
-    def __init__(
-        self, alpha=0.1, position_noise=0.01, velocity_noise=0.1, method="finite_diff"
-    ):
+    def __init__(self, alpha=0.1, position_noise=0.01, velocity_noise=0.1, method="finite_diff"):
         """
         Initialize velocity estimator with multiple estimation methods.
 
@@ -89,9 +87,7 @@ class VelocityEstimator:
         # Extract angular velocity from skew-symmetric matrix
         try:
             omega_skew = logm(R_diff) / dt
-            angular_velocity = np.array(
-                [omega_skew[2, 1], omega_skew[0, 2], omega_skew[1, 0]]
-            )
+            angular_velocity = np.array([omega_skew[2, 1], omega_skew[0, 2], omega_skew[1, 0]])
         except Exception:
             # Fallback to zero angular velocity if computation fails
             angular_velocity = np.zeros(3)
@@ -126,19 +122,15 @@ class VelocityEstimator:
             # Linear velocity using finite differencing
             raw_linear_velocity = (position - self.last_position) / dt
             # Angular velocity calculation
-            raw_angular_velocity = self._compute_angular_velocity(
-                self.last_quaternion, quaternion, dt
-            )
+            raw_angular_velocity = self._compute_angular_velocity(self.last_quaternion, quaternion, dt)
 
             # Exponential smoothing for both linear and angular velocities
             self.smoothed_linear_velocity = (
-                self.alpha * raw_linear_velocity
-                + (1 - self.alpha) * self.smoothed_linear_velocity
+                self.alpha * raw_linear_velocity + (1 - self.alpha) * self.smoothed_linear_velocity
             )
 
             self.smoothed_angular_velocity = (
-                self.alpha * raw_angular_velocity
-                + (1 - self.alpha) * self.smoothed_angular_velocity
+                self.alpha * raw_angular_velocity + (1 - self.alpha) * self.smoothed_angular_velocity
             )
 
             # Update last known state
@@ -188,14 +180,10 @@ class VelocityEstimator:
             current_euler = quaternion_to_euler(quaternion, order="wxyz")
 
             # Angular velocity estimation
-            raw_angular_velocity = self._compute_angular_velocity(
-                self.last_quaternion, quaternion, dt
-            )
+            raw_angular_velocity = self._compute_angular_velocity(self.last_quaternion, quaternion, dt)
 
             # Innovation
-            innovation = np.concatenate(
-                [position - predicted_state[:3], current_euler - predicted_state[6:9]]
-            )
+            innovation = np.concatenate([position - predicted_state[:3], current_euler - predicted_state[6:9]])
 
             # Innovation covariance
             S = H @ predicted_covariance @ H.T + self.R

@@ -13,12 +13,21 @@
         "--line-length",
         "120"
     ],
+    "python.sortImports.args": [
+        "--profile",
+        "black"
+    ],
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
     // Use flake8 for linting
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Args": [
         "--max-line-length=120"
     ],
+    "editor.folding": true,
+    "breadcrumbs.enabled": true,
     "autoDocstring.guessTypes": true,
     // files to be ignored by the linter
     "files.watcherExclude": {
@@ -34,4 +43,11 @@
     "spellright.language": [
         "en-US-10-1."
     ],
+    "cSpell.words": [
+        "precommit",
+        "flake8",
+        "pylint",
+        "mujoco",
+        "Unitree"
+    ]
 }

@@ -66,9 +66,7 @@ class BaseRLLocomotionController(ControllerBase):
         self.policy.eval()
 
         # Precompute static configurations
-        self.action_scale = torch.tensor(
-            configs["controller_config"]["action_scale"], dtype=torch.float32
-        )
+        self.action_scale = torch.tensor(configs["controller_config"]["action_scale"], dtype=torch.float32)
 
     def _initialize_controller_parameters(self, configs: Dict[str, Any]):
         """
@@ -78,13 +76,9 @@ class BaseRLLocomotionController(ControllerBase):
         """
         controller_config = configs["controller_config"]
 
-        self.default_joint_pos = torch.tensor(
-            controller_config["ISAAC_LAB_DEFAULT_JOINT_POS"], dtype=torch.float32
-        )
+        self.default_joint_pos = torch.tensor(controller_config["ISAAC_LAB_DEFAULT_JOINT_POS"], dtype=torch.float32)
 
-        self.actions_isaac_to_unitree_mapping = np.array(
-            controller_config["JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING"]
-        )
+        self.actions_isaac_to_unitree_mapping = np.array(controller_config["JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING"])
 
         self.joint_obs_unitree_to_isaac_mapping = torch.tensor(
             controller_config["JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING"]
@@ -110,21 +104,15 @@ class BaseRLLocomotionController(ControllerBase):
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
-        self.obs_buffer = ObservationHistoryStorage(
-            num_envs=1, num_obs=48, max_length=1, device="cpu"
-        )
+        self.obs_buffer = ObservationHistoryStorage(num_envs=1, num_obs=48, max_length=1, device="cpu")
 
         # Start concurrent processing threads
         self._init_processing_threads()
 
     def _init_processing_threads(self):
         """Initialize and start concurrent processing threads."""
-        self.obs_processing_thread = threading.Thread(
-            target=self._process_observations, daemon=True
-        )
-        self.policy_inference_thread = threading.Thread(
-            target=self._run_policy_inference, daemon=True
-        )
+        self.obs_processing_thread = threading.Thread(target=self._process_observations, daemon=True)
+        self.policy_inference_thread = threading.Thread(target=self._run_policy_inference, daemon=True)
 
         self.obs_processing_thread.start()
         self.policy_inference_thread.start()
@@ -145,14 +133,10 @@ class BaseRLLocomotionController(ControllerBase):
                     [
                         current_state["base_pos_w"],
                         current_state["base_quat"],
-                        current_state["joint_pos"][
-                            np.array(self.unitree_pin_joint_mappings)
-                        ],
+                        current_state["joint_pos"][np.array(self.unitree_pin_joint_mappings)],
                     ]
                 )
-                v_pin = current_state["joint_vel"][
-                    np.array(self.unitree_pin_joint_mappings)
-                ]
+                v_pin = current_state["joint_vel"][np.array(self.unitree_pin_joint_mappings)]
 
                 self.pin_model_wrapper.update(q_pin, v_pin)
 
@@ -207,7 +191,7 @@ class BaseRLLocomotionController(ControllerBase):
                 .cpu()
                 .numpy()[self.actions_isaac_to_unitree_mapping]
             )
-            
+
             joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
             # Prepare motor commands
@@ -237,62 +221,67 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     Velocity-conditioned RL Locomotion Controller
     Uses contact-implicit reinforcement learning policy
     """
-    
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
-        super().__init__(pin_model_wrapper=pin_model_wrapper, 
-                         configs=configs)
 
-        
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+        super().__init__(pin_model_wrapper=pin_model_wrapper, configs=configs)
+
         # Default velocity commands
         self.velocity_commands = np.array([0.0, 0.0, 0.0])
-        
+
     def update_commands(self, new_commands: Dict[str, Any]):
         """
         Update velocity commands with validation.
-        
+
         :param new_commands: Dictionary of new command values
         """
 
         try:
             self.velocity_commands = self.command_manager.validate_and_update_commands(
-                self.velocity_commands, 
-                new_commands
+                self.velocity_commands, new_commands
             )
             self.command_manager.logger.debug(f"Command Updated: {new_commands}")
         except ValueError as e:
             # Log error or handle validation failure
             if self.command_manager.logger:
                 self.command_manager.logger.error(f"Command update failed: {e}")
-                    
+
     def register_commands(self):
-        self.command_manager.register("x_velocity", CommandTerm(
-                    name="x_velocity", 
-                    description="X Velocity (m/s)", 
-                    min_value=-1.0, 
-                    max_value=1.0, 
-                    default_value=0.0
-                ))
-        
-        self.command_manager.register("y_velocity", CommandTerm(
-                    name="y_velocity", 
-                    description="Y Velocity (m/s)", 
-                    min_value=-1.0, 
-                    max_value=1.0, 
-                    default_value=0.0
-                ))
-        
-        self.command_manager.register("yaw", CommandTerm(
-                    name="yaw_rate", 
-                    description="Yaw Rate (rad/s)", 
-                    min_value=-3.14, 
-                    max_value=3.14, 
-                    default_value=0.0
-                ))
-        
+        self.command_manager.register(
+            "x_velocity",
+            CommandTerm(
+                name="x_velocity",
+                description="X Velocity (m/s)",
+                min_value=-1.0,
+                max_value=1.0,
+                default_value=0.0,
+            ),
+        )
+
+        self.command_manager.register(
+            "y_velocity",
+            CommandTerm(
+                name="y_velocity",
+                description="Y Velocity (m/s)",
+                min_value=-1.0,
+                max_value=1.0,
+                default_value=0.0,
+            ),
+        )
+
+        self.command_manager.register(
+            "yaw",
+            CommandTerm(
+                name="yaw_rate",
+                description="Yaw Rate (rad/s)",
+                min_value=-3.14,
+                max_value=3.14,
+                default_value=0.0,
+            ),
+        )
 
     def register_observations(self):
         """
-        Register observations for velocity-conditioned locomotion. Maintains a specific order for direct policy input. 
+        Register observations for velocity-conditioned locomotion. Maintains a specific order for direct policy input.
         Lambda is used to get the latest value from the class variables.
         """
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
@@ -317,9 +306,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(
-                joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}
-            ),
+            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}),
         )
         self.obs_manager.register(
             "last_action",
@@ -370,9 +357,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(
-                joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}
-            ),
+            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}),
         )
         self.obs_manager.register(
             "last_action",

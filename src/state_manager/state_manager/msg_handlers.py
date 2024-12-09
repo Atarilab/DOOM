@@ -21,9 +21,7 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         Dict: Low level states directly from the robot
     """
     # Extract motor states directly without reordering
-    motor_states = msg["motor_state"][
-        :12
-    ]  # 12 joint for the legs, the remaining 8 are unactuated
+    motor_states = msg["motor_state"][:12]  # 12 joint for the legs, the remaining 8 are unactuated
     joint_positions = np.array([motor.q for motor in motor_states])
     joint_velocities = np.array([motor.dq for motor in motor_states])
     joint_accelerations = np.array([motor.ddq for motor in motor_states])
@@ -76,9 +74,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     # Singleton pattern for velocity estimator
     if not hasattr(vicon_handler, "velocity_estimator"):
-        vicon_handler.velocity_estimator = VelocityEstimator(
-            method="finite_diff", alpha=0.2
-        )
+        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.2)
 
     # Base Position (in m)
     base_pos = np.array(
@@ -101,9 +97,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
-    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(
-        base_pos, base_quat, current_timestamp, logger
-    )
+    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(base_pos, base_quat, current_timestamp, logger)
 
     # Convert quaternion to a rotation matrix
     rotation_matrix = quat_to_rotmatrix(base_quat, order="wxyz")
@@ -121,9 +115,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     return states
 
 
-def sport_mode_state_handler(
-    msg: Dict[str, List], logger: Optional[logging.Logger] = None
-):
+def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:
@@ -135,9 +127,7 @@ def sport_mode_state_handler(
     """
     # Singleton pattern for velocity estimator
     if not hasattr(sport_mode_state_handler, "velocity_estimator"):
-        sport_mode_state_handler.velocity_estimator = VelocityEstimator(
-            method="finite_diff"
-        )
+        sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
     base_pos_w = msg["position"]
 

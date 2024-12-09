@@ -4,7 +4,7 @@
         {
             "label": "Build ROS2 Workspace",
             "type": "shell",
-            "command": "colcon build",
+            "command": "cd DOOM && colcon build",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -15,6 +15,25 @@
             "type": "shell",
             "command": "source install/setup.bash",
             "problemMatcher": []
+        },
+        {
+            "label": "Format & Lint",
+            "type": "shell",
+            "command": "black . --line-length 120 --exclude 'build|install|share' && python3 -m flake8 --exclude build,install,share --max-line-length=120",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Build and Format",
+            "dependsOn": [
+                "Build ROS2 Workspace",
+                "Source ROS2 Workspace",
+                "Format & Lint"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

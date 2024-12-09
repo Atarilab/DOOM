@@ -6,9 +6,7 @@ import torch
 
 
 class ObservationHistoryStorage:
-    def __init__(
-        self, num_envs: int, num_obs: int, max_length: int, device: torch.device = "cpu"
-    ):
+    def __init__(self, num_envs: int, num_obs: int, max_length: int, device: torch.device = "cpu"):
         """
         Initialize a FIFO queue for state history, starting with zeros at initialization.
 
@@ -65,9 +63,7 @@ class ObservationHistoryStorage:
         self.buffer[done_indices] = 0.0
 
 
-def reorder_robot_states(
-    states: np.ndarray, origin_order: List[str], target_order: List[str]
-) -> np.ndarray:
+def reorder_robot_states(states: np.ndarray, origin_order: List[str], target_order: List[str]) -> np.ndarray:
     """
     Reorder robot states based on origin and target leg orders.
 

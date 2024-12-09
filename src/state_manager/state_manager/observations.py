@@ -7,7 +7,6 @@ import numpy as np
 import torch
 import time
 
-from scipy.spatial.transform import Rotation as R
 
 from utils.helpers import reorder_robot_states
 from utils.math import quat_rotate_inverse, GRAVITY_DIR
@@ -28,9 +27,7 @@ def joint_pos(states: Dict[str, Any]) -> np.ndarray:
     return joint_pos
 
 
-def joint_pos_rel(
-    states: Dict[str, Any], default_joint_pos: np.ndarray, mapping: np.ndarray
-) -> np.ndarray:
+def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping: np.ndarray) -> np.ndarray:
     """
     Compute relative joint positions.
 
@@ -84,9 +81,7 @@ def projected_gravity_b(states: Dict[str, Any]) -> torch.Tensor:
     :return: Angular velocity in the base frame
     """
 
-    return quat_rotate_inverse(
-        torch.tensor([states["base_quat"]]).squeeze(0), GRAVITY_DIR
-    )
+    return quat_rotate_inverse(torch.tensor([states["base_quat"]]).squeeze(0), GRAVITY_DIR)
 
 
 def last_action(states: Dict[str, Any], last_action: Callable) -> np.ndarray:
@@ -99,9 +94,7 @@ def last_action(states: Dict[str, Any], last_action: Callable) -> np.ndarray:
     return last_action()
 
 
-def velocity_commands(
-    states: Dict[str, Any], velocity_commands: Callable
-) -> np.ndarray:
+def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> np.ndarray:
     """
     The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
 

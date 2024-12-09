@@ -1,6 +1,5 @@
 from typing import Dict, Any, Callable, Optional
 import logging
-import inspect
 
 
 class ObsTerm:

@@ -1,6 +1,5 @@
 import rclpy
 import logging
-import time
 from typing import Dict, Any, Callable, Optional
 import threading
 from abc import ABC, abstractmethod
@@ -73,9 +72,7 @@ class DDSStateSubscriber(StateSubscriber):
             # Call handler if exists
             if self.handler_func:
 
-                extracted_state = self.handler_func(
-                    extracted_state, **self.handler_args, logger=self.logger
-                )
+                extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
 
             # Save the final state
             self._latest_state = extracted_state
@@ -85,11 +82,7 @@ class DDSStateSubscriber(StateSubscriber):
         Extract state from DDS message.
         Override this method to customize state extraction.
         """
-        return {
-            field: getattr(msg, field)
-            for field in dir(msg)
-            if not field.startswith("_")
-        }
+        return {field: getattr(msg, field) for field in dir(msg) if not field.startswith("_")}
 
     def start_subscription(self):
         """Start DDS subscription."""
@@ -151,9 +144,7 @@ class ROS2StateSubscriber(StateSubscriber):
 
             # Call handler if exists
             if self.handler_func:
-                extracted_state = self.handler_func(
-                    extracted_state, **self.handler_args, logger=self.logger
-                )
+                extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
 
             # Save the final state
             self._latest_state = extracted_state
@@ -164,10 +155,7 @@ class ROS2StateSubscriber(StateSubscriber):
         Override this method to customize state extraction.
         """
         # Convert message to dictionary
-        return {
-            field: getattr(msg, field)
-            for field in msg.get_fields_and_field_types().keys()
-        }
+        return {field: getattr(msg, field) for field in msg.get_fields_and_field_types().keys()}
 
     def start_subscription(self):
         """Start ROS2 subscription."""
@@ -210,9 +198,7 @@ class StateManager:
         self._combined_state = {}
         self.logger = logger
 
-    def add_subscriber(
-        self, name: str, subscriber: StateSubscriber, start_immediately: bool = True
-    ):
+    def add_subscriber(self, name: str, subscriber: StateSubscriber, start_immediately: bool = True):
         """
         Add a state subscriber to the manager.
 

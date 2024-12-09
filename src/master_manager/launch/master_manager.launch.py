@@ -27,9 +27,7 @@ def generate_launch_description():
         condition=IfCondition(run_simulation),
         cmd=[
             "python3",
-            os.path.join(
-                os.getenv("HOME"), "/home/atari/workspace/DOOM/src/simulate.py"
-            ),
+            os.path.join(os.getenv("HOME"), "/home/atari/workspace/DOOM/src/simulate.py"),
             "--task",
             task,
             "--log",

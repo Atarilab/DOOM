@@ -10,9 +10,7 @@ from vicon_receiver.msg import Position
 class ViconSubscriber(Node):
     def __init__(self):
         super().__init__("vicon_debug_subscriber")
-        self.subscription = self.create_subscription(
-            Position, "/vicon/Go2/Go2", self.listener_callback, 10
-        )
+        self.subscription = self.create_subscription(Position, "/vicon/Go2/Go2", self.listener_callback, 10)
         print("Subscriber initialized!")
 
     def listener_callback(self, msg):

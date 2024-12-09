@@ -65,8 +65,7 @@ class StandUpController(ControllerBase):
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {
-                "q": phase * self.stand_up_joint_pos[i]
-                + (1 - phase) * self.stand_down_joint_pos[i],
+                "q": phase * self.stand_up_joint_pos[i] + (1 - phase) * self.stand_down_joint_pos[i],
                 "kp": phase * 50.0 + (1 - phase) * 20.0,
                 "dq": 0.0,
                 "kd": 3.5,
@@ -109,8 +108,7 @@ class StandDownController(ControllerBase):
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {
-                "q": phase * self.stand_down_joint_pos[i]
-                + (1 - phase) * self.stand_up_joint_pos[i],
+                "q": phase * self.stand_down_joint_pos[i] + (1 - phase) * self.stand_up_joint_pos[i],
                 "kp": phase * 50.0 + (1 - phase) * 20.0,
                 "dq": 0.0,
                 "kd": 3.5,
@@ -144,7 +142,6 @@ class StayDownController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal):
-        obs = self.obs_manager.compute_observations(state)
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {

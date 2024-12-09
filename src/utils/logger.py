@@ -20,9 +20,7 @@ def get_logger(
 
     # File Logs
     try:
-        final_log_file = os.path.abspath(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "../", log_file)
-        )
+        final_log_file = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../", log_file))
         log_dir = os.path.dirname(final_log_file)
 
         os.makedirs(log_dir, exist_ok=True)

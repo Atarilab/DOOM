@@ -15,8 +15,7 @@ class ControllerBase(ABC):
     Manages joint limits, observation tracking, and provides core control infrastructure.
     """
 
-    def __init__(self, pin_model_wrapper, 
-                 configs: Dict[str, Any]):
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
         """
         Initialize the base controller with model wrapper and configuration.
 
@@ -42,18 +41,12 @@ class ControllerBase(ABC):
         :param configs: Configuration dictionary
         """
         # Extract joint mappings
-        self.unitree_pin_joint_mappings = np.array(
-            configs["robot_config"]["unitree_pin_joint_mappings"]
-        )
+        self.unitree_pin_joint_mappings = np.array(configs["robot_config"]["unitree_pin_joint_mappings"])
 
         # Position limits (excluding first 7 DOFs for floating base)
         base_offset = 7
-        lower_limits = self.pin_model_wrapper.model.lowerPositionLimit[base_offset:][
-            self.unitree_pin_joint_mappings
-        ]
-        upper_limits = self.pin_model_wrapper.model.upperPositionLimit[base_offset:][
-            self.unitree_pin_joint_mappings
-        ]
+        lower_limits = self.pin_model_wrapper.model.lowerPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
+        upper_limits = self.pin_model_wrapper.model.upperPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
 
         # Conservative limit settings
         soft_limit_factor = 0.95
@@ -82,7 +75,7 @@ class ControllerBase(ABC):
         # Automatically register observations if method exists
         if hasattr(self, "register_observations"):
             self.register_observations()
-            
+
     def set_cmd_manager(self, cmd_manager: CommandManager):
         """
         Configure command manager for the controller.
@@ -111,7 +104,7 @@ class ControllerBase(ABC):
         :param state: The states directly subscribed from available topics.
         """
         self.latest_state = state
-    
+
     def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """
         Enforce motor torque limits.
@@ -128,10 +121,7 @@ class ControllerBase(ABC):
         :param joint_pos_targets: Desired joint positions
         :return: Positions constrained within soft limits
         """
-        return np.clip(
-            joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1]
-        )
-        
+        return np.clip(joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
 
     @abstractmethod
     def register_observations(self):
@@ -140,11 +130,9 @@ class ControllerBase(ABC):
         Implementations should maintain a consistent observation order.
         """
         pass
-    
+
     @abstractmethod
-    def compute_torques(
-        self, state: Dict[str, Any], desired_goal: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+    def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, np.ndarray]:
         """
         Compute control torques based on current state and desired goal.
 

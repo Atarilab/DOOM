@@ -18,16 +18,12 @@ def main():
         default="rl-velocity-sim-go2",
         help="Task name to run (e.g., rl-sim, mpc-real).",
     )
-    parser.add_argument(
-        "--log", type=str, default="test", help="Experiment name to log information"
-    )
+    parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     args = parser.parse_args()
 
     # Load task-specific configurations
     if args.task not in TASK_CONFIG:
-        raise ValueError(
-            f"Unknown task: {args.task}. Check tasks/task_configs.py for available tasks."
-        )
+        raise ValueError(f"Unknown task: {args.task}. Check tasks/task_configs.py for available tasks.")
 
     task_configs = TASK_CONFIG[args.task]
 
@@ -42,7 +38,7 @@ def main():
 
     # Initialize robot interface
     robot_interface = SimRobotInterface(robot_interface_config)
-    logger.info(f"Starting Simulation.")
+    logger.info("Starting Simulation.")
     # Execution loop
     try:
         for step in range(10000000):
