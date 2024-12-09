@@ -58,10 +58,11 @@ Example Workflow: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > 
 
 
 ## Vicon State Estimation
-The vicon receiver client is already installed in the docker container. You can simply launch it in a new terminal inside existing container (`./doom -a`) using:
+The Vicon receiver client is already installed in the docker container. You can launch it in a new terminal inside existing container (`./doom -a`) using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
+> Note: One of the markers around the midsection is the origin of the vicon frame. The [translations](https://github.com/Atarilab/DOOM/blob/ffeb612f67ab69da194d9a04be915162b138044b/src/state_manager/state_manager/msg_handlers.py#L71) towards the base were taken as a rough estimate. There are no rotations considered for this frame.
 
 ## Live Plotting using PlotJuggler
 ```bash
