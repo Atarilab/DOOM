@@ -80,7 +80,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ ] Implement a real-time High-Level Contact Planner 
 - [ ] Add support for AlienGo
 - [ ] Implement joystick control for velocity commands
-- [ ] Implement interface to change commands from UI
+- [x] Implement interface to change commands from UI
 - [x] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [x] Integrate Pinocchio for additional states such as feet positions
 - [x] Get vicon frame from Vicon SDK and transform to robot base
