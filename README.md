@@ -1,3 +1,4 @@
+![ATARI DOOM Banner](assets/banner.jpg)
 # DOOM
 Repository for running the experiments on the real robots.
 
