@@ -36,8 +36,7 @@ If the connection is not established, you might need to manually set the IP for 
 ---
 
 ## VS Code Workspace Setup
-Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container.
-Additionally, after the build, the debugger can also be setup using `Ctrl+Shift+D > Create launch.json`. `launch.json` can be setup using command line args for task and log.
+Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container. Additionally, debuggers for certain tasks are already defined in `.vscode/launch.json`.
 """
 
 ## How to use DOOM to control your robot
@@ -80,7 +79,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 ## TODO
 - [ ] Implement a real-time High-Level Contact Planner
 - [ ] Run the state publisher on a seperate thread for better performance
-- [ ] Add support for AlienGo
+- [ ] Add support for AlienGo/G1/Allegro
 - [ ] Implement joystick control for velocity commands
 - [x] Implement interface to change commands from UI
 - [x] Implement safety mechanisms (soft dof pos limits, dof torque limits)
