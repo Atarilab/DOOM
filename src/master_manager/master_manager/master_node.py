@@ -1,8 +1,8 @@
 import argparse
-import threading
 import asyncio
 import logging
 import os
+import threading
 from typing import Optional
 
 import rclpy
@@ -27,6 +27,7 @@ from controllers.stand_controller import (
     StandUpController,
     StayDownController,
 )
+from controllers.state_publisher import RobotStatePublisher
 from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber, StateManager
 from utils.initialization import initialize_channel, initialize_robot_controller
@@ -35,8 +36,6 @@ from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 
 # DOOM Imports
 from utils.ui_interface import ModeManager, RobotControlUI
-
-from controllers.state_publisher import RobotStatePublisher
 
 
 class LowLevelCmdPublisher(Node):
@@ -54,7 +53,7 @@ class LowLevelCmdPublisher(Node):
         self.mode_manager = mode_manager
         self.state_manager = state_manager
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # Initialize ROS state publisher
         # self.state_publisher = RobotStatePublisher()
 
@@ -95,7 +94,7 @@ class LowLevelCmdPublisher(Node):
         # Get active controller and compute torques
         active_controller = self.mode_manager.get_active_controller()
         active_obs_manager = self.mode_manager.get_active_obs_manager()
-        
+
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
 
@@ -139,8 +138,11 @@ class LowLevelCmdPublisher(Node):
 
         self.last_callback_time = current_time
 
+
 node = None
 state_manager = None
+
+
 async def main_async(args=None):
     """Main asynchronous entry point for robot controller."""
     global node
@@ -259,7 +261,6 @@ async def main_async(args=None):
                     rclpy.spin_once(node)
                     state_manager.spin_subscribers()
                     # rclpy.spin_once(node.state_publisher)
-                    
 
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
             try:

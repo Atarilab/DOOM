@@ -1,4 +1,4 @@
-policy_path: "policies/policy.pt"
+policy_path: "policies/policy_old.pt"
 control_dt: 0.001
 action_dim: 12
 action_scale: 0.25

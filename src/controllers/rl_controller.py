@@ -191,6 +191,7 @@ class BaseRLLocomotionController(ControllerBase):
                 .numpy()[self.actions_isaac_to_unitree_mapping]
             )
 
+            # Clip the joint pos targets for safety
             joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
             # Prepare motor commands
@@ -326,6 +327,12 @@ class RLLocomotionContactController(BaseRLLocomotionController):
     Contact-conditioned RL Locomotion Controller
     Uses contact-explicit reinforcement learning policy
     """
+    
+    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+        super().__init__(pin_model_wrapper=pin_model_wrapper, configs=configs)
+
+        # Default velocity commands
+        self.velocity_commands = np.array([0.0, 0.0, 0.0])
 
     def register_observations(self):
         """
