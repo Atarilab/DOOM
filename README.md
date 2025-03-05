@@ -1,6 +1,6 @@
 ![ATARI DOOM Banner](assets/banner.jpg)
 # DOOM
-Repository for running the experiments on the real robots.
+Repository for running the experiments on the real robots and simulate them on Mujoco using a common interface.
 
 ## Requirements 
 - docker (ros2 container with unitree_sdk)
