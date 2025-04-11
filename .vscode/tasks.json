@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build ROS2 Workspace",
+            "label": "build_ros2_workspace",
             "type": "shell",
             "command": "cd DOOM && colcon build",
             "group": {

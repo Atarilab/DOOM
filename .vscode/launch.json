@@ -5,7 +5,8 @@
             "name": "rl-velocity-sim-go2 debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/src/master_manager/master_node.py",
+            // "program": "${file}",
             "console": "integratedTerminal",
             "args": [
                 "--task",
@@ -18,7 +19,7 @@
             "name": "rl-velocity-real-go2 debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/src/master_manager/master_node.py",
             "console": "integratedTerminal",
             "args": [
                 "--task",
