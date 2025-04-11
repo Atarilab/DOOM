@@ -25,7 +25,8 @@ For more helpful functions from `./doom.sh`, run:
 ./doom.sh -h
 ```
 
-> **Warning:** Before you run anything on the robot, make sure to turn off the sports mode using the Go2 app. Log in to the app using the ATARI Gmail credentials and toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot. 
+> **Warning:** Before you run anything on the robot, make sure to turn off the sports mode using the Go2 app. Log in to the app using the ATARI Gmail credentials and toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot.
+> **Check:** Unitree ros topics should appear by default with 'ros2 topic list'. If not, try restarting your computer.
 
 ## Testing Robot Connection
 Once inside the docker container, you can access the Robot's IP address via `$ROBOT_IP`. You can test the connection using:
