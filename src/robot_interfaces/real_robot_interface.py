@@ -1,8 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64MultiArray
-
 from robot_interfaces.robot_interface_base import RobotInterfaceBase
+from std_msgs.msg import Float64MultiArray
 
 
 class RealRobotInterface(RobotInterfaceBase):

@@ -6,20 +6,7 @@ import threading
 from typing import Optional
 
 import rclpy
-from rclpy.node import Node
-
-# Unitree DDS
-from unitree_sdk2py.core.channel import ChannelPublisher
-from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportModeState_
-from unitree_sdk2py.utils.crc import CRC
-
-# ROS Messages
-# from unitree_go.msg._low_state import LowState
-# from unitree_go.msg._sport_mode_state import SportModeState
-from vicon_receiver.msg import Position
-
-from controllers.rl_controller import RLLocomotionVelocityController
+from controllers.rl_controller import RLLocomotionContactController, RLLocomotionVelocityController
 from controllers.stand_controller import (
     IdleController,
     StanceController,
@@ -28,14 +15,27 @@ from controllers.stand_controller import (
     StayDownController,
 )
 from controllers.state_publisher import RobotStatePublisher
+from rclpy.node import Node
 from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber, StateManager
+
+# Unitree DDS
+from unitree_sdk2py.core.channel import ChannelPublisher
+from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportModeState_
+from unitree_sdk2py.utils.crc import CRC
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.logger import get_logger
 from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
+from utils.mj_wrapper import MjQuadRobotWrapper
 
 # DOOM Imports
 from utils.ui_interface import ModeManager, RobotControlUI
+
+# ROS Messages
+# from unitree_go.msg._low_state import LowState
+# from unitree_go.msg._sport_mode_state import SportModeState
+from vicon_receiver.msg import Position
 
 
 class LowLevelCmdPublisher(Node):
@@ -110,8 +110,17 @@ class LowLevelCmdPublisher(Node):
             #     )
 
             # Retrieve states from state manager
-            combined_state = self.state_manager.get_combined_state()
-            active_controller.update_state(combined_state)
+            try:
+                combined_state = self.state_manager.get_combined_state()
+            except Exception as e:
+                self.logger.error(f"Error getting combined state: {e}")
+                return
+
+            try:
+                active_controller.update_state(combined_state)
+            except Exception as e:
+                self.logger.error(f"Error updating controller state: {e}")
+                return
             # self.state_publisher.update_latest_state(combined_state)
 
             # self.logger.debug(combined_state['feet_pos'])
@@ -120,7 +129,19 @@ class LowLevelCmdPublisher(Node):
             #     self.logger.debug(observations)
 
             # Compute motor commands
-            motor_commands = active_controller.compute_torques(combined_state, {})
+            try:
+                motor_commands = active_controller.compute_torques(combined_state, {})
+            except Exception as e:
+                self.logger.error(f"Error computing motor commands: {e}")
+                return
+
+            # if active_controller.name != "IdleController":
+            #     # Get positions
+            #     body_pos = active_controller.mj_model_wrapper.get_body_position_init_frame("base_link")
+            #     feet_pos = active_controller.mj_model_wrapper.get_feet_positions_init_frame()
+            #     self.logger.debug(
+            #         f"Body Position (initial frame): {body_pos}\nFeet Positions (initial frame):\n{feet_pos}"
+            #     )
 
             # Update command structure
             for i in range(12):
@@ -134,7 +155,7 @@ class LowLevelCmdPublisher(Node):
 
         except Exception as e:
             if self.logger:
-                self.logger.error(f"Error in command computation: {e}")
+                self.logger.error(f"Error in low level callback computation: {e}")
 
         self.last_callback_time = current_time
 
@@ -217,27 +238,35 @@ async def main_async(args=None):
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
 
         pin_model_wrapper = PinQuadRobotWrapper(configs["robot_config"]["pinocchio_urdf"])
+        mj_model_wrapper = MjQuadRobotWrapper(configs["robot_config"]["xml_path"])  # Using same URDF for now
 
         # Create mode manager and register controllers
         mode_manager = ModeManager(logger=logger)
-        mode_manager.register_mode("IDLE", {"default": IdleController(pin_model_wrapper, configs)})
+        mode_manager.register_mode("IDLE", {"default": IdleController(pin_model_wrapper, mj_model_wrapper, configs)})
 
         mode_manager.register_mode(
             "STANDING",
             {
-                "STAY_DOWN": StayDownController(pin_model_wrapper, configs),
-                "STAND_UP": StandUpController(pin_model_wrapper, configs),
-                "STAND_DOWN": StandDownController(pin_model_wrapper, configs),
+                "STAY_DOWN": StayDownController(pin_model_wrapper, mj_model_wrapper, configs),
+                "STAND_UP": StandUpController(pin_model_wrapper, mj_model_wrapper, configs),
+                "STAND_DOWN": StandDownController(pin_model_wrapper, mj_model_wrapper, configs),
             },
         )
 
-        mode_manager.register_mode("STANCE", {"STANCE": StanceController(pin_model_wrapper, configs)})
+        mode_manager.register_mode("STANCE", {"STANCE": StanceController(pin_model_wrapper, mj_model_wrapper, configs)})
 
         mode_manager.register_mode(
             "RL-VELOCITY",
             {
                 "STANCE": StanceController(pin_model_wrapper, configs),
-                "RL-VELOCITY": RLLocomotionVelocityController(pin_model_wrapper=pin_model_wrapper, configs=configs),
+                "RL-VELOCITY": RLLocomotionVelocityController(
+                    pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs
+                ),
+                # "RL-CONTACT": RLLocomotionContactController(
+                #     pin_model_wrapper=pin_model_wrapper,
+                #     mj_model_wrapper=mj_model_wrapper,
+                #     configs=configs
+                # ),
             },
         )
 

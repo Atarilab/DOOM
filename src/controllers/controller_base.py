@@ -1,11 +1,14 @@
-from abc import ABC, abstractmethod
 import threading
-from typing import Any, Dict, Optional
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import numpy as np
-
 from commands.command_manager import CommandManager
 from state_manager.obs_manager import ObservationManager
+
+if TYPE_CHECKING:
+    from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
+    from utils.mj_wrapper.mj_robot import MjQuadRobotWrapper
 
 
 class ControllerBase(ABC):
@@ -16,11 +19,17 @@ class ControllerBase(ABC):
     Manages joint limits, observation tracking, and provides core control infrastructure.
     """
 
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+    def __init__(
+        self,
+        pin_model_wrapper: "PinQuadRobotWrapper",
+        mj_model_wrapper: "MjQuadRobotWrapper" = None,
+        configs: Dict[str, Any] = None,
+    ):
         """
         Initialize the base controller with model wrapper and configuration.
 
         :param pin_model_wrapper: Pinocchio model wrapper for kinematics
+        :param mj_model_wrapper: MuJoCo model wrapper for additional computations
         :param configs: Configuration dictionary containing robot-specific parameters
         """
         # Timing and synchronization
@@ -29,8 +38,12 @@ class ControllerBase(ABC):
 
         # Model and manager initialization
         self.pin_model_wrapper = pin_model_wrapper
+        self.mj_model_wrapper = mj_model_wrapper
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
+        self.configs = configs
+        self.latest_state = None
+        self.name = None
 
         # Joint mapping and limits
         self._setup_joint_limits(configs)
@@ -97,7 +110,7 @@ class ControllerBase(ABC):
         """
         self.start_time = start_time
 
-    def update_state(self, state):
+    def update_state(self, state: Dict[str, Any]) -> None:
         """
         Sets the latest state received from the subscribers. This is done such that the mode-specific
         observations can be computed in real-time.
@@ -133,7 +146,7 @@ class ControllerBase(ABC):
         pass
 
     @abstractmethod
-    def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, np.ndarray]:
+    def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, Any]:
         """
         Compute control torques based on current state and desired goal.
 
@@ -141,4 +154,6 @@ class ControllerBase(ABC):
         :param desired_goal: Target state or task objective
         :return: Control torques for robot actuation
         """
+        if self.mj_model_wrapper is not None:
+            self.mj_model_wrapper.update(state)
         pass

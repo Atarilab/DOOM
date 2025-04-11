@@ -1,4 +1,66 @@
-policy_path: "path/to/pretrained/policy.pt"
-observation_normalization: true
-action_clipping: true
-control_dt: 0.002
+policy_path: "policies/contact_policy.pt"
+control_dt: 0.001
+action_dim: 12
+obs_dim: 65
+action_scale: 0.25
+stiffness: 25.0
+damping: 0.5
+default_joint_pos:
+  - 0.1
+  - 0.8
+  - -1.5
+  - -0.1
+  - 0.8
+  - -1.5
+  - 0.1
+  - 1.0
+  - -1.5
+  - -0.1
+  - 1.0
+  - -1.5
+
+ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joint_names object
+  - "FL_hip_joint" # 0
+  - "FR_hip_joint" # 1
+  - "RL_hip_joint" # 2
+  - "RR_hip_joint" # 3
+  - "FL_thigh_joint" # 4
+  - "FR_thigh_joint" # 5
+  - "RL_thigh_joint" # 6
+  - "RR_thigh_joint" # 7
+  - "FL_calf_joint" # 8
+  - "FR_calf_joint" # 9
+  - "RL_calf_joint" # 10
+  - "RR_calf_joint" # 11
+
+JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING:
+  [3, 0, 9, 6, 4, 1, 10, 7, 5, 2, 11, 8]
+JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
+    1,
+    5,
+    9,
+    0,
+    4,
+    8,
+    3,
+    7,
+    11,
+    2,
+    6,
+    10,
+  ] 
+
+ISAAC_LAB_DEFAULT_JOINT_POS: [
+    0.1000, # 0
+    -0.1000, # 1
+    0.1000, # 2
+    -0.1000, # 3
+    0.8000, # 4
+    0.8000, # 5
+    1.0000, # 6
+    1.0000, # 7
+    -1.5000, # 8
+    -1.5000, # 9
+    -1.5000, # 10
+    -1.5000, # 11
+  ] # from asset.data.default_joint_pos; corresponds to ISAACLAB_JOINT_ORDER; is used as action offset

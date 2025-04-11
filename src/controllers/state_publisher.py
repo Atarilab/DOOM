@@ -2,8 +2,8 @@
 import threading
 from threading import Lock
 
-from geometry_msgs.msg import PoseStamped, TwistStamped
 import rclpy
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
@@ -58,8 +58,8 @@ class RobotStatePublisher(Node):
                 base_pose_msg.pose.orientation.z = float(current_state["base_quat"][3])
                 base_pose_msg.pose.orientation.w = float(current_state["base_quat"][0])
             else:
-                base_pose_msg.pose.position.y = 0.0
                 base_pose_msg.pose.position.x = 0.0
+                base_pose_msg.pose.position.y = 0.0
                 base_pose_msg.pose.position.z = 0.0
                 base_pose_msg.pose.orientation.x = 0.0
                 base_pose_msg.pose.orientation.y = 0.0

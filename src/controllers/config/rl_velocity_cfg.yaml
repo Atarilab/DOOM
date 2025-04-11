@@ -1,6 +1,7 @@
-policy_path: "policies/policy_old.pt"
+policy_path: "policies/velocity_policy.pt"
 control_dt: 0.001
 action_dim: 12
+obs_dim: 48
 action_scale: 0.25
 stiffness: 25.0
 damping: 0.5
@@ -24,7 +25,7 @@ ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joi
   - "RL_hip_joint" # 2
   - "RR_hip_joint" # 3
   - "FL_thigh_joint" # 4
-  - "F # joint" # 5
+  - "FR_thigh_joint" # 5
   - "RL_thigh_joint" # 6
   - "RR_thigh_joint" # 7
   - "FL_calf_joint" # 8

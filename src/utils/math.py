@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.spatial.transform import Rotation as R
 import torch
+from scipy.spatial.transform import Rotation as R
 
 GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
 

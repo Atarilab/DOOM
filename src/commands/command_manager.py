@@ -17,7 +17,8 @@ class CommandTerm:
     min_value: float
     max_value: float
     default_value: float
-    type: type = float
+    type: type
+    current_value: Any = None
     validator: Optional[Callable[[Any], bool]] = None
 
     def validate_type(self, value: Any) -> bool:
@@ -46,6 +47,9 @@ class CommandTerm:
             return True
         except (TypeError, ValueError):
             return False
+
+    def set_value(self, value: Any):
+        self.current_value = value
 
 
 class CommandManager:
@@ -87,11 +91,11 @@ class CommandManager:
             (param.name, param.description, param.min_value, param.max_value) for cmd, param in self._commands.items()
         ]
 
-    def validate_and_update_commands(
+    def validate_and_change_commands(
         self, current_commands: np.ndarray, new_command_values: Dict[str, Any]
     ) -> np.ndarray:
         """
-        Validate and update command values for a specific controller.
+        Validate and change command values for a specific controller.
 
         :param controller_type: Name of the controller type
         :param current_commands: Current command values
@@ -111,6 +115,7 @@ class CommandManager:
                     try:
                         index = [p.name for cmd, p in self._commands.items()].index(param.name)
                         updated_commands[index] = float(new_value)
+
                     except ValueError:
                         if self.logger:
                             self.logger.warning(f"Could not find index for parameter {param.name}")

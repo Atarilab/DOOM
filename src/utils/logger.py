@@ -25,7 +25,7 @@ def get_logger(
 
         os.makedirs(log_dir, exist_ok=True)
 
-        file_handler = logging.FileHandler(final_log_file)
+        file_handler = logging.FileHandler(final_log_file, mode="w")
         file_handler.setLevel(file_level)
         file_handler.setFormatter(logging.Formatter(log_format))
         logger.addHandler(file_handler)

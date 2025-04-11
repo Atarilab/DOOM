@@ -1,15 +1,14 @@
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from commands.command_manager import CommandManager
+from controllers.stand_controller import ControllerBase
+from state_manager.obs_manager import ObservationManager
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.validation import Number
 from textual.widgets import Button, Header, Input, Label, Static
-
-from commands.command_manager import CommandManager
-from controllers.stand_controller import ControllerBase
-from state_manager.obs_manager import ObservationManager
 from utils.logger import logging
 
 
@@ -67,6 +66,16 @@ class ModeManager:
 
         if submode is not None:
             self.logger.debug(f"Mode set to: {self._current_mode} - {self._current_submode}")
+            
+        # Run set_mode function if it exists in the controller
+        if self._current_submode:
+            controller = self._modes[self._current_mode][self._current_submode]
+        else:
+            controller = self._modes[self._current_mode].get("default", None)
+            
+        if controller and hasattr(controller, "set_mode"):
+            controller.set_mode()
+
         else:
             self.logger.debug(f"Mode set to: {self._current_mode}")
 
@@ -139,27 +148,54 @@ class CommandWidget(Vertical):
 
         # Create a container for input fields to group them
         with Vertical(classes="command-inputs-container"):
-
             yield Button(
-                "Update Commands",
+                "Change Commands",
                 variant="success",
                 classes="update-button",
                 id="update-commands-btn",
             )
-            # Create input fields for each command specification
-            for command_name, label, min_val, max_val in self.command_specs:
-                with Horizontal(classes="command-input-row"):
-                    # Label for the input
-                    yield Label(label, classes="command-label")
 
-                    # Numeric input with validation
-                    input_field = Input(
-                        placeholder=f"Enter {label}",
-                        validators=[Number(minimum=min_val, maximum=max_val)],
-                        classes="command-input",
-                        id=f"input-{command_name}",
-                    )
-                    yield input_field
+            # Check if this is a contact controller
+            if hasattr(self.controller, "gait_patterns"):
+                # Create gait selection buttons
+                yield Label("Select Gait Pattern", classes="command-label")
+                with Horizontal(classes="gait-buttons-container"):
+                    for gait in self.controller.gait_patterns.keys():
+                        yield Button(
+                            gait.capitalize(),
+                            classes="gait-button",
+                            id=f"gait-{gait}",
+                        )
+            elif hasattr(self.controller, "velocity_commands"):
+                # Create numeric input fields for other controllers
+                for command_name, label, min_val, max_val in self.command_specs:
+                    with Horizontal(classes="command-input-row"):
+                        yield Label(label, classes="command-label")
+                        input_field = Input(
+                            placeholder=f"Enter {label}",
+                            validators=[Number(minimum=min_val, maximum=max_val)],
+                            classes="command-input",
+                            id=f"input-{command_name}",
+                        )
+                        yield input_field
+
+    def on_button_pressed(self, event: Button.Pressed):
+        """Handle button presses for gait selection."""
+        button_id = event.button.id
+
+        if button_id.startswith("gait-"):
+            # Update the gait selection
+            gait = button_id.replace("gait-", "")
+            updates = {"gait": gait}
+
+            # Update the controller
+            if hasattr(self.controller, "change_commands"):
+                self.controller.change_commands(updates)
+
+                # Visual feedback
+                for btn in self.query(".gait-button"):
+                    btn.styles.background = "rgb(50, 50, 80)"
+                event.button.styles.background = "rgb(70, 70, 110)"
 
 
 class RobotControlUI(App):
@@ -325,6 +361,32 @@ class RobotControlUI(App):
             display: block;
             align: center middle;
     }
+
+        .gait-buttons-container {
+            layout: horizontal;
+            align: center middle;
+            margin: 1;
+            height: auto;
+        }
+
+        .gait-button {
+            width: 20%;
+            margin: 0 1;
+            background: rgb(50, 50, 80);
+            color: rgb(200, 200, 230);
+            border: round $background;
+        }
+
+        .gait-button:hover {
+            background: rgb(70, 70, 110);
+            color: $text;
+        }
+
+        .gait-button.selected {
+            background: $accent;
+            color: $text;
+            border: tall $background;
+        }
     """
 
     current_mode = reactive(None)
@@ -486,12 +548,12 @@ class RobotControlUI(App):
 
         self.logger.info(f"Button Pressed: {event.button.id}")
         active_controller = self.mode_manager.get_active_controller()
-        if event.button.id == "update-commands-btn" and hasattr(active_controller, "update_commands"):
-            self.update_commands(active_controller)
+        if event.button.id == "update-commands-btn" and hasattr(active_controller, "change_commands"):
+            self.change_commands(active_controller)
 
         self.show_widgets()
 
-    def update_commands(self, active_controller: ControllerBase):
+    def change_commands(self, active_controller: ControllerBase):
         """
         Validate and apply command configurations to the controller.
         """
@@ -524,8 +586,8 @@ class RobotControlUI(App):
         # Apply updates if all inputs are valid
         if is_valid:
             try:
-                if hasattr(active_controller, "update_commands"):
-                    active_controller.update_commands(updates)
+                if hasattr(active_controller, "change_commands"):
+                    active_controller.change_commands(updates)
 
                 # Provide visual feedback
                 update_button = self.query_one("#update-commands-btn")

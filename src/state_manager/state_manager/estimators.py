@@ -2,7 +2,6 @@ import threading
 
 import numpy as np
 from scipy.linalg import logm
-
 from utils.math import quat_to_rotmatrix, quaternion_to_euler
 
 

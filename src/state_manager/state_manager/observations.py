@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict
 
 import numpy as np
 import torch
-
 from utils.helpers import reorder_robot_states
 from utils.math import GRAVITY_DIR, quat_rotate_inverse
 
@@ -78,7 +77,7 @@ def projected_gravity_b(states: Dict[str, Any]) -> torch.Tensor:
     The projected gravity vector.
 
     :param states: State dictionary
-    :return: Angular velocity in the base frame
+    :return: Projected Gravity vector in the base frame
     """
 
     return quat_rotate_inverse(torch.tensor([states["base_quat"]]).squeeze(0), GRAVITY_DIR)
@@ -102,6 +101,16 @@ def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> np
     :return: Velocity commands (Vx, Vy, Wz)
     """
     return velocity_commands()
+
+
+def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> np.ndarray:
+    """
+    The contact plan. We use a callable (lambda) to fetch the latest value from the controller class.
+
+    :param states: State dictionary
+    :return: Contact plan
+    """
+    return contact_plan().view(-1)
 
 
 def feet_pos(states: Dict[str, Any], pin_model_wrapper) -> np.ndarray:

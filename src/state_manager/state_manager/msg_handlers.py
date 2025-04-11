@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pinocchio as pin
-
 from state_manager.estimators import VelocityEstimator
 from utils.logger import logging
 from utils.math import quat_to_rotmatrix
@@ -43,7 +42,7 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         "joint_vel": joint_velocities,
         "joint_acc": joint_accelerations,
         "joint_tau_est": joint_tau_est,
-        # 'foot_forces': foot_forces,
+        "foot_forces": foot_forces,
         # 'foot_force_est': foot_force_est,
         # 'feet_pos': dict(zip([f'{name}_foot' for name in pin_model_wrapper.foot_names],
         #                         pin_model_wrapper.get_foot_pos_base())),

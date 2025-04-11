@@ -1,8 +1,11 @@
-import numpy as np
+from typing import Any, Dict
 
+import numpy as np
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import starting_time
+from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
+from utils.mj_wrapper import MjQuadRobotWrapper
 
 
 class IdleController(ControllerBase):
@@ -10,8 +13,8 @@ class IdleController(ControllerBase):
     Used to set zero commands to the motor. This is particularly useful when exiting the controller to reset the torques to 0.
     """
 
-    def __init__(self, pin_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, configs)
+    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
+        super().__init__(pin_model_wrapper, mj_model_wrapper, configs=configs)
 
     def register_observations(self):
         """
@@ -20,6 +23,12 @@ class IdleController(ControllerBase):
         pass
 
     def compute_torques(self, state, desired_goal):
+
+        # When Init Controller is called, set the init frame
+        self.mj_model_wrapper.set_initial_world_frame(state, caller=self.__class__.__name__)
+
+        super().compute_torques(state, desired_goal=desired_goal)
+
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {
@@ -38,9 +47,12 @@ class StandUpController(ControllerBase):
     to the stand up joint positions which are constants.
     """
 
-    def __init__(self, pin_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, configs)
+    def __init__(
+        self, pin_model_wrapper: PinQuadRobotWrapper, mj_model_wrapper: MjQuadRobotWrapper, configs: Dict[str, Any]
+    ):
+        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
+        self.name = "StandUpController"
         self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
         self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
         self.start_time = 0.0
@@ -59,10 +71,12 @@ class StandUpController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal=None):
+        super().compute_torques(state, desired_goal=desired_goal)
         obs = self.obs_manager.compute(state)
 
         time = obs["time"] - self.start_time
         phase = np.tanh(time / 1.2)
+
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {
@@ -81,8 +95,8 @@ class StandDownController(ControllerBase):
     to the stand down joint positions which are constants.
     """
 
-    def __init__(self, pin_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, configs)
+    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
+        super().__init__(pin_model_wrapper, mj_model_wrapper, configs=configs)
 
         self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
         self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
@@ -102,6 +116,8 @@ class StandDownController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal=None):
+        super().compute_torques(state, desired_goal=desired_goal)
+
         obs = self.obs_manager.compute(state)
 
         time = obs["time"] - self.start_time
@@ -123,8 +139,8 @@ class StayDownController(ControllerBase):
     The Stay Down Controller is used to stay down close the ground, to prepare to get up.
     """
 
-    def __init__(self, pin_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, configs)
+    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
+        super().__init__(pin_model_wrapper, mj_model_wrapper, configs=configs)
 
         self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
         self.start_time = 0.0
@@ -143,6 +159,8 @@ class StayDownController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal):
+        super().compute_torques(state, desired_goal=desired_goal)
+
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {
@@ -160,8 +178,8 @@ class StanceController(ControllerBase):
     The Stance Controller is used to stay in stance. Used to prepare to go to rest from other controllers.
     """
 
-    def __init__(self, pin_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, configs)
+    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
+        super().__init__(pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
         self.start_time = 0.0
@@ -180,6 +198,7 @@ class StanceController(ControllerBase):
         )
 
     def compute_torques(self, state, desired_goal):
+        super().compute_torques(state, desired_goal=desired_goal)
         cmd = {}
         for i in range(12):
             cmd[f"motor_{i}"] = {

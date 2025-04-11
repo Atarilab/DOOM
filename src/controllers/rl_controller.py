@@ -1,12 +1,11 @@
-from itertools import chain
 import os
 import threading
 import time
-from typing import Any, Dict
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Dict
 
 import numpy as np
 import torch
-
 from commands.command_manager import CommandTerm
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
@@ -22,6 +21,11 @@ from state_manager.observations import (
 )
 from utils.helpers import ObservationHistoryStorage
 
+if TYPE_CHECKING:
+    from state_manager.obs_manager import ObservationManager
+    from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
+    from utils.mj_wrapper.mj_robot import MjQuadRobotWrapper
+
 
 class BaseRLLocomotionController(ControllerBase):
     """
@@ -31,14 +35,16 @@ class BaseRLLocomotionController(ControllerBase):
     with concurrent observation processing and policy inference.
     """
 
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
+    def __init__(
+        self, pin_model_wrapper: "PinQuadRobotWrapper", mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
+    ):
         """
         Initialize the RL locomotion controller with model and configuration.
 
         :param pin_model_wrapper: Pinocchio model wrapper for kinematics
         :param configs: Configuration dictionary
         """
-        super().__init__(pin_model_wrapper=pin_model_wrapper, configs=configs)
+        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Load and prepare policy model
         self._load_policy_model(configs)
@@ -100,10 +106,11 @@ class BaseRLLocomotionController(ControllerBase):
         """
         # Performance optimization: Preallocate tensors
         action_dim = configs["controller_config"]["action_dim"]
+        obs_dim = configs["controller_config"]["obs_dim"]
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
-        self.obs_buffer = ObservationHistoryStorage(num_envs=1, num_obs=48, max_length=1, device="cpu")
+        self.obs_buffer = ObservationHistoryStorage(num_envs=1, num_obs=obs_dim, max_length=1, device="cpu")
 
         # Start concurrent processing threads
         self._init_processing_threads()
@@ -142,15 +149,31 @@ class BaseRLLocomotionController(ControllerBase):
                 # Compute and store observations
                 with torch.no_grad():
                     obs = self.obs_manager.compute(current_state)
-                    obs_tensor = torch.tensor(
-                        list(chain.from_iterable(obs.values())),
-                        dtype=torch.float32,
-                        device="cpu",
-                    )
-                    self.obs_buffer.add(obs_tensor.unsqueeze(0))
+
+                    try:
+                        obs_tensor = torch.tensor(
+                            list(chain.from_iterable(obs.values())),
+                            dtype=torch.float32,
+                            device="cpu",
+                        )
+                        self.obs_buffer.add(obs_tensor.unsqueeze(0))
+                    except Exception as e:
+                        print(f"Error converting observations to tensor: {e}")
+                        print("Observations that caused the error:")
+                        for obs_name, obs_value in obs.items():
+                            print(f"{obs_name}: {type(obs_value)}")
+                            if isinstance(obs_value, (np.ndarray, torch.Tensor)):
+                                print(f"  Shape: {obs_value.shape}")
+                            else:
+                                print(f"  Value: {obs_value}")
+                        raise
 
             except Exception as e:
                 print(f"Observation processing error: {e}")
+                print(f"Error type: {type(e)}")
+                import traceback
+
+                print(f"Traceback: {traceback.format_exc()}")
                 time.sleep(0.1)  # Prevent rapid error loops
 
     def _run_policy_inference(self):
@@ -177,6 +200,8 @@ class BaseRLLocomotionController(ControllerBase):
         :param desired_goal: Desired goal state (not used in this implementation)
         :return: Motor commands dictionary
         """
+        super().compute_torques(state, desired_goal)
+
         start_time = time.perf_counter()
 
         try:
@@ -222,21 +247,23 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     Uses contact-implicit reinforcement learning policy
     """
 
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
-        super().__init__(pin_model_wrapper=pin_model_wrapper, configs=configs)
+    def __init__(
+        self, pin_model_wrapper: "PinQuadRobotWrapper", mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
+    ):
+        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Default velocity commands
         self.velocity_commands = np.array([0.0, 0.0, 0.0])
 
-    def update_commands(self, new_commands: Dict[str, Any]):
+    def change_commands(self, new_commands: Dict[str, Any]):
         """
-        Update velocity commands with validation.
+        Change velocity commands with validation.
 
         :param new_commands: Dictionary of new command values
         """
 
         try:
-            self.velocity_commands = self.command_manager.validate_and_update_commands(
+            self.velocity_commands = self.command_manager.validate_and_change_commands(
                 self.velocity_commands, new_commands
             )
             self.command_manager.logger.debug(f"Command Updated: {new_commands}")
@@ -249,6 +276,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         self.command_manager.register(
             "x_velocity",
             CommandTerm(
+                type=float,
                 name="x_velocity",
                 description="X Velocity (m/s)",
                 min_value=-1.0,
@@ -260,6 +288,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         self.command_manager.register(
             "y_velocity",
             CommandTerm(
+                type=float,
                 name="y_velocity",
                 description="Y Velocity (m/s)",
                 min_value=-1.0,
@@ -271,6 +300,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         self.command_manager.register(
             "yaw",
             CommandTerm(
+                type=float,
                 name="yaw_rate",
                 description="Yaw Rate (rad/s)",
                 min_value=-3.14,
@@ -327,30 +357,144 @@ class RLLocomotionContactController(BaseRLLocomotionController):
     Contact-conditioned RL Locomotion Controller
     Uses contact-explicit reinforcement learning policy
     """
-    
-    def __init__(self, pin_model_wrapper, configs: Dict[str, Any]):
-        super().__init__(pin_model_wrapper=pin_model_wrapper, configs=configs)
 
-        # Default velocity commands
-        self.velocity_commands = np.array([0.0, 0.0, 0.0])
+    def __init__(
+        self, pin_model_wrapper: "PinQuadRobotWrapper", mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
+    ):
+        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
+        self.mj_model_wrapper = mj_model_wrapper
+
+        # Contact command parameters
+        self.contact_plan_duration = 0.35  # Duration of each contact plan in seconds
+        self.current_contact_plan = torch.zeros((2, 4), dtype=torch.bool)  # Current contact pattern
+        self.contact_plan_start_time = time.time()  # When the current plan started
+        self.contact_plan_phase = 0.0  # Current phase within the contact plan (0 to 1)
+
+        # Horizon planning
+        self.future_feet_positions_init_frame = None
+        self.horizon_length = 10
+        self.feet_step_size = 0.2  # meters
+
+
+        # Define gait patterns (FL, FR, RL, RR)
+        self.gait_patterns = {
+            "trot": torch.tensor(
+                [
+                    [True, False, False, True],  # Phase 1: FL and RR in contact
+                    [False, True, True, False],  # Phase 2: FR and RL in contact
+                ]
+            ),
+            "pace": torch.tensor(
+                [
+                    [True, False, True, False],  # Phase 1: FL and RL in contact
+                    [False, True, False, True],  # Phase 2: FR and RR in contact
+                ]
+            ),
+            "bound": torch.tensor(
+                [
+                    [True, True, False, False],  # Phase 1: Front legs in contact
+                    [False, False, True, True],  # Phase 2: Back legs in contact
+                ]
+            ),
+            "jump": torch.tensor(
+                [
+                    [True, True, True, True],  # Phase 1: All legs in contact
+                    [False, False, False, False],  # Phase 2: All legs in flight
+                ]
+            ),
+        }
+        self.current_gait = "trot"  # Default gait
+        self.gait_pattern_idx = 0
+        self.current_goal_idx = 0
+
+    def change_commands(self, new_commands: Dict[str, Any]):
+        """
+        Change contact commands with validation.
+
+        :param new_commands: Dictionary containing contact pattern and timing information
+        """
+        # Update contact plan phase
+        current_time = time.time()
+        elapsed = current_time - self.contact_plan_start_time
+
+        if elapsed > self.contact_plan_duration:
+            self.contact_plan_start_time = current_time
+            self.gait_pattern_idx = (self.gait_pattern_idx + 1) % 2
+            next_pattern_idx = (self.gait_pattern_idx + 1) % 2
+            self.current_contact_plan = torch.stack(
+                [
+                    self.gait_patterns[self.current_gait][self.gait_pattern_idx],
+                    self.gait_patterns[self.current_gait][next_pattern_idx],
+                ]
+            )
+
+        self.contact_time_left = self.contact_plan_duration - elapsed
+
+        try:
+            if "gait" in new_commands:
+                new_gait = new_commands["gait"].lower()
+                if new_gait in self.gait_patterns:
+                    self.current_gait = new_gait
+                    self.gait_pattern_idx = 0
+                    next_pattern_idx = 1
+                    self.current_contact_plan = torch.stack(
+                        [
+                            self.gait_patterns[self.current_gait][self.gait_pattern_idx],
+                            self.gait_patterns[self.current_gait][next_pattern_idx],
+                        ]
+                    )
+                    self.contact_plan_start_time = time.time()
+                else:
+                    raise ValueError(f"Invalid gait: {new_gait}. Must be one of {list(self.gait_patterns.keys())}")
+
+            self.command_manager.logger.debug(f"Contact Command Updated: {new_commands}")
+        except ValueError as e:
+            if self.command_manager.logger:
+                self.command_manager.logger.error(f"Contact command update failed: {e}")
+
+    def register_commands(self):
+        """Register contact command parameters."""
+        self.command_manager.register(
+            "gait",
+            CommandTerm(
+                type=str,
+                name="gait",
+                description="Gait pattern (trot, pace, bound, jump)",
+                min_value=0,  # Not used for string type
+                max_value=1,  # Not used for string type
+                default_value="trot",
+            ),
+        )
 
     def register_observations(self):
         """
         Register observations for contact-conditioned locomotion.
-        Maintains a specific order for direct policy input.
+        Includes contact pattern and timing information.
         """
-        # Observation registration identical to velocity controller
-        # (You might want to add contact-specific observations in the future)
+        from state_manager.observations import base_height, contact_plan, contact_status, contact_time_left, ee_pos_rel, contact_locations
+
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
         self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
         self.obs_manager.register(
-            "velocity_commands",
+            "base_height", ObsTerm(base_height, params={"mj_model_wrapper": self.mj_model_wrapper})
+        )
+        self.obs_manager.register("contact_status", ObsTerm(contact_status))
+        self.obs_manager.register("contact_locations", ObsTerm(contact_locations, params={"mj_model_wrapper": self.mj_model_wrapper, 
+                                                                                   "future_feet_positions_init_frame": lambda: self.future_feet_positions_init_frame,
+                                                                                   "obs_horizon": 2,
+                                                                                   "current_goal_idx": lambda: self.current_goal_idx}))
+        self.obs_manager.register(
+            "contact_time_left", ObsTerm(contact_time_left, params={"contact_time_left": lambda: self.contact_time_left})
+        )
+        self.obs_manager.register(
+            "contact_plan",
             ObsTerm(
-                velocity_commands,
-                params={"velocity_commands": lambda: self.velocity_commands},
+                contact_plan,
+                params={"contact_plan": lambda: self.current_contact_plan},
             ),
         )
+
         self.obs_manager.register(
             "joint_pos",
             ObsTerm(
@@ -369,3 +513,39 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             "last_action",
             ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
         )
+        self.obs_manager.register(
+           "ee_pos_rel",
+            ObsTerm(
+                ee_pos_rel, 
+                params={"mj_model_wrapper": self.mj_model_wrapper,
+                        "future_feet_positions_init_frame": lambda: self.future_feet_positions_init_frame,
+                        "current_goal_idx": lambda: self.current_goal_idx
+                }
+            )
+        )
+
+    def set_mode(self):
+        """Runs when the mode is changed in the UI.
+        Generates the future feet positions in the init frame for horizon planning.
+        """
+        
+         # compute the feet positions in the init frame
+        if self.mj_model_wrapper.initial_feet_positions_init_frame is None:
+            raise RuntimeError("Initial feet positions not set. Call set_initial_world_frame() first.")
+        
+        self.feet_pos_init_frame = self.mj_model_wrapper.get_feet_positions_init_frame()
+        
+        # Get current feet positions and convert to tensor
+        current_feet_pos = torch.from_numpy(self.feet_pos_init_frame)
+        
+        # Create offset tensor for x coordinates: shape (horizon_length,)
+        x_offsets = torch.arange(self.horizon_length, dtype=torch.float32) * self.feet_step_size
+        
+        # Expand current feet positions and x_offsets for broadcasting
+        # current_feet_pos: (4,1,3), x_offsets: (1,horizon_length,1)
+        expanded_feet_pos = current_feet_pos.unsqueeze(1)  # Shape: (4,1,3)
+        expanded_offsets = x_offsets.view(1, -1, 1)  # Shape: (1,horizon_length,1)
+        
+        # Create the horizon positions using broadcasting
+        self.future_feet_positions_init_frame = expanded_feet_pos.clone()  # Shape: (4,horizon_length,3)
+        self.future_feet_positions_init_frame[:,:,0] += expanded_offsets.squeeze(-1)  # Add offsets to x coordinates only
