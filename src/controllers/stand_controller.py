@@ -4,7 +4,6 @@ import numpy as np
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import starting_time
-from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 from utils.mj_wrapper import MjQuadRobotWrapper
 
 
@@ -47,9 +46,7 @@ class StandUpController(ControllerBase):
     to the stand up joint positions which are constants.
     """
 
-    def __init__(
-        self, mj_model_wrapper: MjQuadRobotWrapper, configs: Dict[str, Any]
-    ):
+    def __init__(self, mj_model_wrapper: MjQuadRobotWrapper, configs: Dict[str, Any]):
         super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         self.name = "StandUpController"

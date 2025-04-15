@@ -19,8 +19,6 @@ class MjQuadRobotWrapper:
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
 
-        BASE_NAME = "base_link"
-
         # Cache commonly used body and joint indices
         self.body_names = {}
         for i in range(self.model.nbody):
@@ -134,28 +132,28 @@ class MjQuadRobotWrapper:
             base_frame_pos = base_rot.T @ rel_pos
             positions.append(base_frame_pos)
         return np.array(positions)
-    
+
     def base_pos_init_frame(self) -> np.ndarray:
         """Get the base position in the init frame."""
         if not self._init_world_frame:
             raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
         return self.get_body_position_init_frame("base_link")
-    
+
     def transform_init_to_base(self, pos: np.ndarray) -> np.ndarray:
         """Transform quantities from the init frame to the base frame.
-        
+
         Args:
             pos: Array of shape (N,3) or (N,M,3) containing positions in the init frame
-            
+
         Returns:
             Array of the same shape as pos but with positions transformed to the base frame
         """
         if not self._init_world_frame:
             raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
-        
+
         # Get the original shape
         original_shape = pos.shape
-        
+
         # Reshape to (N*M, 3) if needed
         if len(original_shape) == 3:
             # For (N,M,3) shape
@@ -164,23 +162,23 @@ class MjQuadRobotWrapper:
         else:
             # For (N,3) shape
             pos_reshaped = pos
-            
+
         # Apply transformation to each position
         transformed = self.world_to_init[:3, :3].T @ (pos_reshaped - self.world_to_init[:3, 3]).T
         transformed = transformed.T
-        
+
         # Reshape back to original shape if needed
         if len(original_shape) == 3:
             transformed = transformed.reshape(original_shape)
-            
+
         return transformed
-    
+
     def transform_world_to_base(self, pos: np.ndarray) -> np.ndarray:
         """Transform quantities from the world frame to the base frame.
-        
+
         Args:
             pos: Array of shape (N,3) or (N,M,3) containing positions in the world frame
-            
+
         Returns:
             Array of the same shape as pos but with positions transformed to the base frame
         """
@@ -188,13 +186,13 @@ class MjQuadRobotWrapper:
         base_idx = self.body_names.get("base_link", -1)
         if base_idx < 0:
             raise ValueError("Base body not found in model")
-            
+
         base_pos = self.data.xpos[base_idx]
         base_rot = self.data.xmat[base_idx].reshape(3, 3)
-        
+
         # Get the original shape
         original_shape = pos.shape
-        
+
         # Reshape to (N*M, 3) if needed
         if len(original_shape) == 3:
             # For (N,M,3) shape
@@ -203,20 +201,20 @@ class MjQuadRobotWrapper:
         else:
             # For (N,3) shape
             pos_reshaped = pos
-            
+
         # Apply transformation to each position
         # First subtract the base position to get relative position
         rel_pos = pos_reshaped - base_pos
         # Then rotate using the transpose of the base rotation matrix
         transformed = base_rot.T @ rel_pos.T
         transformed = transformed.T
-        
+
         # Reshape back to original shape if needed
         if len(original_shape) == 3:
             transformed = transformed.reshape(original_shape)
-            
+
         return transformed
-    
+
     def get_feet_positions_init_frame(self) -> np.ndarray:
         """Get feet positions in the init frame."""
         if not self._init_world_frame:
@@ -246,9 +244,6 @@ class MjQuadRobotWrapper:
         world_pos = self.get_body_position_world(body_name)
         rel_pos = world_pos - self.world_to_init[:3, 3]
         return self.world_to_init[:3, :3].T @ rel_pos
-    
-    
-    
 
     def get_body_orientation_world(self, body_name: str) -> np.ndarray:
         """Get orientation matrix of a specific body in world frame."""
@@ -275,27 +270,29 @@ class MjQuadRobotWrapper:
         """
         Get the height of the base in the init frame relative to the average
         of the initial feet positions using vectorized operations.
-        
+
         Returns:
             float: The height of the base relative to the average initial feet position.
         """
         if not self._init_world_frame:
             raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
-            
+
         if self.initial_feet_positions_init_frame is None:
             raise RuntimeError("Initial feet positions not saved. Call set_initial_world_frame() first.")
-            
+
         # Get base position in world frame
         base_pos_world = self.get_body_position_world("base_link")
-        
+
         # Transform to initial frame using vectorized operations
         rel_pos = base_pos_world - self.world_to_init[:3, 3]
         base_pos_init = self.world_to_init[:3, :3].T @ rel_pos
-        
+
         # Calculate average of initial feet positions using vectorized operations
         # This is more efficient than np.mean(axis=0) for large arrays
-        avg_feet_pos_init = np.sum(self.initial_feet_positions_init_frame, axis=0) / self.initial_feet_positions_init_frame.shape[0]
-        
+        avg_feet_pos_init = (
+            np.sum(self.initial_feet_positions_init_frame, axis=0) / self.initial_feet_positions_init_frame.shape[0]
+        )
+
         # Return the height difference (z-coordinate)
         return base_pos_init[2] - avg_feet_pos_init[2]
 

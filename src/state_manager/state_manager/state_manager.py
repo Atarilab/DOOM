@@ -45,20 +45,24 @@ class DDSStateSubscriber(StateSubscriber):
         logger: Optional[logging.Logger] = None,
     ):
         """
-        Initialize DDS state subscriber.
+        Initialize the DDS state subscriber.
 
-        :param topic: DDS topic to subscribe to
-        :param msg_type: Message type for the topic
-        :param handler_func: Optional function to process received messages
+        Args:
+            topic: DDS topic to subscribe to
+            msg_type: DDS message type
+            handler_func: Optional function to handle incoming messages
+            handler_args: Optional arguments for the handler function
+            logger: Optional logger for debugging
         """
         from unitree_sdk2py.core.channel import ChannelSubscriber
 
         super().__init__(logger)
-
         self.topic = topic
         self.msg_type = msg_type
         self.handler_func = handler_func
         self.handler_args = handler_args or {}
+        self.latest_state = {}
+        self._subscriber = None
 
         self.subscriber = ChannelSubscriber(topic, msg_type)
         self._latest_state = {}

@@ -91,13 +91,14 @@ class ObservationManager:
 
     def __init__(self, logger: logging.Logger = None):
         """
-        Initialize the State Observation Manager.
+        Initialize the observation manager.
 
-        :param logger: Optional logger for tracking observations
+        Args:
+            logger: Optional logger for debugging
         """
-        self._observations: Dict[str, ObsTerm] = {}
-        self._all_observations: Dict[str, Any] = {}
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger
+        self.obs_terms = {}
+        self.obs_order = []
 
     def register(self, name: str, obs_term: ObsTerm):
         """
@@ -106,10 +107,10 @@ class ObservationManager:
         :param name: Name of the observation
         :param obs_term: ObsTerm instance defining the observation
         """
-        if name in self._observations:
+        if name in self.obs_terms:
             self.logger.warning(f"Overwriting existing observation: {name}")
 
-        self._observations[name] = obs_term
+        self.obs_terms[name] = obs_term
 
     def compute(self, combined_state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -118,13 +119,13 @@ class ObservationManager:
         :param combined_state: Complete state dictionary
         :return: Dictionary of computed observations
         """
-        self._all_observations.clear()
+        self.obs_order.clear()
         observations = {}
 
-        for name, obs_term in self._observations.items():
+        for name, obs_term in self.obs_terms.items():
             try:
                 computed_obs = obs_term(combined_state)
-                self._all_observations[name] = computed_obs
+                self.obs_order.append(name)
 
                 # Only include in returned observations if include is True
                 if obs_term._include:
@@ -141,4 +142,4 @@ class ObservationManager:
         :param name: Name of the observation
         :return: The computed observation
         """
-        return self._all_observations.get(name)
+        return self.obs_terms.get(name)

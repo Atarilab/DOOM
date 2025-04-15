@@ -2,11 +2,10 @@ import argparse
 import asyncio
 import logging
 import os
-import threading
 from typing import Optional
 
 import rclpy
-from controllers.rl_controller import RLLocomotionContactController, RLLocomotionVelocityController
+from controllers.rl_controller import RLLocomotionContactController
 from controllers.stand_controller import (
     IdleController,
     StanceController,
@@ -151,7 +150,6 @@ class LowLevelCmdPublisher(Node):
             except Exception as e:
                 self.logger.error(f"Error updating motor commands: {e}")
                 return
-            
 
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
@@ -262,13 +260,10 @@ async def main_async(args=None):
             {
                 "STANCE": StanceController(mj_model_wrapper, configs),
                 # "RL-VELOCITY": RLLocomotionVelocityController(
-                #     mj_model_wrapper=mj_model_wrapper, 
+                #     mj_model_wrapper=mj_model_wrapper,
                 #     configs=configs``
                 # ),
-                "RL-CONTACT": RLLocomotionContactController(
-                    mj_model_wrapper=mj_model_wrapper,
-                    configs=configs
-                ),
+                "RL-CONTACT": RLLocomotionContactController(mj_model_wrapper=mj_model_wrapper, configs=configs),
             },
         )
 
@@ -303,11 +298,11 @@ async def main_async(args=None):
         await run()
     except KeyboardInterrupt:
         logger.info("Received KeyboardInterrupt. Shutting down...")
-        
+
         # Set controller to idle mode before shutting down
         mode_manager.set_mode("IDLE")
         logger.info("Set controller to IDLE mode before shutdown")
-     
+
     except Exception as e:
         logger.exception(f"An error occurred: {e}")
         raise

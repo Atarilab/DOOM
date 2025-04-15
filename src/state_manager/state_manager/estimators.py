@@ -6,14 +6,21 @@ from utils.math import quat_to_rotmatrix, quaternion_to_euler
 
 
 class VelocityEstimator:
-    def __init__(self, alpha=0.1, position_noise=0.01, velocity_noise=0.1, method="finite_diff"):
+    def __init__(
+        self, 
+        alpha=0.1, 
+        position_noise=0.01, 
+        velocity_noise=0.1, 
+        method="finite_diff"
+    ):
         """
         Initialize velocity estimator with multiple estimation methods.
 
-        :param alpha: Smoothing factor for velocity estimation
-        :param position_noise: Process noise for position
-        :param velocity_noise: Process noise for velocity
-        :param method: Estimation method ('ekf' or 'finite_diff')
+        Args:
+            alpha: Smoothing factor for velocity estimation
+            position_noise: Process noise for position
+            velocity_noise: Process noise for velocity
+            method: Estimation method ('ekf' or 'finite_diff')
         """
         self.method = method
         self.alpha = alpha

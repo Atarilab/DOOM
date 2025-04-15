@@ -7,8 +7,6 @@ IDL file: ViconReceiver.idl
 """
 
 from dataclasses import dataclass
-from enum import auto
-from typing import TYPE_CHECKING, Optional
 
 import cyclonedds.idl as idl
 import cyclonedds.idl.annotations as annotate

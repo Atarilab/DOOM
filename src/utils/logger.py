@@ -9,13 +9,29 @@ def get_logger(
     file_level=logging.DEBUG,
     console_level=logging.INFO,
 ):
+    """
+    Create and configure a logger with file and console handlers.
+
+    Args:
+        name: Name of the logger
+        log_file: Path to the log file
+        debug: Whether to enable debug mode
+        file_level: Logging level for file handler
+        console_level: Logging level for console handler
+
+    Returns:
+        Configured logger instance
+    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)  # Set to lowest level to capture all logs
 
     if logger.hasHandlers():
         logger.handlers.clear()
 
-    log_format = "[%(levelname)s] [%(asctime)s] [%(filename)s:%(lineno)d]: %(message)s"
+    log_format = (
+        "[%(levelname)s] [%(asctime)s] "
+        "[%(filename)s:%(lineno)d]: %(message)s"
+    )
     # log_format = '[%(asctime)s] : %(message)s'
 
     # File Logs

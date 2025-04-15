@@ -1,14 +1,10 @@
 import threading
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 from commands.command_manager import CommandManager
 from state_manager.obs_manager import ObservationManager
-
-if TYPE_CHECKING:
-    from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
-    from utils.mj_wrapper.mj_robot import MjQuadRobotWrapper
 
 
 class ControllerBase(ABC):

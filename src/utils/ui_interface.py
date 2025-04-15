@@ -5,18 +5,18 @@ from commands.command_manager import CommandManager
 from controllers.stand_controller import ControllerBase
 from state_manager.obs_manager import ObservationManager
 from textual.app import App, ComposeResult
+from textual.color import Color
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.validation import Number
 from textual.widgets import Button, Header, Input, Label, Static
 from utils.logger import logging
 
-from textual.color import Color
-
- # Define color constants
+# Define color constants
 BUTTON_DEFAULT_COLOR = Color(50, 50, 80)
 BUTTON_ACTIVE_COLOR = Color(70, 70, 110)
-    
+
+
 class ModeManager:
     """
     A flexible mode management system that allows dynamic registration of modes and controllers.
@@ -77,13 +77,13 @@ class ModeManager:
 
         if submode is not None:
             self.logger.debug(f"Mode set to: {self._current_mode} - {self._current_submode}")
-            
+
         # Run set_mode function if it exists in the controller
         if self._current_submode:
             controller = self._modes[self._current_mode][self._current_submode]
         else:
             controller = self._modes[self._current_mode].get("default", None)
-            
+
         if controller and hasattr(controller, "set_mode"):
             controller.set_mode()
 
@@ -215,7 +215,6 @@ class RobotControlUI(App):
     """
 
     CSS = """
-    
         Screen {
             background: rgb(0, 0, 0);
             color: rgb(220, 220, 240);

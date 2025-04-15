@@ -92,35 +92,36 @@ class CommandManager:
         ]
 
     def validate_and_change_commands(
-        self, current_commands: np.ndarray, new_command_values: Dict[str, Any]
+        self, 
+        current_commands: np.ndarray, 
+        new_command_values: Dict[str, Any]
     ) -> np.ndarray:
         """
-        Validate and change command values for a specific controller.
+        Validate and update command values.
 
-        :param controller_type: Name of the controller type
-        :param current_commands: Current command values
-        :param new_command_values: Dictionary of new command values
-        :return: Updated command values
+        Args:
+            current_commands: Current command values
+            new_command_values: New command values to set
+
+        Returns:
+            Updated command values
         """
-
-        # Create a copy of current commands to modify
+        # Create a copy of current commands
         updated_commands = current_commands.copy()
-
-        for cmd, param in self._commands.items():
-            # If value provided, validate and update
-            if param.name in new_command_values:
-                new_value = new_command_values[param.name]
-                if param.validate_type(new_value):
-                    # Find index of this parameter
-                    try:
-                        index = [p.name for cmd, p in self._commands.items()].index(param.name)
-                        updated_commands[index] = float(new_value)
-
-                    except ValueError:
-                        if self.logger:
-                            self.logger.warning(f"Could not find index for parameter {param.name}")
+        
+        # Update each command value
+        for name, value in new_command_values.items():
+            if name in self._commands:
+                command_term = self._commands[name]
+                if command_term.validate_type(value):
+                    command_term.set_value(value)
+                    updated_commands[self.command_indices[name]] = value
                 else:
-                    if self.logger:
-                        self.logger.warning(f"Invalid value for {param.name}: {new_value}")
-
+                    self.logger.warning(
+                        f"Invalid value {value} for command {name}. "
+                        f"Must be of type {command_term.type}"
+                    )
+            else:
+                self.logger.warning(f"Unknown command: {name}")
+        
         return updated_commands

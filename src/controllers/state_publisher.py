@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-import threading
 from threading import Lock
 
 import rclpy
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from rclpy.node import Node
-from sensor_msgs.msg import JointState
 
 
 class RobotStatePublisher(Node):

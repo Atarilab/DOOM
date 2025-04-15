@@ -11,15 +11,20 @@ def quaternion_to_euler(q, order="wxyz") -> np.ndarray:
     """
     Convert quaternion to Euler angles (roll, pitch, yaw).
 
-    :param q: The quaternion. Shape is (4,).
-    :param order: The convention/order of the quaternion in the arguments. Defaults to 'wxyz'.
+    Args:
+        q: The quaternion. Shape is (4,).
+        order: The convention/order of the quaternion in the arguments. 
+               Defaults to 'wxyz'.
 
-    :return : The corresponding euler angles. Shape is (3,)
+    Returns:
+        The corresponding euler angles. Shape is (3,)
     """
     if order == "wxyz":
         w, x, y, z = q
-    else:
+    elif order == "xyzw":
         x, y, z, w = q
+    else:
+        raise ValueError(f"Unknown quaternion order: {order}")
 
     # Roll (x-axis rotation)
     sinr_cosp = 2 * (w * x + y * z)
@@ -28,7 +33,10 @@ def quaternion_to_euler(q, order="wxyz") -> np.ndarray:
 
     # Pitch (y-axis rotation)
     sinp = 2 * (w * y - z * x)
-    pitch = np.arcsin(sinp)
+    if np.abs(sinp) >= 1:
+        pitch = np.copysign(np.pi / 2, sinp)  # Use 90 degrees if out of range
+    else:
+        pitch = np.arcsin(sinp)
 
     # Yaw (z-axis rotation)
     siny_cosp = 2 * (w * z + x * y)

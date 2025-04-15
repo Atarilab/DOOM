@@ -2,7 +2,6 @@ import time
 from typing import Dict, List, Optional
 
 import numpy as np
-import pinocchio as pin
 from state_manager.estimators import VelocityEstimator
 from utils.logger import logging
 from utils.math import quat_to_rotmatrix
@@ -28,11 +27,9 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
 
     # Extract foot forces directly without reordering
     foot_forces = msg["foot_force"]
-    foot_force_est = msg["foot_force_est"]
 
     # Extract IMU states
     imu_state = msg["imu_state"]
-
 
     # Construct and return the parsed states dictionary
     states = {
@@ -41,7 +38,6 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         "joint_acc": joint_accelerations,
         "joint_tau_est": joint_tau_est,
         "foot_forces": foot_forces,
-
         "base_quat": imu_state.quaternion,
         "rpy": imu_state.rpy,
         "gyroscope": imu_state.gyroscope,
