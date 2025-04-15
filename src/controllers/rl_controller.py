@@ -475,7 +475,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                             
                             # Call set_mode() if the pending gait is "stance"
                             if self.pending_gait_change == "stance":
-                                self.set_mode()
+                                self.generate_future_feet_positions()
                                 
                             self.pending_gait_change = None
                             if (
@@ -650,31 +650,13 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # Call the base class set_mode to activate the controller
         super().set_mode()
 
-        # # Initialize the processing threads if they haven't been started yet
-        # if not hasattr(self, 'obs_processing_thread') or not self.obs_processing_thread.is_alive():
-        #     self._init_processing_threads()
+        self.generate_future_feet_positions()
 
-        # compute the feet positions in the init frame
-        # if self.mj_model_wrapper.initial_feet_positions_init_frame is None:
-        #     raise RuntimeError("Initial feet positions not set. Call set_initial_world_frame() first.")
-
-        # self.feet_pos_init_frame = self.mj_model_wrapper.get_feet_positions_init_frame() +
-
-        # # Get current feet positions (already a numpy array)
-        # current_feet_pos = self.feet_pos_init_frame
-
-        # # Create offset array for x coordinates: shape (horizon_length,)
-        # x_offsets = np.arange(self.horizon_length, dtype=np.float32) * self.feet_step_size
-
-        # # Expand current feet positions and x_offsets for broadcasting
-        # # current_feet_pos: (4,3), x_offsets: (horizon_length,)
-        # expanded_feet_pos = current_feet_pos[:, np.newaxis, :]  # Shape: (4,1,3)
-        # expanded_offsets = x_offsets[np.newaxis, :, np.newaxis]  # Shape: (1,horizon_length,1)
-
-        # # Create the horizon positions using broadcasting
-        # self.future_feet_positions_init_frame = np.tile(expanded_feet_pos, (1, self.horizon_length, 1))  # Shape: (4,horizon_length,3)
-        # self.future_feet_positions_init_frame[:,:,0] += expanded_offsets.squeeze(-1)  # Add offsets to x coordinates only
-
+    def generate_future_feet_positions(self):
+        """
+        Generates future feet positions for the controller.
+        """
+        
         self.goal_completion_counter = 0
         self.current_goal_idx = 0
         offset = torch.tensor(
