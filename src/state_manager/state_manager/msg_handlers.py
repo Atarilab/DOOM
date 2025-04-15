@@ -33,8 +33,6 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
     # Extract IMU states
     imu_state = msg["imu_state"]
 
-    # # Get feet positions from Pinocchio Wrapper
-    # pin_model_wrapper.update(joint_positions[np.array(joint_mappings['unitree_pin'])], joint_velocities[np.array(joint_mappings['unitree_pin'])])
 
     # Construct and return the parsed states dictionary
     states = {
@@ -43,9 +41,7 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         "joint_acc": joint_accelerations,
         "joint_tau_est": joint_tau_est,
         "foot_forces": foot_forces,
-        # 'foot_force_est': foot_force_est,
-        # 'feet_pos': dict(zip([f'{name}_foot' for name in pin_model_wrapper.foot_names],
-        #                         pin_model_wrapper.get_foot_pos_base())),
+
         "base_quat": imu_state.quaternion,
         "rpy": imu_state.rpy,
         "gyroscope": imu_state.gyroscope,

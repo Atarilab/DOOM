@@ -21,14 +21,12 @@ class ControllerBase(ABC):
 
     def __init__(
         self,
-        pin_model_wrapper: "PinQuadRobotWrapper",
         mj_model_wrapper: "MjQuadRobotWrapper" = None,
         configs: Dict[str, Any] = None,
     ):
         """
         Initialize the base controller with model wrapper and configuration.
 
-        :param pin_model_wrapper: Pinocchio model wrapper for kinematics
         :param mj_model_wrapper: MuJoCo model wrapper for additional computations
         :param configs: Configuration dictionary containing robot-specific parameters
         """
@@ -37,7 +35,6 @@ class ControllerBase(ABC):
         self._lock = threading.Lock()
 
         # Model and manager initialization
-        self.pin_model_wrapper = pin_model_wrapper
         self.mj_model_wrapper = mj_model_wrapper
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
@@ -56,12 +53,10 @@ class ControllerBase(ABC):
         :param configs: Configuration dictionary
         """
         # Extract joint mappings
-        self.unitree_pin_joint_mappings = np.array(configs["robot_config"]["unitree_pin_joint_mappings"])
 
         # Position limits (excluding first 7 DOFs for floating base)
-        base_offset = 7
-        lower_limits = self.pin_model_wrapper.model.lowerPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
-        upper_limits = self.pin_model_wrapper.model.upperPositionLimit[base_offset:][self.unitree_pin_joint_mappings]
+        lower_limits = self.mj_model_wrapper.model.jnt_range[1:, 0]
+        upper_limits = self.mj_model_wrapper.model.jnt_range[1:, 1]
 
         # Conservative limit settings
         soft_limit_factor = 0.95

@@ -26,7 +26,6 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_, LowState_, SportMode
 from unitree_sdk2py.utils.crc import CRC
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.logger import get_logger
-from utils.mj_pin_wrapper.pin_robot import PinQuadRobotWrapper
 from utils.mj_wrapper import MjQuadRobotWrapper
 
 # DOOM Imports
@@ -202,7 +201,6 @@ async def main_async(args=None):
             topic="rt/lowstate",
             msg_type=LowState_,
             handler_func=low_state_handler,
-            # handler_args={"pin_model_wrapper": pin_model_wrapper, "joint_mappings": configs['robot_config']['joint_mappings']},
             logger=logger,
         )
 
@@ -242,35 +240,32 @@ async def main_async(args=None):
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
 
-        pin_model_wrapper = PinQuadRobotWrapper(configs["robot_config"]["pinocchio_urdf"])
         mj_model_wrapper = MjQuadRobotWrapper(configs["robot_config"]["xml_path"])  # Using same URDF for now
 
         # Create mode manager and register controllers
         mode_manager = ModeManager(logger=logger)
-        mode_manager.register_mode("IDLE", {"default": IdleController(pin_model_wrapper, mj_model_wrapper, configs)})
+        mode_manager.register_mode("IDLE", {"default": IdleController(mj_model_wrapper, configs)})
 
         mode_manager.register_mode(
             "STANDING",
             {
-                "STAY_DOWN": StayDownController(pin_model_wrapper, mj_model_wrapper, configs),
-                "STAND_UP": StandUpController(pin_model_wrapper, mj_model_wrapper, configs),
-                "STAND_DOWN": StandDownController(pin_model_wrapper, mj_model_wrapper, configs),
+                "STAY_DOWN": StayDownController(mj_model_wrapper, configs),
+                "STAND_UP": StandUpController(mj_model_wrapper, configs),
+                "STAND_DOWN": StandDownController(mj_model_wrapper, configs),
             },
         )
 
-        mode_manager.register_mode("STANCE", {"STANCE": StanceController(pin_model_wrapper, mj_model_wrapper, configs)})
+        mode_manager.register_mode("STANCE", {"STANCE": StanceController(mj_model_wrapper, configs)})
 
         mode_manager.register_mode(
             "RL-VELOCITY",
             {
-                "STANCE": StanceController(pin_model_wrapper, mj_model_wrapper, configs),
+                "STANCE": StanceController(mj_model_wrapper, configs),
                 # "RL-VELOCITY": RLLocomotionVelocityController(
-                #     pin_model_wrapper=pin_model_wrapper, 
                 #     mj_model_wrapper=mj_model_wrapper, 
-                #     configs=configs
+                #     configs=configs``
                 # ),
                 "RL-CONTACT": RLLocomotionContactController(
-                    pin_model_wrapper=pin_model_wrapper,
                     mj_model_wrapper=mj_model_wrapper,
                     configs=configs
                 ),

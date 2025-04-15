@@ -11,7 +11,6 @@ from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import (
     ang_vel_b,
-    feet_pos,
     joint_pos_rel,
     joint_vel,
     last_action,
@@ -36,15 +35,15 @@ class BaseRLLocomotionController(ControllerBase):
     """
 
     def __init__(
-        self, pin_model_wrapper: "PinQuadRobotWrapper", mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
+        self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
     ):
         """
         Initialize the RL locomotion controller with model and configuration.
 
-        :param pin_model_wrapper: Pinocchio model wrapper for kinematics
+        :param mj_model_wrapper: Mujoco model wrapper for kinematics
         :param configs: Configuration dictionary
         """
-        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         self.active = False
         # Load and prepare policy model
@@ -246,9 +245,9 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     """
 
     def __init__(
-        self, pin_model_wrapper: "PinQuadRobotWrapper", mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
+        self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
     ):
-        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Default velocity commands
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0])
@@ -340,14 +339,6 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
             "last_action",
             ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
         )
-        self.obs_manager.register(
-            "feet_pos",
-            ObsTerm(
-                feet_pos,
-                params={"pin_model_wrapper": self.pin_model_wrapper},
-                include=False,
-            ),
-        )
     
     def set_mode(self):
         """Runs when the mode is changed in the UI.
@@ -362,10 +353,10 @@ class RLLocomotionContactController(BaseRLLocomotionController):
     """
 
     def __init__(
-        self, pin_model_wrapper: "PinQuadRobotWrapper", mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
+        self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]
     ):
         self.init_completed = False
-        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Contact command parameters
         self.command_duration = 0.35  # Duration of each contact plan in seconds
@@ -374,8 +365,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
 
         # Horizon planning
         self.future_feet_positions_init_frame = None
-        self.horizon_length = 100
-        self.feet_step_size = 0.1  # meters
+        self.horizon_length = 1000
+        self.feet_step_size = 0.2  # meters
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
@@ -420,6 +411,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.time_left = self.command_duration
         self.current_contact_plan = self.gait_patterns[self.current_gait]
         self.current_goal_idx = 0
+        self.goal_completion_counter = 0
         
         self.init_completed = True
         self.active = False
@@ -484,7 +476,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             
             # Normal gait progression (only if not in transition phase)
             if not self.in_transition and self.current_gait != "stance":
-                self.current_goal_idx += 1
+                self.goal_completion_counter +=1
+                self.current_goal_idx += 1 if self.goal_completion_counter % 2 == 0 and self.goal_completion_counter > 0 else 0
                 self.current_contact_plan = torch.stack(
                     [
                         self.current_contact_plan[1],
@@ -545,7 +538,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Register observations for contact-conditioned locomotion.
         Includes contact pattern and timing information.
         """
-        from state_manager.observations import base_height, contact_plan, contact_status, contact_time_left, ee_pos_rel, contact_locations, contact_locations_b, ee_pos_rel_b
+        from state_manager.observations import base_height, contact_plan, contact_status, contact_time_left, ee_pos_rel, contact_locations, contact_locations_b
 
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))

@@ -13,8 +13,8 @@ class IdleController(ControllerBase):
     Used to set zero commands to the motor. This is particularly useful when exiting the controller to reset the torques to 0.
     """
 
-    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, mj_model_wrapper, configs=configs)
+    def __init__(self, mj_model_wrapper, configs):
+        super().__init__(mj_model_wrapper, configs=configs)
 
     def register_observations(self):
         """
@@ -48,9 +48,9 @@ class StandUpController(ControllerBase):
     """
 
     def __init__(
-        self, pin_model_wrapper: PinQuadRobotWrapper, mj_model_wrapper: MjQuadRobotWrapper, configs: Dict[str, Any]
+        self, mj_model_wrapper: MjQuadRobotWrapper, configs: Dict[str, Any]
     ):
-        super().__init__(pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         self.name = "StandUpController"
         self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
@@ -95,8 +95,8 @@ class StandDownController(ControllerBase):
     to the stand down joint positions which are constants.
     """
 
-    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, mj_model_wrapper, configs=configs)
+    def __init__(self, mj_model_wrapper, configs):
+        super().__init__(mj_model_wrapper, configs=configs)
 
         self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
         self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
@@ -139,8 +139,8 @@ class StayDownController(ControllerBase):
     The Stay Down Controller is used to stay down close the ground, to prepare to get up.
     """
 
-    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, mj_model_wrapper, configs=configs)
+    def __init__(self, mj_model_wrapper, configs):
+        super().__init__(mj_model_wrapper, configs=configs)
 
         self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
         self.start_time = 0.0
@@ -178,8 +178,8 @@ class StanceController(ControllerBase):
     The Stance Controller is used to stay in stance. Used to prepare to go to rest from other controllers.
     """
 
-    def __init__(self, pin_model_wrapper, mj_model_wrapper, configs):
-        super().__init__(pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs)
+    def __init__(self, mj_model_wrapper, configs):
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
         self.start_time = 0.0
