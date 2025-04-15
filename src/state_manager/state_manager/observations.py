@@ -3,12 +3,15 @@ This file is used to define the functions that process the states to compute ind
 """
 
 import time
-from typing import Any, Callable, Dict
+from typing import TYPE_CHECKING, Any, Callable, Dict
 
 import numpy as np
 import torch
 from utils.helpers import reorder_robot_states
 from utils.math import GRAVITY_DIR, quat_rotate_inverse
+
+if TYPE_CHECKING:
+    from utils.mj_wrapper.mj_robot import MjQuadRobotWrapper
 
 
 def joint_pos(states: Dict[str, Any]) -> np.ndarray:
@@ -23,7 +26,7 @@ def joint_pos(states: Dict[str, Any]) -> np.ndarray:
         origin_order=["FL", "FR", "RL", "RR"],
         target_order=["FR", "FL", "RR", "RL"],
     )
-    return joint_pos
+    return torch.tensor(joint_pos)
 
 
 def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping: np.ndarray) -> np.ndarray:
@@ -35,7 +38,7 @@ def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping
     :param mapping: Mapping from Unitree to Isaac Joint Order
     :return: Relative joint positions
     """
-    return states["joint_pos"][mapping] - default_joint_pos
+    return torch.tensor(states["joint_pos"][mapping] - default_joint_pos)
 
 
 def joint_vel(states: Dict[str, Any], mapping: np.ndarray) -> np.ndarray:
@@ -46,7 +49,7 @@ def joint_vel(states: Dict[str, Any], mapping: np.ndarray) -> np.ndarray:
     :param mapping: Mapping from Unitree to Isaac Joint Order
     :return: Joint velocities
     """
-    return states["joint_vel"][mapping]
+    return torch.tensor(states["joint_vel"][mapping])
 
 
 def lin_vel_b(states: Dict[str, Any]) -> np.ndarray:
@@ -57,7 +60,7 @@ def lin_vel_b(states: Dict[str, Any]) -> np.ndarray:
     :return: Linear velocity in the base frame
     """
 
-    return states["lin_vel_b"]
+    return torch.tensor(states["lin_vel_b"])
 
 
 def ang_vel_b(states: Dict[str, Any]) -> np.ndarray:
@@ -68,7 +71,7 @@ def ang_vel_b(states: Dict[str, Any]) -> np.ndarray:
     :return: Angular velocity in the base frame
     """
 
-    return states["gyroscope"]
+    return torch.tensor(states["gyroscope"])
 
 
 # TODO: Convert to pure NumPy function
@@ -103,16 +106,6 @@ def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> np
     return velocity_commands()
 
 
-def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> np.ndarray:
-    """
-    The contact plan. We use a callable (lambda) to fetch the latest value from the controller class.
-
-    :param states: State dictionary
-    :return: Contact plan
-    """
-    return contact_plan().view(-1)
-
-
 def feet_pos(states: Dict[str, Any], pin_model_wrapper) -> np.ndarray:
     """
     The feet positions of the robot. Calculated from the pinocchio wrapper
@@ -127,3 +120,65 @@ def feet_pos(states: Dict[str, Any], pin_model_wrapper) -> np.ndarray:
 
 def starting_time(states: Dict[str, Any]):
     return time.time()
+
+
+# Contact Explicit Additional Observations
+
+def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> np.ndarray:
+    """
+    The contact plan. We use a callable (lambda) to fetch the latest value from the controller class.
+
+    :param states: State dictionary
+    :return: Contact plan
+    """
+    return contact_plan().view(-1)
+
+
+def contact_status(states: Dict[str, Any]) -> np.ndarray:
+    """
+    The contact status. We use a callable (lambda) to fetch the latest value from the controller class.
+    """
+    contact_status = np.zeros(4)
+    contact_forces = np.array(states["foot_forces"])
+    contact_forces_norm = np.linalg.norm(contact_forces)
+    contact_status[contact_forces_norm > 1.0] = 1
+    return torch.tensor(contact_status)
+
+def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> np.ndarray:
+    """
+    The contact timing. We use a callable (lambda) to fetch the latest value from the controller class.
+
+    :param states: State dictionary
+    :return: Contact timing
+    """
+    return torch.tensor([contact_time_left()])
+
+
+def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") -> np.ndarray:
+    """
+    The height of the base of the robot.
+    """
+    return torch.tensor([mj_model_wrapper.get_base_height_init_frame()])
+
+def ee_pos_rel(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper", future_feet_positions_init_frame: Callable, current_goal_idx: Callable) -> np.ndarray:
+    """
+    The position of the future feet with respect to the current feet positions.
+    :param future_feet_positions_init_frame: The future feet positions in the init frame. Shape (4, obs_horizon, 3)
+    :param obs_horizon: The number of future feet positions to consider.
+    :param current_goal_idx: The index of the current goal.
+    """
+    current_feet_pos = mj_model_wrapper.get_feet_positions_init_frame() # Shape (4, 3)
+    desired_feet_pos = future_feet_positions_init_frame()[:, current_goal_idx()] 
+    return torch.tensor((desired_feet_pos - current_feet_pos)).norm(dim=1)
+
+def contact_locations(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper", future_feet_positions_init_frame: Callable, current_goal_idx: Callable, obs_horizon: int) -> np.ndarray:
+    """
+    The future desired feet positions in the base frame.
+    """
+    return torch.tensor(mj_model_wrapper.transform_init_to_base(future_feet_positions_init_frame()[:, current_goal_idx():current_goal_idx()+obs_horizon]).flatten())
+
+def contact_locations_b(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper", future_feet_positions_w: Callable, current_goal_idx: Callable, obs_horizon: int) -> np.ndarray:
+    """
+    The future desired feet positions in the base frame.
+    """
+    return torch.tensor(mj_model_wrapper.transform_world_to_base(future_feet_positions_w()[:, current_goal_idx():current_goal_idx()+obs_horizon]).flatten())

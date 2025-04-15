@@ -1,7 +1,7 @@
-policy_path: "policies/contact_policy.pt"
+policy_path: "policies/contact_policy_lowerObs_DR.pt"
 control_dt: 0.001
 action_dim: 12
-obs_dim: 65
+obs_dim: 82
 action_scale: 0.25
 stiffness: 25.0
 damping: 0.5

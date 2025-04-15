@@ -11,7 +11,12 @@ from textual.validation import Number
 from textual.widgets import Button, Header, Input, Label, Static
 from utils.logger import logging
 
+from textual.color import Color
 
+ # Define color constants
+BUTTON_DEFAULT_COLOR = Color(50, 50, 80)
+BUTTON_ACTIVE_COLOR = Color(70, 70, 110)
+    
 class ModeManager:
     """
     A flexible mode management system that allows dynamic registration of modes and controllers.
@@ -60,6 +65,12 @@ class ModeManager:
 
         if submode is not None and submode not in self._modes[mode_name]:
             raise ValueError(f"Submode {submode} not registered for mode {mode_name}")
+
+        # Deactivate existing controller
+        if self._current_submode and self._current_mode:
+            controller = self._modes[self._current_mode][self._current_submode]
+            if hasattr(controller, "active"):
+                controller.active = False
 
         self._current_mode = mode_name
         self._current_submode = submode
@@ -192,10 +203,10 @@ class CommandWidget(Vertical):
             if hasattr(self.controller, "change_commands"):
                 self.controller.change_commands(updates)
 
-                # Visual feedback
+                # Visual feedback using predefined colors
                 for btn in self.query(".gait-button"):
-                    btn.styles.background = "rgb(50, 50, 80)"
-                event.button.styles.background = "rgb(70, 70, 110)"
+                    btn.styles.background = BUTTON_DEFAULT_COLOR
+                event.button.styles.background = BUTTON_ACTIVE_COLOR
 
 
 class RobotControlUI(App):
@@ -559,6 +570,12 @@ class RobotControlUI(App):
         """
         updates = {}
         is_valid = True
+
+        # Check if this is a contact controller with gait patterns
+        if hasattr(active_controller, "gait_patterns"):
+            # For contact controllers, we don't need to validate inputs
+            # The gait selection is handled by button clicks
+            return
 
         # Validate and collect input values
         command_specs = active_controller.command_manager.get_command_specs()

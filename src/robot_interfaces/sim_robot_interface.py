@@ -72,6 +72,8 @@ class SimRobotInterface(RobotInterfaceBase):
                 time.sleep(time_until_next_step)
 
     def _physics_viewer_thread(self):
+        # Enable rendering of world frame axes
+        self.viewer.opt.frame = mujoco.mjtFrame.mjFRAME_WORLD
         while self.viewer.is_running():
             self.locker.acquire()
             # Find the robot body (might need adjustment based on your exact model)

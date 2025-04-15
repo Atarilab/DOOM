@@ -44,6 +44,7 @@ class ControllerBase(ABC):
         self.configs = configs
         self.latest_state = None
         self.name = None
+        self.active = False
 
         # Joint mapping and limits
         self._setup_joint_limits(configs)

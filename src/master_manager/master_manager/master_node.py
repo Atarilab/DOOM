@@ -143,11 +143,16 @@ class LowLevelCmdPublisher(Node):
             #         f"Body Position (initial frame): {body_pos}\nFeet Positions (initial frame):\n{feet_pos}"
             #     )
 
-            # Update command structure
-            for i in range(12):
-                motor = motor_commands[f"motor_{i}"]
-                for attr in ["q", "kp", "dq", "kd", "tau"]:
-                    setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
+            try:
+                # Update command structure
+                for i in range(12):
+                    motor = motor_commands[f"motor_{i}"]
+                    for attr in ["q", "kp", "dq", "kd", "tau"]:
+                        setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
+            except Exception as e:
+                self.logger.error(f"Error updating motor commands: {e}")
+                return
+            
 
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
@@ -258,15 +263,17 @@ async def main_async(args=None):
         mode_manager.register_mode(
             "RL-VELOCITY",
             {
-                "STANCE": StanceController(pin_model_wrapper, configs),
-                "RL-VELOCITY": RLLocomotionVelocityController(
-                    pin_model_wrapper=pin_model_wrapper, mj_model_wrapper=mj_model_wrapper, configs=configs
-                ),
-                # "RL-CONTACT": RLLocomotionContactController(
-                #     pin_model_wrapper=pin_model_wrapper,
-                #     mj_model_wrapper=mj_model_wrapper,
+                "STANCE": StanceController(pin_model_wrapper, mj_model_wrapper, configs),
+                # "RL-VELOCITY": RLLocomotionVelocityController(
+                #     pin_model_wrapper=pin_model_wrapper, 
+                #     mj_model_wrapper=mj_model_wrapper, 
                 #     configs=configs
                 # ),
+                "RL-CONTACT": RLLocomotionContactController(
+                    pin_model_wrapper=pin_model_wrapper,
+                    mj_model_wrapper=mj_model_wrapper,
+                    configs=configs
+                ),
             },
         )
 
@@ -301,6 +308,11 @@ async def main_async(args=None):
         await run()
     except KeyboardInterrupt:
         logger.info("Received KeyboardInterrupt. Shutting down...")
+        
+        # Set controller to idle mode before shutting down
+        mode_manager.set_mode("IDLE")
+        logger.info("Set controller to IDLE mode before shutdown")
+     
     except Exception as e:
         logger.exception(f"An error occurred: {e}")
         raise
