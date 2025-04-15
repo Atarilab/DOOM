@@ -370,21 +370,29 @@ class RobotControlUI(App):
             width: 100%;
             display: block;
             align: center middle;
-    }
+        }
+        
+
+
+
 
         .gait-buttons-container {
-            layout: horizontal;
+            layout: grid;
+            grid-size: 2;
+            grid-columns: 1fr 1fr;
+            grid-rows: auto;
             align: center middle;
-            margin: 1;
+            margin: 1 1;
             height: auto;
         }
 
         .gait-button {
-            width: 20%;
+            width: 50%;
             margin: 0 1;
             background: rgb(50, 50, 80);
             color: rgb(200, 200, 230);
             border: round $background;
+            padding: 0 1;
         }
 
         .gait-button:hover {

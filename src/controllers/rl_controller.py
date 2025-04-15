@@ -352,13 +352,19 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # Horizon planning
         self.future_feet_positions_init_frame = None
         self.horizon_length = 1000
-        self.feet_step_size = 0.2  # meters
+        self.feet_step_size = 0.15  # meters
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
 
         # Define gait patterns (FL, FR, RL, RR)
         self.gait_patterns = {
+            "transition": torch.tensor(
+                [
+                    [True, True, True, True],  # Phase 1: FL and RR in contact
+                    [True, True, True, True],  # Phase 2: FR and RL in contact
+                ]
+            ),
             "stance": torch.tensor(
                 [
                     [True, True, True, True],  # Phase 1: FL and RR in contact
@@ -390,9 +396,10 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 ]
             ),
         }
-        self.current_gait = "stance"  # Default gait
+        self.current_gait = "transition"  # Default gait
         self.pending_gait_change = None  # Store pending gait change
         self.in_transition = False  # Flag to indicate if we're in a transition phase
+        self.transition_counter = 0  # Counter to track resample steps during transition
         self.time_left = self.command_duration
         self.current_contact_plan = self.gait_patterns[self.current_gait]
         self.current_goal_idx = 0
@@ -444,8 +451,9 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                     if not self.in_transition:
                         # Start transition phase - switch to stance
                         self.in_transition = True
-                        self.current_gait = "stance"
-                        self.current_contact_plan = self.gait_patterns["stance"]
+                        self.transition_counter = 0  # Reset transition counter
+                        self.current_gait = "transition"
+                        self.current_contact_plan = self.gait_patterns["transition"]
                         if (
                             hasattr(self, "command_manager")
                             and self.command_manager
@@ -455,20 +463,30 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                                 f"Starting transition phase to: {self.pending_gait_change}"
                             )
                     else:
-                        # Transition phase complete - apply the pending gait
-                        self.in_transition = False
-                        self.current_gait = self.pending_gait_change
-                        self.current_contact_plan = self.gait_patterns[self.pending_gait_change]
-                        self.pending_gait_change = None
-                        if (
-                            hasattr(self, "command_manager")
-                            and self.command_manager
-                            and hasattr(self.command_manager, "logger")
-                        ):
-                            self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
+                        # Increment transition counter
+                        self.transition_counter += 1
+                        
+                        # Only apply the pending gait after two resample steps
+                        if self.transition_counter >= 2:
+                            # Transition phase complete - apply the pending gait
+                            self.in_transition = False
+                            self.current_gait = self.pending_gait_change
+                            self.current_contact_plan = self.gait_patterns[self.pending_gait_change]
+                            
+                            # Call set_mode() if the pending gait is "stance"
+                            if self.pending_gait_change == "stance":
+                                self.set_mode()
+                                
+                            self.pending_gait_change = None
+                            if (
+                                hasattr(self, "command_manager")
+                                and self.command_manager
+                                and hasattr(self.command_manager, "logger")
+                            ):
+                                self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
 
             # Normal gait progression (only if not in transition phase)
-            if not self.in_transition and self.current_gait != "stance":
+            if not self.in_transition and self.current_gait not in ["stance", "transition"]:
                 self.goal_completion_counter += 1
                 self.current_goal_idx += (
                     1 if self.goal_completion_counter % 2 == 0 and self.goal_completion_counter > 0 else 0
@@ -486,37 +504,33 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 print(f"Error resampling commands: {e}")
 
     def change_commands(self, new_commands: Dict[str, Any]):
-        """
-        Change contact commands with validation.
+        """Change the robot's contact commands.
 
-        :param new_commands: Dictionary containing contact pattern and timing information
+        This method handles changes to the robot's gait pattern. When a new gait is requested,
+        it is stored as a pending change rather than applied immediately. The actual gait
+        transition happens during the next resampling phase to ensure smooth transitions.
+
+        Args:
+            new_commands: Dictionary containing command updates. Currently supports:
+                - 'gait': String specifying the new gait pattern (e.g. 'trot', 'pace', etc.)
+
+        Raises:
+            ValueError: If an invalid gait pattern is specified
         """
 
         try:
             if "gait" in new_commands:
                 new_gait = new_commands["gait"].lower()
-                if new_gait in self.gait_patterns:
+                if new_gait in self.gait_patterns and new_gait != self.current_gait:
                     # Store the requested gait change instead of applying it immediately
                     with self._lock:
                         # Only set pending change if it's different from current gait
-                        if new_gait != self.current_gait:
-                            self.pending_gait_change = new_gait
-                            if (
-                                hasattr(self, "command_manager")
-                                and self.command_manager
-                                and hasattr(self.command_manager, "logger")
-                            ):
-                                self.command_manager.logger.debug(f"Stored pending gait change to: {new_gait}")
-                else:
-                    raise ValueError(f"Invalid gait: {new_gait}. Must be one of {list(self.gait_patterns.keys())}")
+                        self.pending_gait_change = new_gait
+                        self.command_manager.logger.debug(f"Stored pending gait change to: {new_gait}")
 
-            if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
-                self.command_manager.logger.debug(f"Contact Command Updated: {new_commands}")
-        except ValueError as e:
-            if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
-                self.command_manager.logger.error(f"Contact command update failed: {e}")
-            else:
-                print(f"Contact command update failed: {e}")
+        except Exception as e:
+            self.command_manager.logger.error(f"Contact command update failed: {e}")
+
 
     def register_commands(self):
         """Register contact command parameters."""
@@ -661,6 +675,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # self.future_feet_positions_init_frame = np.tile(expanded_feet_pos, (1, self.horizon_length, 1))  # Shape: (4,horizon_length,3)
         # self.future_feet_positions_init_frame[:,:,0] += expanded_offsets.squeeze(-1)  # Add offsets to x coordinates only
 
+        self.goal_completion_counter = 0
+        self.current_goal_idx = 0
         offset = torch.tensor(
             [(0.2334, 0.1865, 0.0), (0.2334, -0.1865, 0.0), (-0.2334, 0.1865, 0.0), (-0.2334, -0.1865, 0.0)]
         )
@@ -679,7 +695,10 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         direction_y = torch.sin(yaw)
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
-        self.future_feet_positions_w[:, :, 2] = 0.2
+        self.future_feet_positions_w[:, :, 2] = 0.15
+        
+        self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(self.future_feet_positions_w.numpy())
+        
         # self.future_feet_positions_w[:,:,2] = torch.tensor(self.mj_model_wrapper.get_feet_positions_world()[:, 2]).unsqueeze(-1)
         # self.future_feet_positions_w[:, :, 2] =
         # self.future_feet_positions_b = self.mj_model_wrapper.transform_world_to_base(self.future_feet_positions_w)

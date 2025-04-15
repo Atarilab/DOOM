@@ -214,6 +214,45 @@ class MjQuadRobotWrapper:
             transformed = transformed.reshape(original_shape)
 
         return transformed
+    
+    def transform_world_to_init_frame(self, pos: np.ndarray) -> np.ndarray:
+        """Transform quantities from the world frame to the init frame.
+
+        Args:
+            pos: Array of shape (N,3) or (N,M,3) containing positions in the world frame
+
+        Returns:
+            Array of the same shape as pos but with positions transformed to the init frame
+        """
+        if not self._init_world_frame:
+            raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
+
+        # Get the original shape
+        original_shape = pos.shape
+
+        # Reshape to (N*M, 3) if needed
+        if len(original_shape) == 3:
+            # For (N,M,3) shape
+            N, M, _ = original_shape
+            pos_reshaped = pos.reshape(-1, 3)
+        else:
+            # For (N,3) shape
+            pos_reshaped = pos
+
+        # Apply transformation to each position
+        # First subtract the init frame origin to get relative position
+        rel_pos = pos_reshaped - self.world_to_init[:3, 3]
+        # Then rotate using the transpose of the init frame rotation matrix
+        transformed = self.world_to_init[:3, :3].T @ rel_pos.T
+        transformed = transformed.T
+
+        # Reshape back to original shape if needed
+        if len(original_shape) == 3:
+            transformed = transformed.reshape(original_shape)
+
+        return transformed
+
+    
 
     def get_feet_positions_init_frame(self) -> np.ndarray:
         """Get feet positions in the init frame."""
