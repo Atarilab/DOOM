@@ -2,6 +2,7 @@ import os
 import threading
 import time
 from typing import Any, Dict
+from queue import Queue
 
 import numpy as np
 import torch
@@ -18,9 +19,16 @@ from state_manager.observations import (
     velocity_commands,
 )
 from utils.helpers import ObservationHistoryStorage
+import rclpy
+from rclpy.node import Node
+from visualization_msgs.msg import MarkerArray, Marker
+from std_msgs.msg import ColorRGBA
+from geometry_msgs.msg import Point
+from tf2_ros import StaticTransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 
 
-class BaseRLLocomotionController(ControllerBase):
+class BaseRLLocomotionController(ControllerBase, Node):
     """
     Base Reinforcement Learning Locomotion Controller
 
@@ -35,8 +43,31 @@ class BaseRLLocomotionController(ControllerBase):
         :param mj_model_wrapper: Mujoco model wrapper for kinematics
         :param configs: Configuration dictionary
         """
-        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+        # Initialize ROS2 node
+        Node.__init__(self, 'rl_locomotion_controller')
+        # Initialize controller base
+        ControllerBase.__init__(self, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
+        # Create publisher for future feet positions
+        self.feet_pos_pub = self.create_publisher(MarkerArray, 'future_feet_positions', 10)
+        
+        # Create static transform publisher for map frame
+        self.tf_broadcaster = StaticTransformBroadcaster(self)
+        
+        # Create and publish static transform from map to world
+        transform = TransformStamped()
+        transform.header.stamp = self.get_clock().now().to_msg()
+        transform.header.frame_id = 'map'
+        transform.child_frame_id = 'world'
+        transform.transform.translation.x = 0.0
+        transform.transform.translation.y = 0.0
+        transform.transform.translation.z = 0.0
+        transform.transform.rotation.w = 1.0
+        transform.transform.rotation.x = 0.0
+        transform.transform.rotation.y = 0.0
+        transform.transform.rotation.z = 0.0
+        self.tf_broadcaster.sendTransform(transform)
+        
         self.active = False
         # Load and prepare policy model
         self._load_policy_model(configs)
@@ -345,9 +376,13 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Contact command parameters
-        self.command_duration = 0.35  # Duration of each contact plan in seconds
+        self.command_duration = 0.4  # Duration of each contact plan in seconds
         self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool)  # Current contact pattern
         self.command_start_time = time.time()  # When the current plan started
+
+        # Thread synchronization for gait changes
+        self._gait_lock = threading.RLock()  # Reentrant lock for gait changes
+        self._gait_change_event = threading.Event()  # Event to signal gait changes
 
         # Horizon planning
         self.future_feet_positions_init_frame = None
@@ -361,14 +396,14 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.gait_patterns = {
             "transition": torch.tensor(
                 [
-                    [True, True, True, True],  # Phase 1: FL and RR in contact
-                    [True, True, True, True],  # Phase 2: FR and RL in contact
+                    [True, True, True, True],  # Phase 1: All legs in contact
+                    [True, True, True, True],  # Phase 2: All legs in contact
                 ]
             ),
             "stance": torch.tensor(
                 [
-                    [True, True, True, True],  # Phase 1: FL and RR in contact
-                    [True, True, True, True],  # Phase 2: FR and RL in contact
+                    [True, True, True, True],  # Phase 1: All legs in contact
+                    [True, True, True, True],  # Phase 2: All legs in contact
                 ]
             ),
             "trot": torch.tensor(
@@ -400,13 +435,17 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.pending_gait_change = None  # Store pending gait change
         self.in_transition = False  # Flag to indicate if we're in a transition phase
         self.transition_counter = 0  # Counter to track resample steps during transition
+        self.transition_duration = 3  # Number of resample steps for transition (increased from 2)
+        self.transition_progress = 0.0
+        self.transition_start_gait = None  # Starting gait for transition
+        self.transition_end_gait = None  # Ending gait for transition
         self.time_left = self.command_duration
         self.current_contact_plan = self.gait_patterns[self.current_gait]
         self.current_goal_idx = 0
         self.goal_completion_counter = 0
 
         self.init_completed = True
-        self.active = False
+        self.active = True
 
     def compute_torques(self, state, desired_goal):
         """
@@ -423,51 +462,53 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         with self._lock:
             self.latest_state = state
 
-        # Update contact plan timing
-        current_time = time.time()
-        elapsed = current_time - self.command_start_time
-        self.time_left = max(0, self.command_duration - elapsed)
-        if elapsed >= self.command_duration:
-            self.command_start_time = current_time
-            self._resample_commands()
+        # Update contact plan timing with thread safety
+        with self._gait_lock:
+            current_time = time.time()
+            elapsed = current_time - self.command_start_time
+            self.time_left = max(0, self.command_duration - elapsed)
+            if elapsed >= self.command_duration:
+                self.command_start_time = current_time
+                self._resample_commands()
 
         # Use the base class implementation to compute torques
         # This will use the pre-computed raw_action from the policy inference thread
         return super().compute_torques(state, desired_goal)
 
-    def _update_commands(self):
-        """Update the commands for the controller."""
-        # This method is called within the _process_commands thread with the lock already held
-        # It can be extended to update any command-related variables that need to be updated
-        # For now, we'll just log that it's being called for debugging purposes
-        pass
-
     def _resample_commands(self):
-        """Resample the commands for the controller."""
+        """Resample the commands for the controller with thread safety."""
         try:
-            # Handle gait transitions
-            if self.pending_gait_change is not None:
-                with self._lock:
+            with self._gait_lock:
+                # Handle gait transitions
+                if self.pending_gait_change is not None:
                     if not self.in_transition:
-                        # Start transition phase - switch to stance
+                        # Start transition phase
                         self.in_transition = True
-                        self.transition_counter = 0  # Reset transition counter
-                        self.current_gait = "transition"
-                        self.current_contact_plan = self.gait_patterns["transition"]
+                        self.transition_counter = 0
+                        self.transition_progress = 0.0
+                        self.transition_start_gait = self.current_gait
+                        self.transition_end_gait = self.pending_gait_change
+                        
+                        # For safety, start with a stable stance if transitioning to a dynamic gait
+                        if self.pending_gait_change in ["trot", "pace", "bound", "jump"]:
+                            self.current_gait = "transition"
+                            self.current_contact_plan = self.gait_patterns["transition"]
+                            
                         if (
                             hasattr(self, "command_manager")
                             and self.command_manager
                             and hasattr(self.command_manager, "logger")
                         ):
                             self.command_manager.logger.debug(
-                                f"Starting transition phase to: {self.pending_gait_change}"
+                                f"Starting transition phase from {self.transition_start_gait} to {self.transition_end_gait}"
                             )
                     else:
-                        # Increment transition counter
+                        # Increment transition counter and update progress
                         self.transition_counter += 1
+                        self.transition_progress = min(1.0, self.transition_counter / self.transition_duration)
                         
-                        # Only apply the pending gait after two resample steps
-                        if self.transition_counter >= 2:
+                        # Only apply the pending gait after transition duration
+                        if self.transition_counter >= self.transition_duration:
                             # Transition phase complete - apply the pending gait
                             self.in_transition = False
                             self.current_gait = self.pending_gait_change
@@ -478,25 +519,32 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                                 self.generate_future_feet_positions()
                                 
                             self.pending_gait_change = None
-                            if (
-                                hasattr(self, "command_manager")
-                                and self.command_manager
-                                and hasattr(self.command_manager, "logger")
-                            ):
-                                self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
+                            self.transition_start_gait = None
+                            self.transition_end_gait = None
+                            
+                            # Signal that the gait change is complete
+                            self._gait_change_event.set()
+                            
+                            self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
+                        else:
+                            # Log transition progress for debugging
+                            if (self.transition_counter % 2 == 0 ):
+                                self.command_manager.logger.debug(
+                                    f"Transition progress: {self.transition_progress:.2f}"
+                                )
 
-            # Normal gait progression (only if not in transition phase)
-            if not self.in_transition and self.current_gait not in ["stance", "transition"]:
-                self.goal_completion_counter += 1
-                self.current_goal_idx += (
-                    1 if self.goal_completion_counter % 2 == 0 and self.goal_completion_counter > 0 else 0
-                )
-                self.current_contact_plan = torch.stack(
-                    [
-                        self.current_contact_plan[1],
-                        self.current_contact_plan[0],
-                    ]
-                )
+                # Normal gait progression (only if not in transition phase)
+                if not self.in_transition and self.current_gait not in ["stance", "transition"]:
+                    self.goal_completion_counter += 1
+                    self.current_goal_idx += (
+                        1 if self.goal_completion_counter % 2 == 0 and self.goal_completion_counter > 0 else 0
+                    )
+                    self.current_contact_plan = torch.stack(
+                        [
+                            self.current_contact_plan[1],
+                            self.current_contact_plan[0],
+                        ]
+                    )
         except Exception as e:
             if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
                 self.command_manager.logger.error(f"Error resampling commands: {e}")
@@ -504,7 +552,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 print(f"Error resampling commands: {e}")
 
     def change_commands(self, new_commands: Dict[str, Any]):
-        """Change the robot's contact commands.
+        """Change the robot's contact commands with thread safety.
 
         This method handles changes to the robot's gait pattern. When a new gait is requested,
         it is stored as a pending change rather than applied immediately. The actual gait
@@ -517,20 +565,26 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Raises:
             ValueError: If an invalid gait pattern is specified
         """
-
         try:
             if "gait" in new_commands:
                 new_gait = new_commands["gait"].lower()
                 if new_gait in self.gait_patterns and new_gait != self.current_gait:
-                    # Store the requested gait change instead of applying it immediately
-                    with self._lock:
+                    with self._gait_lock:
                         # Only set pending change if it's different from current gait
-                        self.pending_gait_change = new_gait
-                        self.command_manager.logger.debug(f"Stored pending gait change to: {new_gait}")
+                        # and we're not already in a transition to this gait
+                        if self.pending_gait_change != new_gait:
+                            self.pending_gait_change = new_gait
+                            self._gait_change_event.clear()  # Reset event for new change
+                            
+                            # If we're already in a transition, reset it to start fresh
+                            if self.in_transition:
+                                self.transition_counter = 0
+                                self.transition_progress = 0.0
+                                self.transition_start_gait = self.current_gait
+                                self.transition_end_gait = new_gait
 
         except Exception as e:
             self.command_manager.logger.error(f"Contact command update failed: {e}")
-
 
     def register_commands(self):
         """Register contact command parameters."""
@@ -648,7 +702,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Generates the future feet positions in the init frame for horizon planning.
         """
         # Call the base class set_mode to activate the controller
-        super().set_mode()
+        # super().set_mode()
 
         self.generate_future_feet_positions()
 
@@ -677,11 +731,58 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         direction_y = torch.sin(yaw)
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
-        self.future_feet_positions_w[:, :, 2] = 0.15
+        self.future_feet_positions_w[:, :, 2] = 0.1
         
         self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(self.future_feet_positions_w.numpy())
         
-        # self.future_feet_positions_w[:,:,2] = torch.tensor(self.mj_model_wrapper.get_feet_positions_world()[:, 2]).unsqueeze(-1)
-        # self.future_feet_positions_w[:, :, 2] =
-        # self.future_feet_positions_b = self.mj_model_wrapper.transform_world_to_base(self.future_feet_positions_w)
-        # self.future_feet_positions_init_frame = base_pos_w + offset
+        # Create and publish marker array for visualization
+        try:
+            marker_array = MarkerArray()
+            
+            # Colors for each foot trajectory
+            colors = [
+                ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Red for FL
+                ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Green for FR
+                ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0),  # Blue for RL
+                ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # Yellow for RR
+            ]
+            
+            foot_names = ['FL', 'FR', 'RL', 'RR']
+            
+            # Transpose the tensor to match the expected shape (num_steps, 4, 3)
+            positions_for_viz = self.future_feet_positions_w.permute(1, 0, 2).numpy()
+            
+            for foot_idx in range(4):
+                # Create a marker for the trajectory of each foot
+                marker = Marker()
+                marker.header.frame_id = "map"  # Changed from "world" to "map"
+                marker.header.stamp = self.get_clock().now().to_msg()
+                marker.ns = f"foot_trajectory_{foot_names[foot_idx]}"
+                marker.id = foot_idx
+                marker.type = Marker.POINTS
+                marker.action = Marker.ADD
+                
+                # Set the scale of the points
+                marker.scale.x = 0.02  # Point size
+                marker.scale.y = 0.02
+                marker.scale.z = 0.02
+                
+                # Set the color
+                marker.color = colors[foot_idx]
+                
+                # Add all future positions for this foot
+                for step in range(positions_for_viz.shape[0]):
+                    point = Point()
+                    point.x = float(positions_for_viz[step, foot_idx, 0])
+                    point.y = float(positions_for_viz[step, foot_idx, 1])
+                    point.z = float(positions_for_viz[step, foot_idx, 2])
+                    marker.points.append(point)
+                
+                marker_array.markers.append(marker)
+            
+            # Publish the marker array
+            self.feet_pos_pub.publish(marker_array)
+            self.get_logger().debug('Published future feet positions marker array')
+            
+        except Exception as e:
+            self.get_logger().error(f'Failed to publish future feet positions: {e}')
