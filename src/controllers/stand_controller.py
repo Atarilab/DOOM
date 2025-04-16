@@ -34,7 +34,7 @@ class IdleController(ControllerBase):
                 "q": 0.0,
                 "kp": 0.0,
                 "dq": 0.0,
-                "kd": 0.0,
+                "kd": 3.0,
                 "tau": 0.0,
             }
         return cmd
