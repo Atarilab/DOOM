@@ -70,6 +70,11 @@ ros2 launch vicon_receiver client.launch.py
 ros2 run plotjuggler plotjuggler
 ```
 
+## RViz
+```bash
+ros2 launch go2_description display.launch.py
+```
+
 ## Code Formatting
 This project uses [black](https://github.com/psf/black) as the code formatter and [flake7](https://github.com/PyCQA/flake8) as additional linter to ensure consistent code style across the codebase. You can run the formatter inside the container in VS Code using the keyboard shortcut `Ctrl + Shift + B` and running the task `Format and Lint`.
 
