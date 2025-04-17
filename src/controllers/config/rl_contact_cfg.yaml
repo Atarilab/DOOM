@@ -1,7 +1,7 @@
 # policy_path: "policies/contact_policy_lowerObs_DR.pt"
 # obs_dim: 82
-policy_path: "policies/contact_policy_dim83_noContactStatus.pt"
-obs_dim: 83
+policy_path: "policies/contact_policy_dim82.pt"
+obs_dim: 82
 control_dt: 0.001
 action_dim: 12
 action_scale: 0.25

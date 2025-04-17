@@ -617,9 +617,9 @@ class RLLocomotionContactController(BaseRLLocomotionController):
 
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
-        self.obs_manager.register(
-            "base_height", ObsTerm(base_height, params={"mj_model_wrapper": self.mj_model_wrapper})
-        )
+        # self.obs_manager.register(
+        #     "base_height", ObsTerm(base_height, params={"mj_model_wrapper": self.mj_model_wrapper})
+        # )
         self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
         # self.obs_manager.register("contact_status", ObsTerm(contact_status))
         # self.obs_manager.register(
@@ -722,7 +722,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         direction_y = torch.sin(yaw)
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
-        self.future_feet_positions_w[:, :, 2] = 0.1
+        self.future_feet_positions_w[:, :, 2] = 0.01
         
         self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(self.future_feet_positions_w.numpy())
         
@@ -743,7 +743,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             # Transpose the tensor to match the expected shape (num_steps, 4, 3)
             positions_for_viz = self.future_feet_positions_w.permute(1, 0, 2).numpy()
             
-            for foot_idx in range(4):
+            for foot_idx in range(len(foot_names)):
                 # Create a marker for the trajectory of each foot
                 marker = Marker()
                 marker.header.frame_id = "map"  # Changed from "world" to "map"
@@ -773,7 +773,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             
             # Publish the marker array
             self.feet_pos_pub.publish(marker_array)
-            self.get_logger().debug('Published future feet positions marker array')
+            self.command_manager.logger.debug('Published future feet positions marker array')
             
         except Exception as e:
-            self.get_logger().error(f'Failed to publish future feet positions: {e}')
+            self.command_manager.logger.error(f'Failed to publish future feet positions: {e}')
