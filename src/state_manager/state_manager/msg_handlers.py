@@ -58,7 +58,11 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     Returns:
         Dict: Base states from the Vicon Receiver including velocities
     """
-    # Offsets for position of the robot base from the vicon frame
+    # Offsets for position of the robot base from the vicon frame (if using Go2with6markers)
+    # x_offset = 0.0
+    # y_offset = 62.5
+    # z_offset = -75.0
+
     x_offset = 0.0
     y_offset = 62.5
     z_offset = -75.0
