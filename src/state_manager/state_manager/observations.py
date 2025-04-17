@@ -123,7 +123,7 @@ def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> np.ndarray:
     return contact_plan().view(-1)
 
 
-def contact_status(states: Dict[str, Any]) -> np.ndarray:
+def contact_status(states: Dict[str, Any]) -> torch.Tensor:
     """
     The contact status. We use a callable (lambda) to fetch the latest value from the controller class.
     """
@@ -134,7 +134,7 @@ def contact_status(states: Dict[str, Any]) -> np.ndarray:
     return torch.tensor(contact_status)
 
 
-def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> np.ndarray:
+def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> torch.Tensor:
     """
     The contact timing. We use a callable (lambda) to fetch the latest value from the controller class.
 
@@ -144,26 +144,27 @@ def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> np
     return torch.tensor([contact_time_left()])
 
 
-def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") -> np.ndarray:
+def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") ->  np.ndarray:
     """
     The height of the base of the robot.
     """
     return torch.tensor([mj_model_wrapper.get_base_height_init_frame()])
 
 
-def ee_pos_rel(
+
+def ee_pos_rel_b(
     states: Dict[str, Any],
     mj_model_wrapper: "MjQuadRobotWrapper",
-    future_feet_positions_init_frame: Callable,
+    future_feet_positions_w: Callable,
     current_goal_idx: Callable,
-) -> np.ndarray:
+) -> torch.Tensor:
     """
-    Compute the end-effector positions relative to the base frame.
+    Compute the end-effector positions relative to the desired contact locations.
 
     Args:
         states: Dictionary of states
         mj_model_wrapper: MuJoCo model wrapper
-        future_feet_positions_init_frame: Function to get future feet positions
+        future_feet_positions_w: Function to get future feet positions
         current_goal_idx: Function to get current goal index
 
     Returns:
@@ -171,17 +172,12 @@ def ee_pos_rel(
     """
     # Get current feet positions in world frame
     feet_positions_w = mj_model_wrapper.get_feet_positions_world()
-    
     # Get future feet positions in init frame
-    future_feet_positions = future_feet_positions_init_frame()
-    current_idx = current_goal_idx()
-    
-    # Combine current and future positions
-    all_feet_positions = np.vstack([feet_positions_w, future_feet_positions])
-    
-    # Transform to base frame
-    base_pos = mj_model_wrapper.base_pos_init_frame()
-    return all_feet_positions - base_pos
+    desired_feet_positions = future_feet_positions_w()[:, current_goal_idx()]
+    # Compute the distance between the current feet positions and the desired feet positions
+    ee_pos_rel = torch.tensor(desired_feet_positions - feet_positions_w).norm(dim=1)
+
+    return ee_pos_rel
 
 
 def contact_locations(
@@ -211,8 +207,14 @@ def contact_locations_b(
     """
     The future desired feet positions in the base frame.
     """
+    current_base_index = current_goal_idx() // 2
     return torch.tensor(
         mj_model_wrapper.transform_world_to_base(
-            future_feet_positions_w()[:, current_goal_idx() : current_goal_idx() + obs_horizon].numpy()
+            future_feet_positions_w()[:, current_base_index : current_base_index + obs_horizon].numpy()
         ).flatten()
     )
+    # return torch.tensor(
+    #     mj_model_wrapper.transform_world_to_base(
+    #         future_feet_positions_w()[:, current_base_index : current_base_index + obs_horizon].numpy()
+    #     ).flatten()
+    # )[: obs_horizon]
