@@ -64,8 +64,8 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     # z_offset = -75.0
 
     x_offset = 0.0
-    y_offset = 62.5
-    z_offset = -75.0
+    y_offset = 0.0
+    z_offset = 0.0
 
     # Singleton pattern for velocity estimator
     if not hasattr(vicon_handler, "velocity_estimator"):
