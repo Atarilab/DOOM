@@ -333,7 +333,7 @@ class MjQuadRobotWrapper:
         )
 
         # Return the height difference (z-coordinate)
-        return base_pos_init[2] - avg_feet_pos_init[2]
+        return base_pos_init[2] - avg_feet_pos_init[2] - 0.025
 
     def get_initial_feet_positions(self) -> np.ndarray:
         """

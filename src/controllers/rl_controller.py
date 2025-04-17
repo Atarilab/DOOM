@@ -376,7 +376,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Contact command parameters
-        self.command_duration = 0.4  # Duration of each contact plan in seconds
+        self.command_duration = 0.35  # Duration of each contact plan in seconds
         self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool)  # Current contact pattern
         self.command_start_time = time.time()  # When the current plan started
 
@@ -387,7 +387,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # Horizon planning
         self.future_feet_positions_init_frame = None
         self.horizon_length = 1000
-        self.feet_step_size = 0.15  # meters
+        self.feet_step_size = 0.2  # meters
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
@@ -435,7 +435,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.pending_gait_change = None  # Store pending gait change
         self.in_transition = False  # Flag to indicate if we're in a transition phase
         self.transition_counter = 0  # Counter to track resample steps during transition
-        self.transition_duration = 3  # Number of resample steps for transition (increased from 2)
+        self.transition_duration = 2  # Number of resample steps for transition (increased from 2)
         self.transition_progress = 0.0
         self.transition_start_gait = None  # Starting gait for transition
         self.transition_end_gait = None  # Ending gait for transition
@@ -612,16 +612,16 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             contact_plan,
             contact_status,
             contact_time_left,
-            ee_pos_rel,
+            ee_pos_rel_b,
         )
 
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
-        # self.obs_manager.register(
-        #     "base_height", ObsTerm(base_height, params={"mj_model_wrapper": self.mj_model_wrapper})
-        # )
+        self.obs_manager.register(
+            "base_height", ObsTerm(base_height, params={"mj_model_wrapper": self.mj_model_wrapper})
+        )
         self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
-        self.obs_manager.register("contact_status", ObsTerm(contact_status))
+        # self.obs_manager.register("contact_status", ObsTerm(contact_status))
         # self.obs_manager.register(
         #     "contact_locations",
         #     ObsTerm(
@@ -672,26 +672,17 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             "joint_vel",
             ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}),
         )
-        # self.obs_manager.register(
-        #    "ee_pos_rel",
-        #     ObsTerm(
-        #         ee_pos_rel,
-        #         params={"mj_model_wrapper": self.mj_model_wrapper,
-        #                 "future_feet_positions_init_frame": lambda: self.future_feet_positions_init_frame,
-        #                 "current_goal_idx": lambda: self.current_goal_idx
-        #         }
-        #     )
-        # )
-        # self.obs_manager.register(
-        #    "ee_pos_rel_b",
-        #     ObsTerm(
-        #         ee_pos_rel_b,
-        #         params={"mj_model_wrapper": self.mj_model_wrapper,
-        #                 "future_feet_positions_w": lambda: self.future_feet_positions_w,
-        #                 "current_goal_idx": lambda: self.current_goal_idx
-        #         }
-        #     )
-        # )
+
+        self.obs_manager.register(
+           "ee_pos_rel_b",
+            ObsTerm(
+                ee_pos_rel_b,
+                params={"mj_model_wrapper": self.mj_model_wrapper,
+                        "future_feet_positions_w": lambda: self.future_feet_positions_w,
+                        "current_goal_idx": lambda: self.current_goal_idx
+                }
+            )
+        )
         self.obs_manager.register(
             "last_action",
             ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),

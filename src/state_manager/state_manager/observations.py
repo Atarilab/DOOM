@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from utils.mj_wrapper.mj_robot import MjQuadRobotWrapper
 
 
-def joint_pos(states: Dict[str, Any]) -> np.ndarray:
+def joint_pos(states: Dict[str, Any]) -> torch.Tensor:
     """
     The joint positions of the asset.
 
@@ -29,7 +29,7 @@ def joint_pos(states: Dict[str, Any]) -> np.ndarray:
     return torch.tensor(joint_pos)
 
 
-def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping: np.ndarray) -> np.ndarray:
+def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping: np.ndarray) -> torch.Tensor:
     """
     Compute relative joint positions.
 
@@ -41,7 +41,7 @@ def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping
     return torch.tensor(states["joint_pos"][mapping] - default_joint_pos)
 
 
-def joint_vel(states: Dict[str, Any], mapping: np.ndarray) -> np.ndarray:
+def joint_vel(states: Dict[str, Any], mapping: np.ndarray) -> torch.Tensor:
     """
     The joint positions of the asset.
 
@@ -52,7 +52,7 @@ def joint_vel(states: Dict[str, Any], mapping: np.ndarray) -> np.ndarray:
     return torch.tensor(states["joint_vel"][mapping])
 
 
-def lin_vel_b(states: Dict[str, Any]) -> np.ndarray:
+def lin_vel_b(states: Dict[str, Any]) -> torch.Tensor:
     """
     The linear velocity of the asset in base frame.
 
@@ -63,7 +63,7 @@ def lin_vel_b(states: Dict[str, Any]) -> np.ndarray:
     return torch.tensor(states["lin_vel_b"])
 
 
-def ang_vel_b(states: Dict[str, Any]) -> np.ndarray:
+def ang_vel_b(states: Dict[str, Any]) -> torch.Tensor:
     """
     The angular velocity of the asset in base frame.
 
@@ -86,7 +86,7 @@ def projected_gravity_b(states: Dict[str, Any]) -> torch.Tensor:
     return quat_rotate_inverse(torch.tensor([states["base_quat"]]).squeeze(0), GRAVITY_DIR)
 
 
-def last_action(states: Dict[str, Any], last_action: Callable) -> np.ndarray:
+def last_action(states: Dict[str, Any], last_action: Callable) -> torch.Tensor:
     """
     The previous action from the policy. We use a callable (lambda) to fetch the latest value from the controller class.
 
@@ -96,7 +96,7 @@ def last_action(states: Dict[str, Any], last_action: Callable) -> np.ndarray:
     return last_action()
 
 
-def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> np.ndarray:
+def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> torch.Tensor:
     """
     The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
 
@@ -113,7 +113,7 @@ def starting_time(states: Dict[str, Any]):
 # Contact Explicit Additional Observations
 
 
-def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> np.ndarray:
+def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> torch.Tensor:
     """
     The contact plan. We use a callable (lambda) to fetch the latest value from the controller class.
 
@@ -144,7 +144,7 @@ def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> to
     return torch.tensor([contact_time_left()])
 
 
-def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") ->  np.ndarray:
+def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") ->  torch.Tensor:
     """
     The height of the base of the robot.
     """
@@ -186,7 +186,7 @@ def contact_locations(
     future_feet_positions_init_frame: Callable,
     current_goal_idx: Callable,
     obs_horizon: int,
-) -> np.ndarray:
+) -> torch.Tensor:
     """
     The future desired feet positions in the base frame.
     """
@@ -203,18 +203,13 @@ def contact_locations_b(
     future_feet_positions_w: Callable,
     current_goal_idx: Callable,
     obs_horizon: int,
-) -> np.ndarray:
+) -> torch.Tensor:
     """
     The future desired feet positions in the base frame.
     """
     current_base_index = current_goal_idx() // 2
     return torch.tensor(
         mj_model_wrapper.transform_world_to_base(
-            future_feet_positions_w()[:, current_base_index : current_base_index + obs_horizon].numpy()
+            future_feet_positions_w()[:,  current_goal_idx() :  current_goal_idx() + obs_horizon].numpy()
         ).flatten()
     )
-    # return torch.tensor(
-    #     mj_model_wrapper.transform_world_to_base(
-    #         future_feet_positions_w()[:, current_base_index : current_base_index + obs_horizon].numpy()
-    #     ).flatten()
-    # )[: obs_horizon]
