@@ -2,31 +2,48 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "rl-velocity-sim-go2 debug",
+            "name": "Contact Sim debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/master_manager/master_node.py",
-            // "program": "${file}",
-            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/DOOM/src/master_manager/master_manager/master_node.py",
             "args": [
                 "--task",
-                "rl-velocity-sim-go2",
+                "rl-contact-sim-go2",
                 "--log",
                 "test"
-            ]
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/DOOM",
+            "preLaunchTask": "build_ros2_workspace",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/DOOM/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/DOOM/install/lib:${env:LD_LIBRARY_PATH}",
+                "ROS_DISTRO": "humble",
+                "ROS_VERSION": "2"
+            },
+            "justMyCode": false
         },
         {
-            "name": "rl-velocity-real-go2 debug",
+            "name": "Contact Real debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/master_manager/master_node.py",
-            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/DOOM/src/master_manager/master_manager/master_node.py",
             "args": [
                 "--task",
-                "rl-velocity-real-go2",
+                "rl-contact-real-go2",
                 "--log",
                 "test"
-            ]
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/DOOM",
+            "preLaunchTask": "build_ros2_workspace",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/DOOM/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/DOOM/install/lib:${env:LD_LIBRARY_PATH}",
+                "ROS_DISTRO": "humble",
+                "ROS_VERSION": "2"
+            },
+            "justMyCode": false
         }
     ]
 }

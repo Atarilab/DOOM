@@ -4,7 +4,7 @@
         {
             "label": "build_ros2_workspace",
             "type": "shell",
-            "command": "cd DOOM && colcon build",
+            "command": "cd DOOM && rm -rf install/ build/ log/ && colcon build && source install/setup.bash",
             "group": {
                 "kind": "build",
                 "isDefault": true
