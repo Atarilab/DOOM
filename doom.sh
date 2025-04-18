@@ -89,6 +89,8 @@ while [[ $# -gt 0 ]]; do
                 docker run -it --privileged \
                     --env-file .env.docker \
                     --network host \
+                    --device /dev/input \
+                    --group-add 107 \
                     --user $(id -u):$(id -g) \
                     --gpus all \
                     -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
