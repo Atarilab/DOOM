@@ -606,11 +606,10 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Includes contact pattern and timing information.
         """
         from state_manager.observations import (
-            base_height,
-            contact_locations,
+            # base_height,
             contact_locations_b,
             contact_plan,
-            contact_status,
+            # contact_status,
             contact_time_left,
             ee_pos_rel_b,
         )
@@ -705,21 +704,38 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.goal_completion_counter = 0
         self.current_goal_idx = 0
         offset = torch.tensor(
-            [(0.2334, 0.1865, 0.0), (0.2334, -0.1865, 0.0), (-0.2334, 0.1865, 0.0), (-0.2334, -0.1865, 0.0)]
+            [(0.2334, 0.1865, 0.0), (0.2334, -0.1865, 0.0), (-0.2334, 0.1865, 0.0), (-0.2334, -0.1865, 0.0)],
+            dtype=torch.float32
         )
         #
-        base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"))
-        self.future_feet_positions_w[:] = (base_pos_w + offset).unsqueeze(1)
-        stride_offsets = torch.arange(self.horizon_length).unsqueeze(0) * torch.tensor(self.feet_step_size).unsqueeze(
+        base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
+        
+        # Get robot yaw from base orientation matrix
+        base_rot = torch.tensor(self.mj_model_wrapper.get_body_orientation_world("base_link"), dtype=torch.float32)
+        yaw = torch.atan2(base_rot[1, 0], base_rot[0, 0])
+        
+        # Create rotation matrix for yaw
+        cos_yaw = torch.cos(yaw)
+        sin_yaw = torch.sin(yaw)
+        rotation_matrix = torch.tensor([
+            [cos_yaw, -sin_yaw, 0],
+            [sin_yaw, cos_yaw, 0],
+            [0, 0, 1]
+        ], dtype=torch.float32)
+        
+        # Rotate the offset positions
+        rotated_offset = torch.matmul(rotation_matrix, offset.T).T
+        
+        # Apply the rotated offset to base position
+        self.future_feet_positions_w[:] = (base_pos_w + rotated_offset).unsqueeze(1)
+        
+        stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32).unsqueeze(0) * torch.tensor(self.feet_step_size, dtype=torch.float32).unsqueeze(
             -1
         )
-        # get robot yaw
-        # Get robot yaw from base orientation matrix
-        base_rot = torch.tensor(self.mj_model_wrapper.get_body_orientation_world("base_link"))
-        yaw = torch.atan2(base_rot[1, 0], base_rot[0, 0])
-        # yaw = torch.tensor([0.0])
-        direction_x = torch.cos(yaw)
-        direction_y = torch.sin(yaw)
+        
+        # Apply stride in the direction of robot's orientation
+        direction_x = cos_yaw
+        direction_y = sin_yaw
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
         self.future_feet_positions_w[:, :, 2] = 0.01
@@ -746,7 +762,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             for foot_idx in range(len(foot_names)):
                 # Create a marker for the trajectory of each foot
                 marker = Marker()
-                marker.header.frame_id = "map"  # Changed from "world" to "map"
+                marker.header.frame_id = "world"
                 marker.header.stamp = self.get_clock().now().to_msg()
                 marker.ns = f"foot_trajectory_{foot_names[foot_idx]}"
                 marker.id = foot_idx

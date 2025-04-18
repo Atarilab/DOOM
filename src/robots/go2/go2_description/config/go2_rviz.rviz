@@ -24,11 +24,6 @@ Panels:
     Name: Time
     SyncMode: 0
     SyncSource: PointCloud2
-  - Class: rviz_common/Views
-    Expanded:
-      - /Current View1
-    Name: Views
-    Splitter Ratio: 0.5
 Visualization Manager:
   Class: ""
   Displays:
@@ -48,147 +43,20 @@ Visualization Manager:
         Z: 0
       Plane: XY
       Plane Cell Count: 10
-      Reference Frame: <Fixed Frame>
+      Reference Frame: world
       Value: true
-    - Class: rviz_default_plugins/TF
-      Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        FL_calf:
-          Value: true
-        FL_calflower:
-          Value: true
-        FL_calflower1:
-          Value: true
-        FL_foot:
-          Value: true
-        FL_hip:
-          Value: true
-        FL_thigh:
-          Value: true
-        FR_calf:
-          Value: true
-        FR_calflower:
-          Value: true
-        FR_calflower1:
-          Value: true
-        FR_foot:
-          Value: true
-        FR_hip:
-          Value: true
-        FR_thigh:
-          Value: true
-        Head_lower:
-          Value: true
-        Head_upper:
-          Value: true
-        RL_calf:
-          Value: true
-        RL_calflower:
-          Value: true
-        RL_calflower1:
-          Value: true
-        RL_foot:
-          Value: true
-        RL_hip:
-          Value: true
-        RL_thigh:
-          Value: true
-        RR_calf:
-          Value: true
-        RR_calflower:
-          Value: true
-        RR_calflower1:
-          Value: true
-        RR_foot:
-          Value: true
-        RR_hip:
-          Value: true
-        RR_thigh:
-          Value: true
-        base_link:
-          Value: true
-        camera_link:
-          Value: true
-        hesai_lidar:
-          Value: true
-        imu:
-          Value: true
-        world:
-          Value: true
-        radar:
-          Value: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Tree:
-        world:
-          base_link:
-            FL_hip:
-              FL_thigh:
-                FL_calf:
-                  FL_calflower:
-                    FL_calflower1:
-                      {}
-                  FL_foot:
-                    {}
-            FR_hip:
-              FR_thigh:
-                FR_calf:
-                  FR_calflower:
-                    FR_calflower1:
-                      {}
-                  FR_foot:
-                    {}
-            Head_upper:
-              Head_lower:
-                {}
-              camera_link:
-                {}
-            RL_hip:
-              RL_thigh:
-                RL_calf:
-                  RL_calflower:
-                    RL_calflower1:
-                      {}
-                  RL_foot:
-                    {}
-            RR_hip:
-              RR_thigh:
-                RR_calf:
-                  RR_calflower:
-                    RR_calflower1:
-                      {}
-                  RR_foot:
-                    {}
-            hesai_lidar:
-              {}
-            imu:
-              {}
-            radar:
-              {}
-      Update Interval: 0
-      Value: true
-    - Alpha: 1
-      Class: rviz_default_plugins/RobotModel
+    - Class: rviz_default_plugins/RobotModel
       Collision Enabled: false
       Description File: ""
-      Description Source: Topic
-      Description Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /robot_description
+      Description Source: Parameter
+      Description Parameter: robot_description
       Enabled: true
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
         FL_calf:
           Alpha: 1
           Show Axes: false
@@ -259,7 +127,6 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        Link Tree Style: Links in Alphabetic Order
         RL_calf:
           Alpha: 1
           Show Axes: false
@@ -325,69 +192,48 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        hesai_lidar:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         imu:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+          Value: true
         radar:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-      Mass Properties:
-        Inertia: false
-        Mass: false
+          Value: true
       Name: RobotModel
       TF Prefix: ""
       Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 0
+    - Class: rviz_default_plugins/TF
       Enabled: true
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 216
-      Min Color: 0; 0; 0
-      Min Intensity: 74
-      Name: PointCloud2
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.009999999776482582
-      Style: Flat Squares
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /pointcloud
-      Use Fixed Frame: true
-      Use rainbow: true
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Alpha: 1
+      Marker Scale: 0.4000000059604645
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: true
+    - Class: rviz_default_plugins/Axes
+      Enabled: true
+      Length: 0.30000001192092896
+      Name: Axes
+      Reference Frame: world
+      Shaft Length: 0.23000000417232513
+      Shaft Radius: 0.009999999776482582
       Value: true
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 238; 238; 236
+    Default Light: true
     Fixed Frame: world
     Frame Rate: 30
   Name: root
@@ -447,7 +293,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.4752010107040405
-      Target Frame: <Fixed Frame>
+      Target Frame: world
       Value: Orbit (rviz)
       Yaw: 5.166723251342773
     Saved: ~
