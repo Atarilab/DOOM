@@ -70,9 +70,10 @@ ros2 launch vicon_receiver client.launch.py
 ros2 run plotjuggler plotjuggler
 ```
 
-## RViz
+## Robot Visualization in RViz
+Visualizing in RViz is useful, especially for debugging, to see what the world looks like to the robot. Once the master node is launched in a terminal, you can launch RViz in another terminal using:
 ```bash
-ros2 launch go2_description display.launch.py
+ros2 launch go2_description go2_visualization.launch.py
 ```
 
 ## Code Formatting
@@ -88,6 +89,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ ] Run the state publisher on a seperate thread for better performance
 - [ ] Add support for AlienGo/G1/Allegro
 - [ ] Implement joystick control for velocity commands
+- [x] Visualize Robot in RViz
 - [x] Implement interface to change commands from UI
 - [x] Implement safety mechanisms (soft dof pos limits, dof torque limits)
 - [x] Integrate Pinocchio for additional states such as feet positions

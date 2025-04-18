@@ -1,5 +1,4 @@
 effort_limit: 23.5
-pinocchio_urdf: "/home/atari/workspace/DOOM/src/robots/go2/go2_description/urdf/go2_description.urdf"
 xml_path: "/home/atari/workspace/DOOM/src/robots/go2/go2.xml"
 stand_up_joint_pos:
   - 0.1

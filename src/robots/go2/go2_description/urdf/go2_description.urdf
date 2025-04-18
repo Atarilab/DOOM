@@ -6,7 +6,7 @@ Stephen Brawner (brawner@gmail.com)
 <robot
   name="go2_description">
   <link
-    name="base">
+    name="base_link">
     <inertial>
       <origin
         xyz="0.021112 0 -0.005366"
@@ -27,7 +27,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/base.dae" />
+          filename="package://go2_description/dae/base.dae" />
       </geometry>
       <material
         name="">
@@ -74,7 +74,7 @@ Stephen Brawner (brawner@gmail.com)
       xyz="0.285 0 0.01"
       rpy="0 0 0" />
     <parent
-      link="base" />
+      link="base_link" />
     <child
       link="Head_upper" />
     <axis
@@ -118,303 +118,6 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 0 0" />
   </joint>
-
-  <link
-    name="FR_hip">
-    <inertial>
-      <origin
-        xyz="-0.0054 -0.00194 -0.000105"
-        rpy="0 0 0" />
-      <mass
-        value="0.678" />
-      <inertia
-        ixx="0.00048"
-        ixy="3.01E-06"
-        ixz="1.11E-06"
-        iyy="0.000884"
-        iyz="1.42E-06"
-        izz="0.000596" />
-    </inertial>
-    <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="3.1415 0 0" />
-      <geometry>
-        <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/hip.dae" />
-      </geometry>
-      <material
-        name="">
-        <color
-          rgba="1 1 1 1" />
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="1.5707963267948966 0 0" xyz="0 -0.08 0" />
-      <geometry>
-        <cylinder length="0.04" radius="0.046" />
-      </geometry>
-    </collision>
-  </link>
-  <joint
-    name="FR_hip_joint"
-    type="revolute">
-    <origin
-      xyz="0.1934 -0.0465 0"
-      rpy="0 0 0" />
-    <parent
-      link="base" />
-    <child
-      link="FR_hip" />
-    <axis
-      xyz="1 0 0" />
-    <limit
-      lower="-1.0472"
-      upper="1.0472"
-      effort="23.7"
-      velocity="30.1" />
-  </joint>
-  <link name="FR_hip_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000111842" ixy="0.0" ixz="0.0" iyy="0.000059647" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="FR_hip_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0.11215 -0.04675 0"/>
-    <parent link="base"/>
-    <child link="FR_hip_rotor"/>
-  </joint>
-  <link
-    name="FR_thigh">
-    <inertial>
-      <origin
-        xyz="-0.00374 0.0223 -0.0327"
-        rpy="0 0 0" />
-      <mass
-        value="1.152" />
-      <inertia
-        ixx="0.00584"
-        ixy="-8.72E-05"
-        ixz="-0.000289"
-        iyy="0.0058"
-        iyz="-0.000808"
-        izz="0.00103" />
-    </inertial>
-    <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <geometry>
-        <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/thigh_mirror.dae" />
-      </geometry>
-      <material
-        name="">
-        <color
-          rgba="1 1 1 1" />
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="0 1.5707963267948966 0" xyz="0 0 -0.1065" />
-      <geometry>
-        <box size="0.213 0.0245 0.034" />
-      </geometry>
-    </collision>
-  </link>
-  <joint
-    name="FR_thigh_joint"
-    type="revolute">
-    <origin
-      xyz="0 -0.0955 0"
-      rpy="0 0 0" />
-    <parent
-      link="FR_hip" />
-    <child
-      link="FR_thigh" />
-    <axis
-      xyz="0 1 0" />
-    <limit
-      lower="-1.5708"
-      upper="3.4907"
-      effort="23.7"
-      velocity="30.1" />
-  </joint>
-  <link name="FR_thigh_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="FR_thigh_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.00015 0"/>
-    <parent link="FR_hip"/>
-    <child link="FR_thigh_rotor"/>
-  </joint>
-  <link
-    name="FR_calf">
-    <inertial>
-      <origin
-        xyz="0.00548 0.000975 -0.115"
-        rpy="0 0 0" />
-      <mass
-        value="0.154" />
-      <inertia
-        ixx="0.00108"
-        ixy="-3.4E-07"
-        ixz="1.72E-05"
-        iyy="0.0011"
-        iyz="-8.28E-06"
-        izz="3.29E-05" />
-    </inertial>
-    <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <geometry>
-        <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/calf_mirror.dae" />
-      </geometry>
-      <material
-        name="">
-        <color
-          rgba="1 1 1 1" />
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="0 -0.2 0" xyz="0.01 0 -0.06" />
-      <geometry>
-        <cylinder length="0.12" radius="0.013" />
-      </geometry>
-    </collision>
-  </link>
-  <joint
-    name="FR_calf_joint"
-    type="revolute">
-    <origin
-      xyz="0 0 -0.213"
-      rpy="0 0 0" />
-    <parent
-      link="FR_thigh" />
-    <child
-      link="FR_calf" />
-    <axis
-      xyz="0 1 0" />
-    <limit
-      lower="-2.7227"
-      upper="-0.83776"
-      effort="45.43"
-      velocity="15.70" />
-  </joint>
-  <link
-    name="FR_calflower">
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
-      <geometry>
-        <cylinder length="0.065" radius="0.011" />
-      </geometry>
-    </collision>
-  </link>
-  <joint
-    name="FR_calflower_joint"
-    type="fixed">
-    <origin
-      xyz="0.020 0 -0.148"
-      rpy="0 0.05 0" />
-    <parent
-      link="FR_calf" />
-    <child
-      link="FR_calflower" />
-    <axis
-      xyz="0 0 0" />
-  </joint>
-  <link
-    name="FR_calflower1">
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0" />
-      <geometry>
-        <cylinder length="0.03" radius="0.0155" />
-      </geometry>
-    </collision>
-  </link>
-  <joint
-    name="FR_calflower1_joint"
-    type="fixed">
-    <origin
-      xyz="-0.01 0 -0.04"
-      rpy="0 0.48 0" />
-    <parent
-      link="FR_calflower" />
-    <child
-      link="FR_calflower1" />
-    <axis
-      xyz="0 0 0" />
-  </joint>
-  <link name="FR_calf_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="FR_calf_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.03235 0"/>
-    <parent link="FR_thigh"/>
-    <child link="FR_calf_rotor"/>
-  </joint>
-  <link
-    name="FR_foot">
-    <inertial>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <mass
-        value="0.04" />
-      <inertia
-        ixx="9.6e-06"
-        ixy="0"
-        ixz="0"
-        iyy="9.6e-06"
-        iyz="0"
-        izz="9.6e-06" />
-    </inertial>
-    <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <geometry>
-        <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/foot.dae" />
-      </geometry>
-      <material
-        name="">
-        <color
-          rgba="1 1 1 1" />
-      </material>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="-0.002 0 0" />
-      <geometry>
-        <sphere radius="0.022" />
-      </geometry>
-    </collision>
-  </link>
-  <joint
-    name="FR_foot_joint"
-    type="fixed" dont_collapse="true">
-    <origin
-      xyz="0 0 -0.213"
-      rpy="0 0 0" />
-    <parent
-      link="FR_calf" />
-    <child
-      link="FR_foot" />
-    <axis
-      xyz="0 0 0" />
-  </joint>
-
   <link
     name="FL_hip">
     <inertial>
@@ -437,7 +140,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/hip.dae" />
+          filename="package://go2_description/dae/hip.dae" />
       </geometry>
       <material
         name="">
@@ -459,7 +162,7 @@ Stephen Brawner (brawner@gmail.com)
       xyz="0.1934 0.0465 0"
       rpy="0 0 0" />
     <parent
-      link="base" />
+      link="base_link" />
     <child
       link="FL_hip" />
     <axis
@@ -469,18 +172,6 @@ Stephen Brawner (brawner@gmail.com)
       upper="1.0472"
       effort="23.7"
       velocity="30.1" />
-  </joint>
-  <link name="FL_hip_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000111842" ixy="0.0" ixz="0.0" iyy="0.000059647" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="FL_hip_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0.11215 0.04675 0"/>
-    <parent link="base"/>
-    <child link="FL_hip_rotor"/>
   </joint>
   <link
     name="FL_thigh">
@@ -504,7 +195,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/thigh.dae" />
+          filename="package://go2_description/dae/thigh.dae" />
       </geometry>
       <material
         name="">
@@ -537,18 +228,6 @@ Stephen Brawner (brawner@gmail.com)
       effort="23.7"
       velocity="30.1" />
   </joint>
-  <link name="FL_thigh_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="FL_thigh_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.00015 0"/>
-    <parent link="FL_hip"/>
-    <child link="FL_thigh_rotor"/>
-  </joint>
   <link
     name="FL_calf">
     <inertial>
@@ -571,7 +250,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/calf.dae" />
+          filename="package://go2_description/dae/calf.dae" />
       </geometry>
       <material
         name="">
@@ -648,18 +327,6 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 0 0" />
   </joint>
-  <link name="FL_calf_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="FL_calf_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.03235 0"/>
-    <parent link="FL_thigh"/>
-    <child link="FL_calf_rotor"/>
-  </joint>
   <link
     name="FL_foot">
     <inertial>
@@ -682,7 +349,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/foot.dae" />
+          filename="package://go2_description/dae/foot.dae" />
       </geometry>
       <material
         name="">
@@ -710,19 +377,18 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 0 0" />
   </joint>
-
   <link
-    name="RR_hip">
+    name="FR_hip">
     <inertial>
       <origin
-        xyz="0.0054 -0.00194 -0.000105"
+        xyz="-0.0054 -0.00194 -0.000105"
         rpy="0 0 0" />
       <mass
         value="0.678" />
       <inertia
         ixx="0.00048"
-        ixy="-3.01E-06"
-        ixz="-1.11E-06"
+        ixy="3.01E-06"
+        ixz="1.11E-06"
         iyy="0.000884"
         iyz="1.42E-06"
         izz="0.000596" />
@@ -730,10 +396,10 @@ Stephen Brawner (brawner@gmail.com)
     <visual>
       <origin
         xyz="0 0 0"
-        rpy="3.1415 3.1415 0" />
+        rpy="3.1415 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/hip.dae" />
+          filename="package://go2_description/dae/hip.dae" />
       </geometry>
       <material
         name="">
@@ -749,15 +415,15 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
   <joint
-    name="RR_hip_joint"
+    name="FR_hip_joint"
     type="revolute">
     <origin
-      xyz="-0.1934 -0.0465 0"
+      xyz="0.1934 -0.0465 0"
       rpy="0 0 0" />
     <parent
-      link="base" />
+      link="base_link" />
     <child
-      link="RR_hip" />
+      link="FR_hip" />
     <axis
       xyz="1 0 0" />
     <limit
@@ -766,20 +432,8 @@ Stephen Brawner (brawner@gmail.com)
       effort="23.7"
       velocity="30.1" />
   </joint>
-  <link name="RR_hip_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000111842" ixy="0.0" ixz="0.0" iyy="0.000059647" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="RR_hip_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="-0.11215 -0.04675 0"/>
-    <parent link="base"/>
-    <child link="RR_hip_rotor"/>
-  </joint>
   <link
-    name="RR_thigh">
+    name="FR_thigh">
     <inertial>
       <origin
         xyz="-0.00374 0.0223 -0.0327"
@@ -800,7 +454,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/thigh_mirror.dae" />
+          filename="package://go2_description/dae/thigh_mirror.dae" />
       </geometry>
       <material
         name="">
@@ -816,37 +470,25 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
   <joint
-    name="RR_thigh_joint"
+    name="FR_thigh_joint"
     type="revolute">
     <origin
       xyz="0 -0.0955 0"
       rpy="0 0 0" />
     <parent
-      link="RR_hip" />
+      link="FR_hip" />
     <child
-      link="RR_thigh" />
+      link="FR_thigh" />
     <axis
       xyz="0 1 0" />
     <limit
-      lower="-0.5236"
-      upper="4.5379"
+      lower="-1.5708"
+      upper="3.4907"
       effort="23.7"
       velocity="30.1" />
   </joint>
-  <link name="RR_thigh_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="RR_thigh_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.00015 0"/>
-    <parent link="RR_hip"/>
-    <child link="RR_thigh_rotor"/>
-  </joint>
   <link
-    name="RR_calf">
+    name="FR_calf">
     <inertial>
       <origin
         xyz="0.00548 0.000975 -0.115"
@@ -867,7 +509,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/calf_mirror.dae" />
+          filename="package://go2_description/dae/calf_mirror.dae" />
       </geometry>
       <material
         name="">
@@ -883,15 +525,15 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
   <joint
-    name="RR_calf_joint"
+    name="FR_calf_joint"
     type="revolute">
     <origin
       xyz="0 0 -0.213"
       rpy="0 0 0" />
     <parent
-      link="RR_thigh" />
+      link="FR_thigh" />
     <child
-      link="RR_calf" />
+      link="FR_calf" />
     <axis
       xyz="0 1 0" />
     <limit
@@ -901,7 +543,7 @@ Stephen Brawner (brawner@gmail.com)
       velocity="15.70" />
   </joint>
   <link
-    name="RR_calflower">
+    name="FR_calflower">
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -910,20 +552,20 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
   <joint
-    name="RR_calflower_joint"
+    name="FR_calflower_joint"
     type="fixed">
     <origin
       xyz="0.020 0 -0.148"
       rpy="0 0.05 0" />
     <parent
-      link="RR_calf" />
+      link="FR_calf" />
     <child
-      link="RR_calflower" />
+      link="FR_calflower" />
     <axis
       xyz="0 0 0" />
   </joint>
   <link
-    name="RR_calflower1">
+    name="FR_calflower1">
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -932,32 +574,20 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
   <joint
-    name="RR_calflower1_joint"
+    name="FR_calflower1_joint"
     type="fixed">
     <origin
       xyz="-0.01 0 -0.04"
       rpy="0 0.48 0" />
     <parent
-      link="RR_calflower" />
+      link="FR_calflower" />
     <child
-      link="RR_calflower1" />
+      link="FR_calflower1" />
     <axis
       xyz="0 0 0" />
   </joint>
-  <link name="RR_calf_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="RR_calf_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.03235 0"/>
-    <parent link="RR_thigh"/>
-    <child link="RR_calf_rotor"/>
-  </joint>
   <link
-    name="RR_foot">
+    name="FR_foot">
     <inertial>
       <origin
         xyz="0 0 0"
@@ -978,7 +608,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/foot.dae" />
+          filename="package://go2_description/dae/foot.dae" />
       </geometry>
       <material
         name="">
@@ -994,19 +624,18 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
   <joint
-    name="RR_foot_joint"
+    name="FR_foot_joint"
     type="fixed" dont_collapse="true">
     <origin
       xyz="0 0 -0.213"
       rpy="0 0 0" />
     <parent
-      link="RR_calf" />
+      link="FR_calf" />
     <child
-      link="RR_foot" />
+      link="FR_foot" />
     <axis
       xyz="0 0 0" />
   </joint>
-
   <link
     name="RL_hip">
     <inertial>
@@ -1029,7 +658,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 3.1415 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/hip.dae" />
+          filename="package://go2_description/dae/hip.dae" />
       </geometry>
       <material
         name="">
@@ -1051,7 +680,7 @@ Stephen Brawner (brawner@gmail.com)
       xyz="-0.1934 0.0465 0"
       rpy="0 0 0" />
     <parent
-      link="base" />
+      link="base_link" />
     <child
       link="RL_hip" />
     <axis
@@ -1061,18 +690,6 @@ Stephen Brawner (brawner@gmail.com)
       upper="1.0472"
       effort="23.7"
       velocity="30.1" />
-  </joint>
-  <link name="RL_hip_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000111842" ixy="0.0" ixz="0.0" iyy="0.000059647" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="RL_hip_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="-0.11215 0.04675 0"/>
-    <parent link="base"/>
-    <child link="RL_hip_rotor"/>
   </joint>
   <link
     name="RL_thigh">
@@ -1096,7 +713,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/thigh.dae" />
+          filename="package://go2_description/dae/thigh.dae" />
       </geometry>
       <material
         name="">
@@ -1129,18 +746,6 @@ Stephen Brawner (brawner@gmail.com)
       effort="23.7"
       velocity="30.1" />
   </joint>
-  <link name="RL_thigh_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="RL_thigh_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.00015 0"/>
-    <parent link="RL_hip"/>
-    <child link="RL_thigh_rotor"/>
-  </joint>
   <link
     name="RL_calf">
     <inertial>
@@ -1163,7 +768,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/calf.dae" />
+          filename="package://go2_description/dae/calf.dae" />
       </geometry>
       <material
         name="">
@@ -1240,18 +845,6 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 0 0" />
   </joint>
-  <link name="RL_calf_rotor">
-    <inertial>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
-      <mass value="0.089"/>
-      <inertia ixx="0.000059647" ixy="0.0" ixz="0.0" iyy="0.000111842" iyz="0.0" izz="0.000059647"/>
-    </inertial>
-  </link>
-  <joint name="RL_calf_rotor_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.03235 0"/>
-    <parent link="RL_thigh"/>
-    <child link="RL_calf_rotor"/>
-  </joint>
   <link
     name="RL_foot">
     <inertial>
@@ -1274,7 +867,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="/home/atari/workspace/DOOM/src/robots/go2/go2_description/dae/foot.dae" />
+          filename="package://go2_description/dae/foot.dae" />
       </geometry>
       <material
         name="">
@@ -1302,7 +895,265 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 0 0" />
   </joint>
-  
+  <link
+    name="RR_hip">
+    <inertial>
+      <origin
+        xyz="0.0054 -0.00194 -0.000105"
+        rpy="0 0 0" />
+      <mass
+        value="0.678" />
+      <inertia
+        ixx="0.00048"
+        ixy="-3.01E-06"
+        ixz="-1.11E-06"
+        iyy="0.000884"
+        iyz="1.42E-06"
+        izz="0.000596" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="3.1415 3.1415 0" />
+      <geometry>
+        <mesh
+          filename="package://go2_description/dae/hip.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.5707963267948966 0 0" xyz="0 -0.08 0" />
+      <geometry>
+        <cylinder length="0.04" radius="0.046" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="RR_hip_joint"
+    type="revolute">
+    <origin
+      xyz="-0.1934 -0.0465 0"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="RR_hip" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-1.0472"
+      upper="1.0472"
+      effort="23.7"
+      velocity="30.1" />
+  </joint>
+  <link
+    name="RR_thigh">
+    <inertial>
+      <origin
+        xyz="-0.00374 0.0223 -0.0327"
+        rpy="0 0 0" />
+      <mass
+        value="1.152" />
+      <inertia
+        ixx="0.00584"
+        ixy="-8.72E-05"
+        ixz="-0.000289"
+        iyy="0.0058"
+        iyz="-0.000808"
+        izz="0.00103" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://go2_description/dae/thigh_mirror.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 1.5707963267948966 0" xyz="0 0 -0.1065" />
+      <geometry>
+        <box size="0.213 0.0245 0.034" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="RR_thigh_joint"
+    type="revolute">
+    <origin
+      xyz="0 -0.0955 0"
+      rpy="0 0 0" />
+    <parent
+      link="RR_hip" />
+    <child
+      link="RR_thigh" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-0.5236"
+      upper="4.5379"
+      effort="23.7"
+      velocity="30.1" />
+  </joint>
+  <link
+    name="RR_calf">
+    <inertial>
+      <origin
+        xyz="0.00548 0.000975 -0.115"
+        rpy="0 0 0" />
+      <mass
+        value="0.154" />
+      <inertia
+        ixx="0.00108"
+        ixy="-3.4E-07"
+        ixz="1.72E-05"
+        iyy="0.0011"
+        iyz="-8.28E-06"
+        izz="3.29E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://go2_description/dae/calf_mirror.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 -0.2 0" xyz="0.01 0 -0.06" />
+      <geometry>
+        <cylinder length="0.12" radius="0.013" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="RR_calf_joint"
+    type="revolute">
+    <origin
+      xyz="0 0 -0.213"
+      rpy="0 0 0" />
+    <parent
+      link="RR_thigh" />
+    <child
+      link="RR_calf" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-2.7227"
+      upper="-0.83776"
+      effort="45.43"
+      velocity="15.70" />
+  </joint>
+  <link
+    name="RR_calflower">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <cylinder length="0.065" radius="0.011" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="RR_calflower_joint"
+    type="fixed">
+    <origin
+      xyz="0.020 0 -0.148"
+      rpy="0 0.05 0" />
+    <parent
+      link="RR_calf" />
+    <child
+      link="RR_calflower" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="RR_calflower1">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <cylinder length="0.03" radius="0.0155" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="RR_calflower1_joint"
+    type="fixed">
+    <origin
+      xyz="-0.01 0 -0.04"
+      rpy="0 0.48 0" />
+    <parent
+      link="RR_calflower" />
+    <child
+      link="RR_calflower1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <link
+    name="RR_foot">
+    <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.04" />
+      <inertia
+        ixx="9.6e-06"
+        ixy="0"
+        ixz="0"
+        iyy="9.6e-06"
+        iyz="0"
+        izz="9.6e-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://go2_description/dae/foot.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="-0.002 0 0" />
+      <geometry>
+        <sphere radius="0.022" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="RR_foot_joint"
+    type="fixed" dont_collapse="true">
+    <origin
+      xyz="0 0 -0.213"
+      rpy="0 0 0" />
+    <parent
+      link="RR_calf" />
+    <child
+      link="RR_foot" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
   <link
     name="imu">
     <inertial>
@@ -1327,7 +1178,7 @@ Stephen Brawner (brawner@gmail.com)
       xyz="-0.02557 0 0.04232"
       rpy="0 0 0" />
     <parent
-      link="base" />
+      link="base_link" />
     <child
       link="imu" />
     <axis
@@ -1357,24 +1208,10 @@ Stephen Brawner (brawner@gmail.com)
       xyz="0.28945 0 -0.046825"
       rpy="0 2.8782 0" />
     <parent
-      link="base" />
+      link="base_link" />
     <child
       link="radar" />
     <axis
       xyz="0 0 0" />
   </joint>
-  <joint 
-    name="front_camera_joint" 
-    type="fixed">
-    <origin 
-      rpy="0 0 0" 
-      xyz="0.32715 -0.00003 0.04297"/>
-      <parent 
-        link="base"/>
-      <child 
-      link="front_camera"/>
-  </joint>
-  <link 
-    name="front_camera">
-  </link>
 </robot>

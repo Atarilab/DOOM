@@ -387,7 +387,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # Horizon planning
         self.future_feet_positions_init_frame = None
         self.horizon_length = 1000
-        self.feet_step_size = 0.2  # meters
+        self.feet_step_size = 0.1  # meters
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
