@@ -537,7 +537,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 if not self.in_transition and self.current_gait not in ["stance", "transition"]:
                     self.goal_completion_counter += 1
                     self.current_goal_idx += (
-                        1 if self.goal_completion_counter % 2 == 0 and self.goal_completion_counter > 0 else 0
+                        1 if self.goal_completion_counter % 2 != 0 and self.goal_completion_counter > 0 else 0
                     )
                     self.current_contact_plan = torch.stack(
                         [

@@ -109,7 +109,8 @@ class ControllerBase(ABC):
 
         :param state: The states directly subscribed from available topics.
         """
-        self.latest_state = state
+        with self._lock:
+            self.latest_state = state
 
     def _clip_effort(self, effort: np.ndarray) -> np.ndarray:
         """

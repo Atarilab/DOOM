@@ -1,10 +1,10 @@
 # policy_path: "policies/contact_policy_lowerObs_DR.pt"
 # obs_dim: 82
-policy_path: "policies/contact_policy_dim82.pt"
+policy_path: "policies/contact_policy_82dim_latest3.pt"
 obs_dim: 82
 control_dt: 0.001
 action_dim: 12
-action_scale: 0.25
+action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
 default_joint_pos:
