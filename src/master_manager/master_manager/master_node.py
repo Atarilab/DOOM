@@ -3,9 +3,10 @@ import asyncio
 import logging
 import os
 from typing import Optional
+import time
 
 import rclpy
-from controllers.rl_controller import RLLocomotionContactController
+from controllers.rl_controller import RLLocomotionContactController, RLLocomotionVelocityController
 from controllers.stand_controller import (
     IdleController,
     StanceController,
@@ -55,7 +56,7 @@ class LowLevelCmdPublisher(Node):
         self.logger = logger or logging.getLogger(__name__)
         
         # Control parameters
-        self.dt = dt
+        self.dt = dt  # This should be 0.005 for 200Hz control
         self.running_time = 0.0
 
         # DDS Publisher setup
@@ -96,44 +97,7 @@ class LowLevelCmdPublisher(Node):
             motor_cmd.mode = 0x01  # PMSM mode
             motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
 
-    def publish_robot_state(self):
-        """Publish robot state for visualization in RViz."""
-        current_time = self.get_clock().now()
-        
-        combined_state = self.state_manager.get_combined_state()
-        # Publish joint states
-        joint_state_msg = JointState()
-        joint_state_msg.header.stamp = current_time.to_msg()
-        joint_state_msg.name = self.joint_names
-        
-        # Convert numpy arrays to Python lists of floats
-        joint_pos = combined_state.get("joint_pos", [0.0] * 12)
-        joint_vel = combined_state.get("joint_vel", [0.0] * 12)
-        
-        joint_state_msg.position = [float(x) for x in joint_pos]
-        joint_state_msg.velocity = [float(x) for x in joint_vel]
-        
-        self.joint_state_pub.publish(joint_state_msg)
 
-        # Publish base transform
-        transform = TransformStamped()
-        transform.header.stamp = current_time.to_msg()
-        transform.header.frame_id = 'world'
-        transform.child_frame_id = 'base_link'
-        
-        # Set translation from base_pos_w
-        transform.transform.translation.x = float(combined_state["base_pos_w"][0])
-        transform.transform.translation.y = float(combined_state["base_pos_w"][1])
-        transform.transform.translation.z = float(combined_state["base_pos_w"][2])
-        
-        # Set rotation from base_quat
-        transform.transform.rotation.x = float(combined_state["base_quat"][1])
-        transform.transform.rotation.y = float(combined_state["base_quat"][2])
-        transform.transform.rotation.z = float(combined_state["base_quat"][3])
-        transform.transform.rotation.w = float(combined_state["base_quat"][0])
-        
-        # Broadcast the transform
-        self.tf_broadcaster.sendTransform(transform)
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
@@ -193,10 +157,47 @@ class LowLevelCmdPublisher(Node):
 
         self.last_callback_time = current_time
 
+    def publish_robot_state(self):
+        """Publish robot state for visualization in RViz."""
+        current_time = self.get_clock().now()
+        
+        combined_state = self.state_manager.get_combined_state()
+        # Publish joint states
+        joint_state_msg = JointState()
+        joint_state_msg.header.stamp = current_time.to_msg()
+        joint_state_msg.name = self.joint_names
+        
+        # Convert numpy arrays to Python lists of floats
+        joint_pos = combined_state.get("joint_pos", [0.0] * 12)
+        joint_vel = combined_state.get("joint_vel", [0.0] * 12)
+        
+        joint_state_msg.position = [float(x) for x in joint_pos]
+        joint_state_msg.velocity = [float(x) for x in joint_vel]
+        
+        self.joint_state_pub.publish(joint_state_msg)
+
+        # Publish base transform
+        transform = TransformStamped()
+        transform.header.stamp = current_time.to_msg()
+        transform.header.frame_id = 'world'
+        transform.child_frame_id = 'base_link'
+        
+        # Set translation from base_pos_w
+        transform.transform.translation.x = float(combined_state["base_pos_w"][0])
+        transform.transform.translation.y = float(combined_state["base_pos_w"][1])
+        transform.transform.translation.z = float(combined_state["base_pos_w"][2])
+        
+        # Set rotation from base_quat
+        transform.transform.rotation.x = float(combined_state["base_quat"][1])
+        transform.transform.rotation.y = float(combined_state["base_quat"][2])
+        transform.transform.rotation.z = float(combined_state["base_quat"][3])
+        transform.transform.rotation.w = float(combined_state["base_quat"][0])
+        
+        # Broadcast the transform
+        self.tf_broadcaster.sendTransform(transform)
 
 node = None
 state_manager = None
-
 
 async def main_async(args=None):
     """Main asynchronous entry point for robot controller."""
@@ -287,19 +288,22 @@ async def main_async(args=None):
         )
 
         mode_manager.register_mode("STANCE", {"STANCE": StanceController(mj_model_wrapper, configs)})
-
-        mode_manager.register_mode(
-            "RL-VELOCITY",
-            {
-                "STANCE": StanceController(mj_model_wrapper, configs),
-                # "RL-VELOCITY": RLLocomotionVelocityController(
-                #     mj_model_wrapper=mj_model_wrapper,
-                #     configs=configs``
-                # ),
-                "RL-CONTACT": RLLocomotionContactController(mj_model_wrapper=mj_model_wrapper, configs=configs),
-            },
-        )
-
+        if "rl-contact" in args.task:
+            mode_manager.register_mode(
+                "RL-CONTACT",
+                {
+                    "STANCE": StanceController(mj_model_wrapper, configs),
+                    "RL-CONTACT": RLLocomotionContactController(mj_model_wrapper=mj_model_wrapper, configs=configs),
+                },
+            )
+        if "rl-velocity" in args.task:
+            mode_manager.register_mode(
+                "RL-VELOCITY",
+                {
+                    "STANCE": StanceController(mj_model_wrapper, configs),
+                    "RL-VELOCITY": RLLocomotionVelocityController(mj_model_wrapper=mj_model_wrapper, configs=configs),
+                },
+            )
         mode_manager.set_mode("IDLE")
 
         node = LowLevelCmdPublisher(
@@ -316,9 +320,20 @@ async def main_async(args=None):
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
+                last_spin_time = time.time()
+                spin_dt = 0.0005
+                
                 while rclpy.ok():
-                    rclpy.spin_once(node)
-                    state_manager.spin_subscribers()
+                    current_time = time.time()
+                    elapsed = current_time - last_spin_time
+                    
+                    if elapsed >= spin_dt:
+                        rclpy.spin_once(node)
+                        state_manager.spin_subscribers()
+                        last_spin_time = current_time
+                    else:
+                        # Sleep for a short time to avoid busy waiting
+                        time.sleep(max(0, spin_dt - elapsed))
 
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
             try:

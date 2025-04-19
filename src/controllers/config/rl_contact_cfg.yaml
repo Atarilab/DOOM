@@ -1,12 +1,20 @@
 # policy_path: "policies/contact_policy_lowerObs_DR.pt"
 # obs_dim: 82
-policy_path: "policies/contact_policy_82dim_latest3.pt"
+policy_path: "policies/contact_policy_82dim_latest.pt"
 obs_dim: 82
-control_dt: 0.001
+control_dt: 0.005
+decimation: 4
 action_dim: 12
 action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
+feet_step_size: 0.01
+horizon_length: 1000
+action_filter_alpha: 0.3
+visualize: 
+  future_feet_positions: false
+  current_contact_locations: true
+
 default_joint_pos:
   - 0.1
   - 0.8

@@ -116,6 +116,13 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.Kp = controller_config["stiffness"]
         self.Kd = controller_config["damping"]
         self.action_dim = controller_config["action_dim"]
+        self.control_dt = controller_config["control_dt"]
+        self.decimation = controller_config["decimation"]
+
+        # Filter coefficient (0 < alpha < 1), lower values = more smoothing
+        self.action_filter_alpha = controller_config["action_filter_alpha"] if "action_filter_alpha" in controller_config else 1.0
+        self.filtered_action = torch.zeros(self.action_dim, dtype=torch.float32)
+        self.is_first_action = True
 
         # Initial state and commands
         self.latest_state = None
@@ -183,12 +190,27 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 time.sleep(0.1)  # Prevent rapid error loops
 
     def _run_policy_inference(self):
-        """Continuously run policy inference in a separate thread"""
+        """Continuously run policy inference in a separate thread at a fixed dt of 0.02 seconds"""
+        dt = self.control_dt * self.decimation  # Fixed time step in seconds (0.02)
+        last_time = time.time()
+        
         while True:
             try:
                 if not self.active:
                     time.sleep(0.01)
                     continue
+
+                # Calculate time since last iteration
+                current_time = time.time()
+                elapsed = current_time - last_time
+                
+                # Sleep if we're ahead of schedule
+                if elapsed < dt:
+                    time.sleep(dt - elapsed)
+                    current_time = time.time()  # Update current time after sleep
+                
+                # Update last time for next iteration
+                last_time = current_time
 
                 try:
                     obs = self.obs_buffer.get()
@@ -225,9 +247,20 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 # If no observations yet, use default joint positions
                 joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_isaac_to_unitree_mapping]
             else:
-                # Compute joint position targets from the policy output
+                # Apply exponential moving average filter to smooth actions
+                if self.is_first_action:
+                    self.filtered_action = self.raw_action
+                    self.is_first_action = False
+                else:
+                    # EMA filter: filtered = alpha * new + (1 - alpha) * previous
+                    self.filtered_action = (
+                        self.action_filter_alpha * self.raw_action 
+                        + (1 - self.action_filter_alpha) * self.filtered_action
+                    )
+
+                # Compute joint position targets from the filtered policy output
                 joint_pos_targets = (
-                    (self.raw_action * self.action_scale + self.default_joint_pos)
+                    (self.filtered_action * self.action_scale + self.default_joint_pos)
                     .cpu()
                     .numpy()[self.actions_isaac_to_unitree_mapping]
                 )
@@ -379,6 +412,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.command_duration = 0.35  # Duration of each contact plan in seconds
         self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool)  # Current contact pattern
         self.command_start_time = time.time()  # When the current plan started
+        self.visualize_future_feet_positions = configs["controller_config"]["visualize"]["future_feet_positions"]
+        self.visualize_current_contact_locations = configs["controller_config"]["visualize"]["current_contact_locations"]
 
         # Thread synchronization for gait changes
         self._gait_lock = threading.RLock()  # Reentrant lock for gait changes
@@ -386,8 +421,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
 
         # Horizon planning
         self.future_feet_positions_init_frame = None
-        self.horizon_length = 1000
-        self.feet_step_size = 0.1  # meters
+        self.horizon_length = configs["controller_config"]["horizon_length"]
+        self.feet_step_size = configs["controller_config"]["feet_step_size"]
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
@@ -408,8 +443,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             ),
             "trot": torch.tensor(
                 [
-                    [True, False, False, True],  # Phase 1: FL and RR in contact
                     [False, True, True, False],  # Phase 2: FR and RL in contact
+                    [True, False, False, True],  # Phase 1: FL and RR in contact
                 ]
             ),
             "pace": torch.tensor(
@@ -470,6 +505,9 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             if elapsed >= self.command_duration:
                 self.command_start_time = current_time
                 self._resample_commands()
+
+        if self.visualize_current_contact_locations:
+            self.viz_current_contact_locations()
 
         # Use the base class implementation to compute torques
         # This will use the pre-computed raw_action from the policy inference thread
@@ -695,6 +733,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # super().set_mode()
 
         self.generate_future_feet_positions()
+        if self.visualize_future_feet_positions:
+            self.viz_future_feet_positions()
 
     def generate_future_feet_positions(self):
         """
@@ -738,11 +778,15 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         direction_y = sin_yaw
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
-        self.future_feet_positions_w[:, :, 2] = 0.01
+        self.future_feet_positions_w[:, :, 2] = 0.05
         
         self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(self.future_feet_positions_w.numpy())
-        
-        # Create and publish marker array for visualization
+            
+                
+    def viz_future_feet_positions(self):
+        """
+        Visualizes the future feet positions in the world frame.
+        """
         try:
             marker_array = MarkerArray()
             
@@ -793,3 +837,59 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             
         except Exception as e:
             self.command_manager.logger.error(f'Failed to publish future feet positions: {e}')
+
+    def viz_current_contact_locations(self):
+        """
+        Visualizes the current contact locations in the world frame.
+        Colors the markers based on the current contact plan:
+        - Green: for feet that are not in contact (contact_plan is False)
+        - Black: for feet that are in contact (contact_plan is True)
+        """
+        try:
+            marker_array = MarkerArray()
+            
+            # Get current contact locations from future feet positions
+            current_positions = self.future_feet_positions_w[:, self.current_goal_idx]
+            
+            # Create markers for each foot
+            for foot_idx in range(4):
+                marker = Marker()
+                marker.header.frame_id = "world"
+                marker.header.stamp = self.get_clock().now().to_msg()
+                marker.ns = "current_contact_locations"
+                marker.id = foot_idx
+                marker.type = Marker.SPHERE
+                marker.action = Marker.ADD
+                
+                # Set the scale of the sphere
+                marker.scale.x = 0.05  # radius
+                marker.scale.y = 0.05
+                marker.scale.z = 0.05
+                
+                # Set color based on contact plan
+                if self.current_contact_plan[0, foot_idx]:
+                    # Black for feet in contact
+                    marker.color = ColorRGBA(r=0.0, g=0.0, b=0.0, a=1.0)
+                else:
+                    # Green for feet not in contact
+                    marker.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
+                
+                # Set position
+                marker.pose.position.x = float(current_positions[foot_idx, 0])
+                marker.pose.position.y = float(current_positions[foot_idx, 1])
+                marker.pose.position.z = float(current_positions[foot_idx, 2])
+                
+                # Set orientation (identity quaternion)
+                marker.pose.orientation.w = 1.0
+                marker.pose.orientation.x = 0.0
+                marker.pose.orientation.y = 0.0
+                marker.pose.orientation.z = 0.0
+                
+                marker_array.markers.append(marker)
+            
+            # Publish the marker array
+            self.feet_pos_pub.publish(marker_array)
+            
+        except Exception as e:
+            self.command_manager.logger.error(f'Failed to publish current contact locations: {e}')
+
