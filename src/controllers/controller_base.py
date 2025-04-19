@@ -1,6 +1,6 @@
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 
 import numpy as np
 from commands.command_manager import CommandManager
@@ -34,6 +34,7 @@ class ControllerBase(ABC):
         self.mj_model_wrapper = mj_model_wrapper
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
+        self.mode_manager = None  # Will be set by the mode manager when registering
         self.configs = configs
         self.latest_state = None
         self.name = None
@@ -41,6 +42,17 @@ class ControllerBase(ABC):
 
         # Joint mapping and limits
         self._setup_joint_limits(configs)
+
+    def get_joystick_mappings(self) -> Dict[str, Callable[[], None]]:
+        """
+        Define joystick button mappings for this controller.
+        Override this method in subclasses to define controller-specific mappings.
+        
+        Returns:
+            Dict mapping button names to callback functions.
+            Example: {"A": lambda: self.do_something()}
+        """
+        return {}
 
     def _setup_joint_limits(self, configs: Dict[str, Any]):
         """
@@ -90,7 +102,7 @@ class ControllerBase(ABC):
         """
         self.command_manager = cmd_manager
 
-        # Automatically register observations if method exists
+        # Automatically register commands if method exists
         if hasattr(self, "register_commands"):
             self.register_commands()
 
@@ -138,6 +150,14 @@ class ControllerBase(ABC):
         """
         pass
 
+    def register_commands(self):
+        """
+        Register commands for the controller.
+        This method can be overridden by subclasses to register specific commands.
+        By default, it does nothing.
+        """
+        pass
+
     @abstractmethod
     def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -149,4 +169,3 @@ class ControllerBase(ABC):
         """
         if self.mj_model_wrapper is not None:
             self.mj_model_wrapper.update(state)
-        pass

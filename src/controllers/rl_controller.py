@@ -1,11 +1,9 @@
 import os
 import threading
 import time
-from queue import Queue
 from typing import Any, Dict
 
 import numpy as np
-import rclpy
 import torch
 from commands.command_manager import CommandTerm
 from controllers.controller_base import ControllerBase

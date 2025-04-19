@@ -32,7 +32,7 @@ from utils.mj_wrapper import MjQuadRobotWrapper
 
 # DOOM Imports
 from utils.ui_interface import ModeManager, RobotControlUI
-
+from utils.joystick_interface import JoystickManager
 # ROS Messages
 # from unitree_go.msg._low_state import LowState
 # from unitree_go.msg._sport_mode_state import SportModeState
@@ -66,6 +66,9 @@ class LowLevelCmdPublisher(Node):
         # Setup ROS publishers for visualization
         self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
         self.tf_broadcaster = TransformBroadcaster(self)
+
+        # Initialize joystick manager
+        self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, logger=self.logger)
 
         # Define joint names in the correct order
         self.joint_names = [
@@ -118,6 +121,9 @@ class LowLevelCmdPublisher(Node):
 
             # Calculate actual time since last callback
             time_since_last_callback = current_time - self.last_callback_time
+
+            # Update joystick state and handle mode switching
+            joystick_state = self.joystick_manager.update()
 
             # Retrieve states from state manager
             try:
@@ -200,6 +206,11 @@ class LowLevelCmdPublisher(Node):
 
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
+
+    def cleanup(self):
+        """Clean up resources."""
+        if hasattr(self, 'joystick_manager'):
+            self.joystick_manager.cleanup()
 
 
 node = None
@@ -361,8 +372,11 @@ async def main_async(args=None):
         logger.exception(f"An error occurred: {e}")
         raise
     finally:
-        node.destroy_node()
-        state_manager.destroy_subscribers()
+        if node:
+            node.cleanup()
+            node.destroy_node()
+        if state_manager:
+            state_manager.destroy_subscribers()
         rclpy.shutdown()
 
 
@@ -370,4 +384,5 @@ def main():
     asyncio.run(main_async())
 
 
-main()  # For Debug
+if __name__ == "__main__":
+    main()

@@ -86,6 +86,9 @@ class ModeManager:
 
         if controller and hasattr(controller, "set_mode"):
             controller.set_mode()
+            
+        if hasattr(controller, "set_start_time"):
+            controller.set_start_time(time.time())
 
         else:
             self.logger.debug(f"Mode set to: {self._current_mode}")
@@ -518,10 +521,6 @@ class RobotControlUI(App):
         if button_id == "mode-idle":
             self.mode_manager.set_mode("IDLE")
 
-            # Signal the robot controller about mode change
-            if hasattr(self.app, "robot_controller"):
-                self.app.robot_controller.mode_change_event.set()
-
             # Update UI to reflect current state
             self.update_status()
             self.logger.info("Switched to IDLE mode")
@@ -546,17 +545,8 @@ class RobotControlUI(App):
                 submode = button_id.replace(f"{mode.lower()}-", "").upper()
                 self.mode_manager.set_mode(mode, submode)
 
-                # Set start time for the active controller
-                # Note: Can be used to set other properties within the controller
-                active_controller = self.mode_manager.get_active_controller()
-                if hasattr(active_controller, "set_start_time"):
-                    active_controller.set_start_time(time.time())
 
                 break
-
-        # Signal the robot controller about mode change
-        if hasattr(self.app, "robot_controller"):
-            self.app.robot_controller.mode_change_event.set()
 
         # Update UI to reflect current state
         self.update_status()

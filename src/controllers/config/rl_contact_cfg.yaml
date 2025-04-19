@@ -15,6 +15,8 @@ visualize:
   future_feet_positions: false
   current_contact_locations: true
 
+use_joystick: true
+
 default_joint_pos:
   - 0.1
   - 0.8
