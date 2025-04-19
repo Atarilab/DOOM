@@ -124,35 +124,19 @@ class JoystickManager:
             self.mode_manager.set_mode("STANDING", "STAND_DOWN")
         elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "StandDownController":
             self.mode_manager.set_mode("STANDING", "STAY_DOWN")
+        elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "StandUpController":
+            self.mode_manager.set_mode("RL-CONTACT", "RL-CONTACT")
             
-        # elif key_state[self.key_map["start"]] and key_state[self.key_map["B"]]:
-        #     self.mode_manager.set_mode("STANDING", "STAY_DOWN")
-        #     self.logger.info("Switched to STANDING - STAY_DOWN mode")
-        # elif key_state[self.key_map["start"]] and key_state[self.key_map["X"]]:
-        #     self.mode_manager.set_mode("STANDING", "STAND_UP")
-        #     self.logger.info("Switched to STANDING - STAND_UP mode")
-        # elif key_state[self.key_map["start"]] and key_state[self.key_map["Y"]]:
-        #     self.mode_manager.set_mode("STANDING", "STAND_DOWN")
-        #     self.logger.info("Switched to STANDING - STAND_DOWN mode")
-        # elif key_state[self.key_map["start"]] and key_state[self.key_map["R1"]]:
-        #     self.mode_manager.set_mode("STANCE", "STANCE")
-        #     self.logger.info("Switched to STANCE mode")
-        # elif key_state[self.key_map["start"]] and key_state[self.key_map["L1"]]:
-        #     self.mode_manager.set_mode("RL-CONTACT", "RL-CONTACT")
-        #     self.logger.info("Switched to RL-CONTACT mode")
-        # elif key_state[self.key_map["start"]] and key_state[self.key_map["R2"]]:
-        #     self.mode_manager.set_mode("RL-VELOCITY", "RL-VELOCITY")
-        #     self.logger.info("Switched to RL-VELOCITY mode")
 
-        # # Execute controller-specific mappings if available
-        # if self.active_controller and hasattr(self.active_controller, 'get_joystick_mappings'):
-        #     mappings = self.active_controller.get_joystick_mappings()
-        #     for button, callback in mappings.items():
-        #         if button in self.key_map and key_state[self.key_map[button]]:
-        #             try:
-        #                 callback()
-        #             except Exception as e:
-        #                 self.logger.error(f"Error executing joystick mapping for {button}: {e}")
+        # Execute controller-specific mappings if available
+        if self.active_controller and hasattr(self.active_controller, 'get_joystick_mappings'):
+            mappings = self.active_controller.get_joystick_mappings()
+            for button, callback in mappings.items():
+                if button in self.key_map and key_state[self.key_map[button]]:
+                    try:
+                        callback()
+                    except Exception as e:
+                        self.logger.error(f"Error executing joystick mapping for {button}: {e}")
 
         if key_value != 0:
             self.logger.debug(f"Joystick state: {key_value}")

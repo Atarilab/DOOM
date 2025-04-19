@@ -1,7 +1,7 @@
 import os
 import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Callable
 
 import numpy as np
 import torch
@@ -889,3 +889,18 @@ class RLLocomotionContactController(BaseRLLocomotionController):
 
         except Exception as e:
             self.command_manager.logger.error(f"Failed to publish current contact locations: {e}")
+
+    def get_joystick_mappings(self) -> Dict[str, Callable[[], None]]:
+        """
+        Define joystick button mappings for gait changes.
+        
+        Returns:
+            Dict mapping button names to callback functions.
+        """
+        return {
+            "A": lambda: self.change_commands({"gait": "trot"}),
+            "B": lambda: self.change_commands({"gait": "pace"}),
+            "X": lambda: self.change_commands({"gait": "bound"}),
+            "Y": lambda: self.change_commands({"gait": "jump"}),
+            "R2": lambda: self.change_commands({"gait": "stance"}),
+        }
