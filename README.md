@@ -45,6 +45,8 @@ Open VS Code with `unitree_mujoco_container` as the project directory and build 
 The various tasks are defined in `tasks/task_configs.json`. Currently, the following tasks are defined and tested:
 - `rl-velocity-sim-go2` (Status: ✅ )
 - `rl-velocity-real-go2` (Status: ✅ )
+- `rl-contact-sim-go2` (Status: ✅ )
+- `rl-contact-real-go2` (Status: 😫 )
   
 Once you've chosen the task you want to run, you can launch the user interface to control the robot using:
 ```bash
