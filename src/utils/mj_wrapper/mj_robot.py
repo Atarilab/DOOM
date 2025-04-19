@@ -214,7 +214,7 @@ class MjQuadRobotWrapper:
             transformed = transformed.reshape(original_shape)
 
         return transformed
-    
+
     def transform_world_to_init_frame(self, pos: np.ndarray) -> np.ndarray:
         """Transform quantities from the world frame to the init frame.
 
@@ -251,8 +251,6 @@ class MjQuadRobotWrapper:
             transformed = transformed.reshape(original_shape)
 
         return transformed
-
-    
 
     def get_feet_positions_init_frame(self) -> np.ndarray:
         """Get feet positions in the init frame."""

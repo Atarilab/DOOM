@@ -92,9 +92,7 @@ class CommandManager:
         ]
 
     def validate_and_change_commands(
-        self, 
-        current_commands: np.ndarray, 
-        new_command_values: Dict[str, Any]
+        self, current_commands: np.ndarray, new_command_values: Dict[str, Any]
     ) -> np.ndarray:
         """
         Validate and update command values.
@@ -108,7 +106,7 @@ class CommandManager:
         """
         # Create a copy of current commands
         updated_commands = current_commands.copy()
-        
+
         # Update each command value
         for name, value in new_command_values.items():
             if name in self._commands:
@@ -118,10 +116,9 @@ class CommandManager:
                     updated_commands[self.command_indices[name]] = value
                 else:
                     self.logger.warning(
-                        f"Invalid value {value} for command {name}. "
-                        f"Must be of type {command_term.type}"
+                        f"Invalid value {value} for command {name}. " f"Must be of type {command_term.type}"
                     )
             else:
                 self.logger.warning(f"Unknown command: {name}")
-        
+
         return updated_commands

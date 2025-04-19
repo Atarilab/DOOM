@@ -144,12 +144,11 @@ def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> to
     return torch.tensor([contact_time_left()])
 
 
-def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") ->  torch.Tensor:
+def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") -> torch.Tensor:
     """
     The height of the base of the robot.
     """
     return torch.tensor([mj_model_wrapper.get_base_height_init_frame()])
-
 
 
 def ee_pos_rel_b(
@@ -210,6 +209,6 @@ def contact_locations_b(
     current_base_index = current_goal_idx() // 2
     return torch.tensor(
         mj_model_wrapper.transform_world_to_base(
-            future_feet_positions_w()[:,  current_goal_idx() :  current_goal_idx() + obs_horizon].numpy()
+            future_feet_positions_w()[:, current_goal_idx() : current_goal_idx() + obs_horizon].numpy()
         ).flatten()
     )

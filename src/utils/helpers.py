@@ -39,10 +39,10 @@ class ObservationHistoryStorage:
             )
 
         # Shift the buffer to make space for the new observation
-        self.buffer[:, :-self.num_obs] = self.buffer[:, self.num_obs:].clone()
+        self.buffer[:, : -self.num_obs] = self.buffer[:, self.num_obs :].clone()
 
         # Add the new observation at the end
-        self.buffer[:, -self.num_obs:] = observation
+        self.buffer[:, -self.num_obs :] = observation
 
     def get(self) -> torch.Tensor:
         """

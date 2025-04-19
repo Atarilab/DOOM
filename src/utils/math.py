@@ -13,7 +13,7 @@ def quaternion_to_euler(q, order="wxyz") -> np.ndarray:
 
     Args:
         q: The quaternion. Shape is (4,).
-        order: The convention/order of the quaternion in the arguments. 
+        order: The convention/order of the quaternion in the arguments.
                Defaults to 'wxyz'.
 
     Returns:

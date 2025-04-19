@@ -1,13 +1,16 @@
 import os
 import threading
 import time
-from typing import Any, Dict
 from queue import Queue
+from typing import Any, Dict
 
 import numpy as np
+import rclpy
 import torch
 from commands.command_manager import CommandTerm
 from controllers.controller_base import ControllerBase
+from geometry_msgs.msg import Point, TransformStamped
+from rclpy.node import Node
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import (
     ang_vel_b,
@@ -18,14 +21,10 @@ from state_manager.observations import (
     projected_gravity_b,
     velocity_commands,
 )
-from utils.helpers import ObservationHistoryStorage
-import rclpy
-from rclpy.node import Node
-from visualization_msgs.msg import MarkerArray, Marker
 from std_msgs.msg import ColorRGBA
-from geometry_msgs.msg import Point
 from tf2_ros import StaticTransformBroadcaster
-from geometry_msgs.msg import TransformStamped
+from utils.helpers import ObservationHistoryStorage
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 class BaseRLLocomotionController(ControllerBase, Node):
@@ -44,21 +43,21 @@ class BaseRLLocomotionController(ControllerBase, Node):
         :param configs: Configuration dictionary
         """
         # Initialize ROS2 node
-        Node.__init__(self, 'rl_locomotion_controller')
+        Node.__init__(self, "rl_locomotion_controller")
         # Initialize controller base
         ControllerBase.__init__(self, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
         # Create publisher for future feet positions
-        self.feet_pos_pub = self.create_publisher(MarkerArray, 'future_feet_positions', 10)
-        
+        self.feet_pos_pub = self.create_publisher(MarkerArray, "future_feet_positions", 10)
+
         # Create static transform publisher for map frame
         self.tf_broadcaster = StaticTransformBroadcaster(self)
-        
+
         # Create and publish static transform from map to world
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()
-        transform.header.frame_id = 'map'
-        transform.child_frame_id = 'world'
+        transform.header.frame_id = "map"
+        transform.child_frame_id = "world"
         transform.transform.translation.x = 0.0
         transform.transform.translation.y = 0.0
         transform.transform.translation.z = 0.0
@@ -67,7 +66,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         transform.transform.rotation.y = 0.0
         transform.transform.rotation.z = 0.0
         self.tf_broadcaster.sendTransform(transform)
-        
+
         self.active = False
         # Load and prepare policy model
         self._load_policy_model(configs)
@@ -120,7 +119,9 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.decimation = controller_config["decimation"]
 
         # Filter coefficient (0 < alpha < 1), lower values = more smoothing
-        self.action_filter_alpha = controller_config["action_filter_alpha"] if "action_filter_alpha" in controller_config else 1.0
+        self.action_filter_alpha = (
+            controller_config["action_filter_alpha"] if "action_filter_alpha" in controller_config else 1.0
+        )
         self.filtered_action = torch.zeros(self.action_dim, dtype=torch.float32)
         self.is_first_action = True
 
@@ -193,7 +194,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         """Continuously run policy inference in a separate thread at a fixed dt of 0.02 seconds"""
         dt = self.control_dt * self.decimation  # Fixed time step in seconds (0.02)
         last_time = time.time()
-        
+
         while True:
             try:
                 if not self.active:
@@ -203,12 +204,12 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 # Calculate time since last iteration
                 current_time = time.time()
                 elapsed = current_time - last_time
-                
+
                 # Sleep if we're ahead of schedule
                 if elapsed < dt:
                     time.sleep(dt - elapsed)
                     current_time = time.time()  # Update current time after sleep
-                
+
                 # Update last time for next iteration
                 last_time = current_time
 
@@ -254,7 +255,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 else:
                     # EMA filter: filtered = alpha * new + (1 - alpha) * previous
                     self.filtered_action = (
-                        self.action_filter_alpha * self.raw_action 
+                        self.action_filter_alpha * self.raw_action
                         + (1 - self.action_filter_alpha) * self.filtered_action
                     )
 
@@ -413,7 +414,9 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool)  # Current contact pattern
         self.command_start_time = time.time()  # When the current plan started
         self.visualize_future_feet_positions = configs["controller_config"]["visualize"]["future_feet_positions"]
-        self.visualize_current_contact_locations = configs["controller_config"]["visualize"]["current_contact_locations"]
+        self.visualize_current_contact_locations = configs["controller_config"]["visualize"][
+            "current_contact_locations"
+        ]
 
         # Thread synchronization for gait changes
         self._gait_lock = threading.RLock()  # Reentrant lock for gait changes
@@ -526,12 +529,12 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                         self.transition_progress = 0.0
                         self.transition_start_gait = self.current_gait
                         self.transition_end_gait = self.pending_gait_change
-                        
+
                         # For safety, start with a stable stance if transitioning to a dynamic gait
                         if self.pending_gait_change in ["trot", "pace", "bound", "jump"]:
                             self.current_gait = "transition"
                             self.current_contact_plan = self.gait_patterns["transition"]
-                            
+
                         if (
                             hasattr(self, "command_manager")
                             and self.command_manager
@@ -544,29 +547,29 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                         # Increment transition counter and update progress
                         self.transition_counter += 1
                         self.transition_progress = min(1.0, self.transition_counter / self.transition_duration)
-                        
+
                         # Only apply the pending gait after transition duration
                         if self.transition_counter >= self.transition_duration:
                             # Transition phase complete - apply the pending gait
                             self.in_transition = False
                             self.current_gait = self.pending_gait_change
                             self.current_contact_plan = self.gait_patterns[self.pending_gait_change]
-                            
+
                             # Call set_mode() if the pending gait is "stance"
                             if self.pending_gait_change == "stance":
                                 self.generate_future_feet_positions()
-                                
+
                             self.pending_gait_change = None
                             self.transition_start_gait = None
                             self.transition_end_gait = None
-                            
+
                             # Signal that the gait change is complete
                             self._gait_change_event.set()
-                            
+
                             self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
                         else:
                             # Log transition progress for debugging
-                            if (self.transition_counter % 2 == 0 ):
+                            if self.transition_counter % 2 == 0:
                                 self.command_manager.logger.debug(
                                     f"Transition progress: {self.transition_progress:.2f}"
                                 )
@@ -613,7 +616,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                         if self.pending_gait_change != new_gait:
                             self.pending_gait_change = new_gait
                             self._gait_change_event.clear()  # Reset event for new change
-                            
+
                             # If we're already in a transition, reset it to start fresh
                             if self.in_transition:
                                 self.transition_counter = 0
@@ -643,11 +646,9 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Register observations for contact-conditioned locomotion.
         Includes contact pattern and timing information.
         """
-        from state_manager.observations import (
-            # base_height,
+        from state_manager.observations import (  # base_height,; contact_status,
             contact_locations_b,
             contact_plan,
-            # contact_status,
             contact_time_left,
             ee_pos_rel_b,
         )
@@ -711,14 +712,15 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         )
 
         self.obs_manager.register(
-           "ee_pos_rel_b",
+            "ee_pos_rel_b",
             ObsTerm(
                 ee_pos_rel_b,
-                params={"mj_model_wrapper": self.mj_model_wrapper,
-                        "future_feet_positions_w": lambda: self.future_feet_positions_w,
-                        "current_goal_idx": lambda: self.current_goal_idx
-                }
-            )
+                params={
+                    "mj_model_wrapper": self.mj_model_wrapper,
+                    "future_feet_positions_w": lambda: self.future_feet_positions_w,
+                    "current_goal_idx": lambda: self.current_goal_idx,
+                },
+            ),
         )
         self.obs_manager.register(
             "last_action",
@@ -740,56 +742,53 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         """
         Generates future feet positions for the controller.
         """
-        
+
         self.goal_completion_counter = 0
         self.current_goal_idx = 0
         offset = torch.tensor(
             [(0.2334, 0.1865, 0.0), (0.2334, -0.1865, 0.0), (-0.2334, 0.1865, 0.0), (-0.2334, -0.1865, 0.0)],
-            dtype=torch.float32
+            dtype=torch.float32,
         )
         #
         base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
-        
+
         # Get robot yaw from base orientation matrix
         base_rot = torch.tensor(self.mj_model_wrapper.get_body_orientation_world("base_link"), dtype=torch.float32)
         yaw = torch.atan2(base_rot[1, 0], base_rot[0, 0])
-        
+
         # Create rotation matrix for yaw
         cos_yaw = torch.cos(yaw)
         sin_yaw = torch.sin(yaw)
-        rotation_matrix = torch.tensor([
-            [cos_yaw, -sin_yaw, 0],
-            [sin_yaw, cos_yaw, 0],
-            [0, 0, 1]
-        ], dtype=torch.float32)
-        
+        rotation_matrix = torch.tensor([[cos_yaw, -sin_yaw, 0], [sin_yaw, cos_yaw, 0], [0, 0, 1]], dtype=torch.float32)
+
         # Rotate the offset positions
         rotated_offset = torch.matmul(rotation_matrix, offset.T).T
-        
+
         # Apply the rotated offset to base position
         self.future_feet_positions_w[:] = (base_pos_w + rotated_offset).unsqueeze(1)
-        
-        stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32).unsqueeze(0) * torch.tensor(self.feet_step_size, dtype=torch.float32).unsqueeze(
-            -1
-        )
-        
+
+        stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32).unsqueeze(0) * torch.tensor(
+            self.feet_step_size, dtype=torch.float32
+        ).unsqueeze(-1)
+
         # Apply stride in the direction of robot's orientation
         direction_x = cos_yaw
         direction_y = sin_yaw
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
         self.future_feet_positions_w[:, :, 2] = 0.05
-        
-        self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(self.future_feet_positions_w.numpy())
-            
-                
+
+        self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(
+            self.future_feet_positions_w.numpy()
+        )
+
     def viz_future_feet_positions(self):
         """
         Visualizes the future feet positions in the world frame.
         """
         try:
             marker_array = MarkerArray()
-            
+
             # Colors for each foot trajectory
             colors = [
                 ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Red for FL
@@ -797,12 +796,12 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0),  # Blue for RL
                 ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # Yellow for RR
             ]
-            
-            foot_names = ['FL', 'FR', 'RL', 'RR']
-            
+
+            foot_names = ["FL", "FR", "RL", "RR"]
+
             # Transpose the tensor to match the expected shape (num_steps, 4, 3)
             positions_for_viz = self.future_feet_positions_w.permute(1, 0, 2).numpy()
-            
+
             for foot_idx in range(len(foot_names)):
                 # Create a marker for the trajectory of each foot
                 marker = Marker()
@@ -812,15 +811,15 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 marker.id = foot_idx
                 marker.type = Marker.POINTS
                 marker.action = Marker.ADD
-                
+
                 # Set the scale of the points
                 marker.scale.x = 0.02  # Point size
                 marker.scale.y = 0.02
                 marker.scale.z = 0.02
-                
+
                 # Set the color
                 marker.color = colors[foot_idx]
-                
+
                 # Add all future positions for this foot
                 for step in range(positions_for_viz.shape[0]):
                     point = Point()
@@ -828,15 +827,15 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                     point.y = float(positions_for_viz[step, foot_idx, 1])
                     point.z = float(positions_for_viz[step, foot_idx, 2])
                     marker.points.append(point)
-                
+
                 marker_array.markers.append(marker)
-            
+
             # Publish the marker array
             self.feet_pos_pub.publish(marker_array)
-            self.command_manager.logger.debug('Published future feet positions marker array')
-            
+            self.command_manager.logger.debug("Published future feet positions marker array")
+
         except Exception as e:
-            self.command_manager.logger.error(f'Failed to publish future feet positions: {e}')
+            self.command_manager.logger.error(f"Failed to publish future feet positions: {e}")
 
     def viz_current_contact_locations(self):
         """
@@ -847,10 +846,10 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         """
         try:
             marker_array = MarkerArray()
-            
+
             # Get current contact locations from future feet positions
             current_positions = self.future_feet_positions_w[:, self.current_goal_idx]
-            
+
             # Create markers for each foot
             for foot_idx in range(4):
                 marker = Marker()
@@ -860,12 +859,12 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 marker.id = foot_idx
                 marker.type = Marker.SPHERE
                 marker.action = Marker.ADD
-                
+
                 # Set the scale of the sphere
                 marker.scale.x = 0.05  # radius
                 marker.scale.y = 0.05
                 marker.scale.z = 0.05
-                
+
                 # Set color based on contact plan
                 if self.current_contact_plan[0, foot_idx]:
                     # Black for feet in contact
@@ -873,23 +872,22 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 else:
                     # Green for feet not in contact
                     marker.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
-                
+
                 # Set position
                 marker.pose.position.x = float(current_positions[foot_idx, 0])
                 marker.pose.position.y = float(current_positions[foot_idx, 1])
                 marker.pose.position.z = float(current_positions[foot_idx, 2])
-                
+
                 # Set orientation (identity quaternion)
                 marker.pose.orientation.w = 1.0
                 marker.pose.orientation.x = 0.0
                 marker.pose.orientation.y = 0.0
                 marker.pose.orientation.z = 0.0
-                
+
                 marker_array.markers.append(marker)
-            
+
             # Publish the marker array
             self.feet_pos_pub.publish(marker_array)
-            
-        except Exception as e:
-            self.command_manager.logger.error(f'Failed to publish current contact locations: {e}')
 
+        except Exception as e:
+            self.command_manager.logger.error(f"Failed to publish current contact locations: {e}")

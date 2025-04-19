@@ -2,8 +2,8 @@ import argparse
 import asyncio
 import logging
 import os
-from typing import Optional
 import time
+from typing import Optional
 
 import rclpy
 from controllers.rl_controller import RLLocomotionContactController, RLLocomotionVelocityController
@@ -14,9 +14,12 @@ from controllers.stand_controller import (
     StandUpController,
     StayDownController,
 )
+from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber, StateManager
+from tf2_ros import TransformBroadcaster
 
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
@@ -34,9 +37,6 @@ from utils.ui_interface import ModeManager, RobotControlUI
 # from unitree_go.msg._low_state import LowState
 # from unitree_go.msg._sport_mode_state import SportModeState
 from vicon_receiver.msg import Position
-from sensor_msgs.msg import JointState
-from geometry_msgs.msg import TransformStamped
-from tf2_ros import TransformBroadcaster
 
 
 class LowLevelCmdPublisher(Node):
@@ -54,7 +54,7 @@ class LowLevelCmdPublisher(Node):
         self.mode_manager = mode_manager
         self.state_manager = state_manager
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # Control parameters
         self.dt = dt  # This should be 0.005 for 200Hz control
         self.running_time = 0.0
@@ -62,17 +62,25 @@ class LowLevelCmdPublisher(Node):
         # DDS Publisher setup
         self.dds_pub = ChannelPublisher("rt/lowcmd", LowCmd_)
         self.dds_pub.Init()
-        
+
         # Setup ROS publishers for visualization
         self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Define joint names in the correct order
         self.joint_names = [
-            'FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint',
-            'FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint',
-            'RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint',
-            'RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint'
+            "FR_hip_joint",
+            "FR_thigh_joint",
+            "FR_calf_joint",
+            "FL_hip_joint",
+            "FL_thigh_joint",
+            "FL_calf_joint",
+            "RR_hip_joint",
+            "RR_thigh_joint",
+            "RR_calf_joint",
+            "RL_hip_joint",
+            "RL_thigh_joint",
+            "RL_calf_joint",
         ]
 
         # Create timer for periodic command publishing
@@ -96,8 +104,6 @@ class LowLevelCmdPublisher(Node):
             motor_cmd = self.dds_cmd.motor_cmd[i]
             motor_cmd.mode = 0x01  # PMSM mode
             motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
-
-
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
@@ -143,10 +149,9 @@ class LowLevelCmdPublisher(Node):
                 self.logger.error(f"Error updating motor commands: {e}")
                 return
 
-            
             # Publish robot state for visualization
             self.publish_robot_state()
-            
+
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
             self.dds_pub.Write(self.dds_cmd)
@@ -160,44 +165,46 @@ class LowLevelCmdPublisher(Node):
     def publish_robot_state(self):
         """Publish robot state for visualization in RViz."""
         current_time = self.get_clock().now()
-        
+
         combined_state = self.state_manager.get_combined_state()
         # Publish joint states
         joint_state_msg = JointState()
         joint_state_msg.header.stamp = current_time.to_msg()
         joint_state_msg.name = self.joint_names
-        
+
         # Convert numpy arrays to Python lists of floats
         joint_pos = combined_state.get("joint_pos", [0.0] * 12)
         joint_vel = combined_state.get("joint_vel", [0.0] * 12)
-        
+
         joint_state_msg.position = [float(x) for x in joint_pos]
         joint_state_msg.velocity = [float(x) for x in joint_vel]
-        
+
         self.joint_state_pub.publish(joint_state_msg)
 
         # Publish base transform
         transform = TransformStamped()
         transform.header.stamp = current_time.to_msg()
-        transform.header.frame_id = 'world'
-        transform.child_frame_id = 'base_link'
-        
+        transform.header.frame_id = "world"
+        transform.child_frame_id = "base_link"
+
         # Set translation from base_pos_w
         transform.transform.translation.x = float(combined_state["base_pos_w"][0])
         transform.transform.translation.y = float(combined_state["base_pos_w"][1])
         transform.transform.translation.z = float(combined_state["base_pos_w"][2])
-        
+
         # Set rotation from base_quat
         transform.transform.rotation.x = float(combined_state["base_quat"][1])
         transform.transform.rotation.y = float(combined_state["base_quat"][2])
         transform.transform.rotation.z = float(combined_state["base_quat"][3])
         transform.transform.rotation.w = float(combined_state["base_quat"][0])
-        
+
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
 
+
 node = None
 state_manager = None
+
 
 async def main_async(args=None):
     """Main asynchronous entry point for robot controller."""
@@ -322,11 +329,11 @@ async def main_async(args=None):
             def spin_node():
                 spin_dt = 0.0005
                 last_spin_time = time.time()
-                
+
                 while rclpy.ok():
                     current_time = time.time()
                     elapsed = current_time - last_spin_time
-                    
+
                     if elapsed >= spin_dt:
                         rclpy.spin_once(node)
                         state_manager.spin_subscribers()

@@ -28,10 +28,7 @@ def get_logger(
     if logger.hasHandlers():
         logger.handlers.clear()
 
-    log_format = (
-        "[%(levelname)s] [%(asctime)s] "
-        "[%(filename)s:%(lineno)d]: %(message)s"
-    )
+    log_format = "[%(levelname)s] [%(asctime)s] " "[%(filename)s:%(lineno)d]: %(message)s"
     # log_format = '[%(asctime)s] : %(message)s'
 
     # File Logs
