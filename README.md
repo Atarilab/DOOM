@@ -87,14 +87,13 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
-- [ ] Implement a real-time High-Level Contact Planner
-- [ ] Add support for AlienGo/G1/Allegro
 - [ ] Implement joystick control for velocity commands
+- [ ] Add support for AlienGo/G1/Allegro
+- [x] Implement a real-time High-Level Contact Planner
 - [x] Publish robot and joint states to corresponding topics from master node
 - [x] Visualize Robot in RViz
 - [x] Implement interface to change commands from UI
 - [x] Implement safety mechanisms (soft dof pos limits, dof torque limits)
-- [x] Integrate Pinocchio for additional states such as feet positions
 - [x] Get vicon frame from Vicon SDK and transform to robot base (directly using base position from vicon after [**@victorDD1**](https://github.com/victorDD1)'s update)
 - [x] Add mechanism for real-time state logger and plotter (debug logger in console and file, plotjuggler for ros topics)
 - [x] Test Velocity-conditioned policy
