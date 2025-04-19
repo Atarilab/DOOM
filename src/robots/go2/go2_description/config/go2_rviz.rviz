@@ -48,8 +48,13 @@ Visualization Manager:
     - Class: rviz_default_plugins/RobotModel
       Collision Enabled: false
       Description File: ""
-      Description Source: Parameter
-      Description Parameter: robot_description
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
       Enabled: true
       Links:
         All Links Enabled: true

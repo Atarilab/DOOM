@@ -320,8 +320,8 @@ async def main_async(args=None):
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
-                last_spin_time = time.time()
                 spin_dt = 0.0005
+                last_spin_time = time.time()
                 
                 while rclpy.ok():
                     current_time = time.time()

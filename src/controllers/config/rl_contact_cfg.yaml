@@ -8,7 +8,7 @@ action_dim: 12
 action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
-feet_step_size: 0.01
+feet_step_size: 0.1
 horizon_length: 1000
 action_filter_alpha: 0.3
 visualize: 
