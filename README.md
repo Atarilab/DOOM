@@ -88,6 +88,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 
 ## TODO
 - [ ] Implement joystick control for velocity commands
+- [ ] Test RViz on the real robot for contact-conditioned policy (stance, trot in place)
 - [ ] Add support for AlienGo/G1/Allegro
 - [x] Implement a real-time High-Level Contact Planner
 - [x] Publish robot and joint states to corresponding topics from master node
