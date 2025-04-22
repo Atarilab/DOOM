@@ -235,6 +235,33 @@ Visualization Manager:
       Shaft Length: 0.23000000417232513
       Shaft Radius: 0.009999999776482582
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Feet Trajectories
+      Namespaces:
+        foot_trajectory_FL: true
+        foot_trajectory_FR: true
+        foot_trajectory_RL: true
+        foot_trajectory_RR: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /feet_trajectories
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Contact Locations
+      Namespaces:
+        current_contact_locations: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /contact_locations
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 238; 238; 236

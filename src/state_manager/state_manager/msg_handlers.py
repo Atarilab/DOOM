@@ -30,6 +30,45 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
 
     # Extract IMU states
     imu_state = msg["imu_state"]
+    
+    # Extract and filter IMU data
+    try:        
+        # Get gyroscope data
+        gyroscope = np.array([
+            imu_state.gyroscope[0],
+            imu_state.gyroscope[1],
+            imu_state.gyroscope[2]
+        ])
+        
+        # Get accelerometer data
+        accelerometer = np.array([
+            imu_state.accelerometer[0],
+            imu_state.accelerometer[1],
+            imu_state.accelerometer[2]
+        ])
+        
+        alpha = 0.3  # Adjust this value based on your needs (higher = more responsive)
+        
+        # Filter gyroscope data
+        if not hasattr(low_state_handler, "filtered_gyro"):
+            low_state_handler.filtered_gyro = gyroscope
+        else:
+            low_state_handler.filtered_gyro = alpha * gyroscope + (1 - alpha) * low_state_handler.filtered_gyro
+            
+        # Filter accelerometer data
+        if not hasattr(low_state_handler, "filtered_acc"):
+            low_state_handler.filtered_acc = accelerometer
+        else:
+            low_state_handler.filtered_acc = alpha * accelerometer + (1 - alpha) * low_state_handler.filtered_acc
+            
+    except (AttributeError, IndexError) as e:
+        if logger:
+            logger.warning(f"Error accessing IMU state attributes: {e}")
+        # Provide default values if IMU data is not available
+        gyroscope = np.zeros(3)
+        accelerometer = np.zeros(3)
+        low_state_handler.filtered_gyro = np.zeros(3)
+        low_state_handler.filtered_acc = np.zeros(3)
 
     # Construct and return the parsed states dictionary
     states = {
@@ -38,10 +77,9 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         "joint_acc": joint_accelerations,
         "joint_tau_est": joint_tau_est,
         "foot_forces": foot_forces,
+        "gyroscope": low_state_handler.filtered_gyro,
+        "accelerometer": low_state_handler.filtered_acc,
         "base_quat": imu_state.quaternion,
-        "rpy": imu_state.rpy,
-        "gyroscope": imu_state.gyroscope,
-        "accelerometer": imu_state.accelerometer,
     }
 
     return states
@@ -69,13 +107,13 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     # Singleton pattern for velocity estimator
     if not hasattr(vicon_handler, "velocity_estimator"):
-        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.2)
+        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.15)
 
     # Base Position (in m)
     base_pos = np.array(
         [
-            (msg["x_trans"] + x_offset) * 0.001,
             (msg["y_trans"] + y_offset) * 0.001,
+            -(msg["x_trans"] + x_offset) * 0.001,
             (msg["z_trans"] + z_offset) * 0.001,
         ]
     )
@@ -89,6 +127,35 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
             msg["z_rot"],
         ]
     )
+    
+    # Apply a -90-degree rotation around the Z axis to align the robot's frame with the world frame
+    # This creates a rotation quaternion for -90 degrees around Z axis
+    rot_neg90_z = np.array([np.cos(-np.pi/4), 0, 0, np.sin(-np.pi/4)])  # w, x, y, z format
+    
+    # Multiply the quaternions to apply the rotation
+    # Quaternion multiplication formula:
+    # q1 * q2 = [w1*w2 - x1*x2 - y1*y2 - z1*z2,
+    #            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+    #            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+    #            w1*z2 + x1*y2 - y1*x2 + z1*w2]
+    w1, x1, y1, z1 = base_quat
+    w2, x2, y2, z2 = rot_neg90_z
+    
+    base_quat = np.array([
+        w1*w2 - x1*x2 - y1*y2 - z1*z2,
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,
+        w1*z2 + x1*y2 - y1*x2 + z1*w2
+    ])
+    
+    # Swap roll and pitch components to fix orientation
+    # Original: [w, x, y, z] where x is roll, y is pitch, z is yaw
+    # New: [w, y, x, z] where y is now roll, x is now pitch, z is still yaw
+    w, x, y, z = base_quat
+    base_quat = np.array([w, y, x, z])
+    
+    # Invert the pitch component (now at index 2) to fix the pitch direction
+    base_quat[2] = -base_quat[2]
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
@@ -101,7 +168,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     states = {
         "base_pos_w": base_pos,
-        # 'base_quat': base_quat,
+        'base_quat': base_quat,
         "lin_vel_w": lin_vel_w.tolist(),  # Linear velocities in world frame
         "lin_vel_b": lin_vel_b,
         # 'ang_vel_w': angular_velocities.tolist(),  # Angular velocities in world frame
@@ -125,6 +192,7 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
         sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
     base_pos_w = msg["position"]
+    base_quat = msg["imu_state"].quaternion
 
     states = {
         "base_pos_w": base_pos_w,

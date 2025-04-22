@@ -45,9 +45,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
         # Initialize controller base
         ControllerBase.__init__(self, mj_model_wrapper=mj_model_wrapper, configs=configs)
 
-        # Create publisher for future feet positions
-        self.feet_pos_pub = self.create_publisher(MarkerArray, "future_feet_positions", 10)
-
         # Create static transform publisher for map frame
         self.tf_broadcaster = StaticTransformBroadcaster(self)
 
@@ -407,6 +404,10 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.init_completed = False
         super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
 
+        # Create publishers for future feet positions and contact locations
+        self.feet_trajectory_pub = self.create_publisher(MarkerArray, "feet_trajectories", 10)
+        self.contact_locations_pub = self.create_publisher(MarkerArray, "contact_locations", 10)
+
         # Contact command parameters
         self.command_duration = 0.35  # Duration of each contact plan in seconds
         self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool)  # Current contact pattern
@@ -417,16 +418,23 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         ]
 
         # Thread synchronization for gait changes
-        self._gait_lock = threading.RLock()  # Reentrant lock for gait changes
+        self._gait_lock = threading.RLock()  # Reentrant lock for gait changes(self.feet_step_size / 2)
         self._gait_change_event = threading.Event()  # Event to signal gait changes
 
         # Horizon planning
         self.future_feet_positions_init_frame = None
         self.horizon_length = configs["controller_config"]["horizon_length"]
         self.feet_step_size = configs["controller_config"]["feet_step_size"]
+        self.lateral_pos = 0.0
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
+        
+        # Heading command for feet positions
+        self.heading_command = 0.0  # Default heading (in radians)
+        self.heading_command_lock = threading.RLock()  # Lock for heading command updates
+        self.heading_change_pending = False  # Flag to indicate pending heading change
+        self.lateral_pos_change_pending = False  # Flag to indicate pending lateral pos change
 
         # Define gait patterns (FL, FR, RL, RR)
         self.gait_patterns = {
@@ -467,11 +475,11 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 ]
             ),
         }
-        self.current_gait = "transition"  # Default gait
+        self.current_gait = "stance"  # Default gait
         self.pending_gait_change = None  # Store pending gait change
         self.in_transition = False  # Flag to indicate if we're in a transition phase
         self.transition_counter = 0  # Counter to track resample steps during transition
-        self.transition_duration = 2  # Number of resample steps for transition (increased from 2)
+        self.transition_duration = configs["controller_config"]["transition_duration"]  # Number of resample steps for transition (increased from 2)
         self.transition_progress = 0.0
         self.transition_start_gait = None  # Starting gait for transition
         self.transition_end_gait = None  # Ending gait for transition
@@ -518,6 +526,38 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         """Resample the commands for the controller with thread safety."""
         try:
             with self._gait_lock:
+                # Apply pending step size change if any
+                if hasattr(self, 'step_size_change_pending') and self.step_size_change_pending:
+                    self.feet_step_size = self.pending_step_size
+                    self.step_size_change_pending = False
+                    if self.command_manager and self.command_manager.logger:
+                        self.command_manager.logger.debug(f"Applied step size change: {self.feet_step_size:.2f} meters")
+                    # Regenerate future feet positions with new step size
+                    self.generate_future_feet_positions()
+                    if self.visualize_future_feet_positions:
+                        self.viz_future_feet_positions()
+                
+                # Apply pending heading change if any
+                if self.heading_change_pending:
+                    self.heading_command = self.pending_heading
+                    self.heading_change_pending = False
+                    if self.command_manager and self.command_manager.logger:
+                        self.command_manager.logger.debug(f"Applied heading change: {self.heading_command:.2f} radians")
+                    # Regenerate future feet positions with new heading
+                    self.generate_future_feet_positions()
+                    if self.visualize_future_feet_positions:
+                        self.viz_future_feet_positions()
+                
+                if self.lateral_pos_change_pending:
+                    self.lateral_pos = self.pending_lateral_pos
+                    self.lateral_pos_change_pending = False
+                    if self.command_manager and self.command_manager.logger:
+                        self.command_manager.logger.debug(f"Applied lateral pos change: {self.lateral_pos:.2f} meters")
+                    # Regenerate future feet positions with new heading
+                    self.generate_future_feet_positions()
+                    if self.visualize_future_feet_positions:
+                        self.viz_future_feet_positions()
+                
                 # Handle gait transitions
                 if self.pending_gait_change is not None:
                     if not self.in_transition:
@@ -541,6 +581,26 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                             self.command_manager.logger.debug(
                                 f"Starting transition phase from {self.transition_start_gait} to {self.transition_end_gait}"
                             )
+                            
+                        if self.transition_duration == 0:
+                            self.in_transition = False
+                            self.current_gait = self.pending_gait_change
+                            self.current_contact_plan = self.gait_patterns[self.pending_gait_change]
+
+                            # Call set_mode() if the pending gait is "stance"
+                            if self.pending_gait_change == "stance":
+                                self.generate_future_feet_positions()
+
+                            self.pending_gait_change = None
+                            self.transition_start_gait = None
+                            self.transition_end_gait = None
+                            
+                            # Signal that the gait change is complete
+                            self._gait_change_event.set()
+
+                            self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
+
+                            # Signal that the gait change is complete
                     else:
                         # Increment transition counter and update progress
                         self.transition_counter += 1
@@ -624,6 +684,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
 
         except Exception as e:
             self.command_manager.logger.error(f"Contact command update failed: {e}")
+            
 
     def register_commands(self):
         """Register contact command parameters."""
@@ -730,55 +791,161 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Generates the future feet positions in the init frame for horizon planning.
         """
         # Call the base class set_mode to activate the controller
-        # super().set_mode()
+        super().set_mode()
 
-        self.generate_future_feet_positions()
-        if self.visualize_future_feet_positions:
-            self.viz_future_feet_positions()
+        # Set default gait to stance when switching back to RL controller
+        with self._gait_lock:
+            self.current_gait = "stance"
+            self.current_contact_plan = self.gait_patterns["stance"]
+            self.pending_gait_change = None
+            self.in_transition = False
+            self.transition_counter = 0
+            self.transition_progress = 0.0
+            self.transition_start_gait = None
+            self.transition_end_gait = None
+            self.feet_step_size = 0.0
+            self.heading_command = 0.0
+            self.pending_heading = 0.0
+            self.pending_step_size = 0.0
+            self.pending_lateral_pos = 0.0
 
-    def generate_future_feet_positions(self):
+        base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
+        self.lateral_pos = base_pos_w[1]
+        self.generate_future_feet_positions(base_pos_w)
+
+    def generate_future_feet_positions(self, pos=torch.zeros(3)):
         """
         Generates future feet positions for the controller.
+        Uses the heading_command relative to the robot's base yaw to determine the direction of movement.
         """
-
         self.goal_completion_counter = 0
         self.current_goal_idx = 0
         offset = torch.tensor(
-            [(0.2334, 0.1865, 0.0), (0.2334, -0.1865, 0.0), (-0.2334, 0.1865, 0.0), (-0.2334, -0.1865, 0.0)],
+            [(0.2234, 0.1465, 0.0), (0.2234, -0.1665, 0.0), (-0.2234, 0.1465, 0.0), (-0.2234, -0.1665, 0.0)],
             dtype=torch.float32,
         )
-        #
-        base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
-
+        
         # Get robot yaw from base orientation matrix
-        base_rot = torch.tensor(self.mj_model_wrapper.get_body_orientation_world("base_link"), dtype=torch.float32)
-        yaw = torch.atan2(base_rot[1, 0], base_rot[0, 0])
-
-        # Create rotation matrix for yaw
-        cos_yaw = torch.cos(yaw)
-        sin_yaw = torch.sin(yaw)
+        # base_rot = torch.tensor(self.mj_model_wrapper.get_body_orientation_world("base_link"), dtype=torch.float32)
+        # robot_yaw = torch.atan2(base_rot[1, 0], base_rot[0, 0])
+        
+        # Use the heading command relative to robot's yaw
+        with self.heading_command_lock:
+            # Convert heading command to tensor for calculations
+            heading_command_tensor = torch.tensor(self.heading_command, dtype=torch.float32)
+            # Calculate target yaw by adding the heading command to the robot's yaw
+            # target_yaw = robot_yaw + heading_command_tensor
+            target_yaw = heading_command_tensor
+            
+        # Create rotation matrix for the target yaw
+        cos_yaw = torch.cos(target_yaw)
+        sin_yaw = torch.sin(target_yaw)
         rotation_matrix = torch.tensor([[cos_yaw, -sin_yaw, 0], [sin_yaw, cos_yaw, 0], [0, 0, 1]], dtype=torch.float32)
 
         # Rotate the offset positions
         rotated_offset = torch.matmul(rotation_matrix, offset.T).T
 
-        # Apply the rotated offset to base position
-        self.future_feet_positions_w[:] = (base_pos_w + rotated_offset).unsqueeze(1)
+        # Check if pos is a tensor of zeros (default case)
+        if torch.all(pos == 0):
+            # Get the robot's current position
+            robot_pos = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
+            # Use only the x-dimension of the robot's position
+            pos = torch.tensor([robot_pos[0],self.lateral_pos, 0.0], dtype=torch.float32)
+
+        # Apply the rotated offset to base position (if not None)
+        self.future_feet_positions_w[:] = (pos + rotated_offset).unsqueeze(1)
 
         stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32).unsqueeze(0) * torch.tensor(
             self.feet_step_size, dtype=torch.float32
         ).unsqueeze(-1)
 
-        # Apply stride in the direction of robot's orientation
+        # Apply stride in the direction of the target heading
         direction_x = cos_yaw
         direction_y = sin_yaw
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
         self.future_feet_positions_w[:, :, 2] = 0.05
-
+        
+        # if self.current_gait in ["trot", "pace"]:
+        #     self.future_feet_positions_w[[1, 2], :, 0] -= (self.feet_step_size / 2) * direction_x
+        #     self.future_feet_positions_w[[1, 2], :, 1] -= (self.feet_step_size / 2) * direction_y
+            
+        if self.current_gait in ["pace"]:
+            self.future_feet_positions_w[[0, 3], :, 0] += 0.12 * direction_x
+            self.future_feet_positions_w[[0, 3], :, 1] += 0.12 * direction_y
         self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(
             self.future_feet_positions_w.numpy()
         )
+        
+
+    def get_joystick_mappings(self) -> Dict[str, Callable[[], None]]:
+        """
+        Define joystick button mappings for gait changes and heading control.
+        
+        Returns:
+            Dict mapping button names to callback functions.
+        """
+        return {
+            "A": lambda: self.change_commands({"gait": "trot"}),
+            "B": lambda: self.change_commands({"gait": "pace"}),
+            "X": lambda: self.change_commands({"gait": "bound"}),
+            "Y": lambda: self.change_commands({"gait": "jump"}),
+            "R2": lambda: self.change_commands({"gait": "stance"}),
+            "up": lambda: self._handle_step_size_change("up"),
+            "down": lambda: self._handle_step_size_change("down"),
+            # "left": lambda: self._handle_heading_change("left"),
+            # "right": lambda: self._handle_heading_change("right"),
+            "left": lambda: self._handle_lateral_pos_change("left"),
+            "right": lambda: self._handle_lateral_pos_change("right"),
+        }
+        
+    def _handle_step_size_change(self, direction: str):
+        """Handle forwardstep size changes."""
+        # Increase step size by 0.01 meters when up button is pressed
+        if direction == "up":
+            new_step_size = self.feet_step_size + 0.025
+        elif direction == "down":
+            new_step_size = self.feet_step_size - 0.025
+        # Limit maximum step size to 0.2 meters for safety
+        new_step_size = max(-0.2, min(new_step_size, 0.2))
+        
+        # Set the pending step size change instead of applying it immediately
+        with self._gait_lock:
+            self.pending_step_size = new_step_size
+            self.step_size_change_pending = True
+
+    def _handle_heading_change(self, direction: str):
+        """
+        Handle heading changes using directional buttons.
+        
+        Args:
+            direction: String indicating the direction to turn ("left" or "right")
+        """
+        # Define heading change amount in radians
+        heading_change = 0.05  # About 11.5 degrees
+        
+        with self._gait_lock:
+            if direction == "left":
+                # Turn left (positive heading)
+                self.pending_heading = self.heading_command + heading_change
+            elif direction == "right":
+                # Turn right (negative heading)
+                self.pending_heading = self.heading_command - heading_change
+                
+            # # Keep heading within -pi to pi range
+            # self.pending_heading = (self.pending_heading + np.pi) % (2 * np.pi) - np.pi
+            
+            # Set the pending flag
+            self.heading_change_pending = True
+
+    def _handle_lateral_pos_change(self, direction: str):
+        with self._gait_lock:
+            """Handle lateral step size changes."""
+            if direction == "left":
+                self.pending_lateral_pos = self.lateral_pos + 0.05
+            elif direction == "right":
+                self.pending_lateral_pos = self.lateral_pos - 0.05
+            self.lateral_pos_change_pending = True
 
     def viz_future_feet_positions(self):
         """
@@ -829,11 +996,13 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 marker_array.markers.append(marker)
 
             # Publish the marker array
-            self.feet_pos_pub.publish(marker_array)
-            self.command_manager.logger.debug("Published future feet positions marker array")
+            self.feet_trajectory_pub.publish(marker_array)
+            if self.command_manager and self.command_manager.logger:
+                self.command_manager.logger.debug("Published future feet positions marker array")
 
         except Exception as e:
-            self.command_manager.logger.error(f"Failed to publish future feet positions: {e}")
+            if self.command_manager and self.command_manager.logger:
+                self.command_manager.logger.error(f"Failed to publish future feet positions: {e}")
 
     def viz_current_contact_locations(self):
         """
@@ -885,22 +1054,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 marker_array.markers.append(marker)
 
             # Publish the marker array
-            self.feet_pos_pub.publish(marker_array)
+            self.contact_locations_pub.publish(marker_array)
 
         except Exception as e:
-            self.command_manager.logger.error(f"Failed to publish current contact locations: {e}")
-
-    def get_joystick_mappings(self) -> Dict[str, Callable[[], None]]:
-        """
-        Define joystick button mappings for gait changes.
-        
-        Returns:
-            Dict mapping button names to callback functions.
-        """
-        return {
-            "A": lambda: self.change_commands({"gait": "trot"}),
-            "B": lambda: self.change_commands({"gait": "pace"}),
-            "X": lambda: self.change_commands({"gait": "bound"}),
-            "Y": lambda: self.change_commands({"gait": "jump"}),
-            "R2": lambda: self.change_commands({"gait": "stance"}),
-        }
+            if self.command_manager and self.command_manager.logger:
+                self.command_manager.logger.error(f"Failed to publish current contact locations: {e}")

@@ -25,6 +25,10 @@ class JoystickManager:
         self._last_key_value = 0
         self._update_rate = 0.02  # 50Hz update rate
         
+        # Command cooldown
+        self._last_command_time = 0.0
+        self._command_cooldown = 0.2  # 0.2 second cooldown between commands
+        
         # Start the joystick thread
         self.start_thread()
 
@@ -133,31 +137,42 @@ class JoystickManager:
                 for i in range(16):
                     key_value += key_state[i] << i
 
-                # Handle mode switching based on button combinations
-                if key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ == "IdleController":
-                    self.mode_manager.set_mode("STANDING", "STAY_DOWN")
-                elif key_state[self.key_map["start"]] and not self.active_controller.__class__.__name__ == "IdleController":
-                    self.mode_manager.set_mode("IDLE")
-                    
-                elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ == "StayDownController":
-                    self.mode_manager.set_mode("STANDING", "STAND_UP")
-                elif key_state[self.key_map["down"]] and self.active_controller.__class__.__name__ == "StandUpController":
-                    self.mode_manager.set_mode("STANDING", "STAND_DOWN")
-                elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "StandDownController":
-                    self.mode_manager.set_mode("STANDING", "STAY_DOWN")
-                elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "StandUpController":
-                    self.mode_manager.set_mode("RL-CONTACT", "RL-CONTACT")
-                    
+                # Check if enough time has passed since last command
+                current_time = time.time()
+                time_since_last_command = current_time - self._last_command_time
 
-                # Execute controller-specific mappings if available
-                if self.active_controller and hasattr(self.active_controller, 'get_joystick_mappings'):
-                    mappings = self.active_controller.get_joystick_mappings()
-                    for button, callback in mappings.items():
-                        if button in self.key_map and key_state[self.key_map[button]]:
-                            try:
-                                callback()
-                            except Exception as e:
-                                self.logger.error(f"Error executing joystick mapping for {button}: {e}")
+                # Only process commands if cooldown period has passed
+                if time_since_last_command >= self._command_cooldown:
+                    # Handle mode switching based on button combinations
+                    if key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ == "IdleController":
+                        self.mode_manager.set_mode("STANDING", "STAY_DOWN")
+                        self._last_command_time = current_time
+                    elif key_state[self.key_map["start"]] and not self.active_controller.__class__.__name__ == "IdleController":
+                        self.mode_manager.set_mode("IDLE")
+                        self._last_command_time = current_time
+                    elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in ["StayDownController", "StandDownController"]:
+                        self.mode_manager.set_mode("STANDING", "STAND_UP")
+                        self._last_command_time = current_time
+                    elif key_state[self.key_map["down"]] and self.active_controller.__class__.__name__ == "StandUpController":
+                        self.mode_manager.set_mode("STANDING", "STAND_DOWN")
+                        self._last_command_time = current_time
+                    elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "StandDownController":
+                        self.mode_manager.set_mode("STANDING", "STAY_DOWN")
+                        self._last_command_time = current_time
+                    elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "StandUpController":
+                        self.mode_manager.set_mode("RL-CONTACT", "RL-CONTACT")
+                        self._last_command_time = current_time
+
+                    # Execute controller-specific mappings if available
+                    if self.active_controller and hasattr(self.active_controller, 'get_joystick_mappings'):
+                        mappings = self.active_controller.get_joystick_mappings()
+                        for button, callback in mappings.items():
+                            if button in self.key_map and key_state[self.key_map[button]]:
+                                try:
+                                    callback()
+                                    self._last_command_time = current_time
+                                except Exception as e:
+                                    self.logger.error(f"Error executing joystick mapping for {button}: {e}")
 
                 if key_value != 0:
                     self.logger.debug(f"Joystick state: {key_value}")

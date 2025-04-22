@@ -38,8 +38,7 @@ class SimRobotInterface(RobotInterfaceBase):
         self.viewer_dt = config["VIEWER_DT"]
         self.domain_id = config["DOMAIN_ID"]
         self.interface = config["INTERFACE"]
-        self.joystick_type = config["JOYSTICK_TYPE"]
-        self.use_joystick = config.get("USE_JOYSTICK", False)
+
         self.print_scene_info = config.get("PRINT_SCENE_INFORMATION", False)
 
         # Start threads
@@ -53,8 +52,6 @@ class SimRobotInterface(RobotInterfaceBase):
         ChannelFactoryInitialize(self.domain_id, self.interface)
         unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data)
 
-        if self.use_joystick:
-            unitree.SetupJoystick(device_id=0, js_type=self.joystick_type)
         if self.print_scene_info:
             unitree.PrintSceneInformation()
 

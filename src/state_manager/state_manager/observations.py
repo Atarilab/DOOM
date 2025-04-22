@@ -74,7 +74,6 @@ def ang_vel_b(states: Dict[str, Any]) -> torch.Tensor:
     return torch.tensor(states["gyroscope"])
 
 
-# TODO: Convert to pure NumPy function
 def projected_gravity_b(states: Dict[str, Any]) -> torch.Tensor:
     """
     The projected gravity vector.
@@ -83,7 +82,10 @@ def projected_gravity_b(states: Dict[str, Any]) -> torch.Tensor:
     :return: Projected Gravity vector in the base frame
     """
 
-    return quat_rotate_inverse(torch.tensor([states["base_quat"]]).squeeze(0), GRAVITY_DIR)
+    quat = torch.tensor([states["base_quat"]], dtype=torch.float64).squeeze(0)
+    gravity_dir = torch.tensor([0, 0, -1.0], dtype=torch.float64)
+    
+    return quat_rotate_inverse(quat, gravity_dir)
 
 
 def last_action(states: Dict[str, Any], last_action: Callable) -> torch.Tensor:

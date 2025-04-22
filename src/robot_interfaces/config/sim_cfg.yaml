@@ -3,9 +3,6 @@ consts: robots/go2/consts.yaml
 
 SIMULATION_DT: 0.005
 VIEWER_DT: 0.02  # 50 fps for viewer
-USE_JOYSTICK: 0
-JOYSTICK_DEVICE: 0 # Joystick number
-JOYSTICK_TYPE: "xbox"
 PRINT_SCENE_INFORMATION: True
 INTERFACE: "lo"
 DOMAIN_ID: 1

@@ -148,8 +148,13 @@ class MjQuadRobotWrapper:
         Returns:
             Array of the same shape as pos but with positions transformed to the base frame
         """
-        if not self._init_world_frame:
-            raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
+        # Get the base position and orientation
+        base_idx = self.body_names.get("base_link", -1)
+        if base_idx < 0:
+            raise ValueError("Base body not found in model")
+
+        base_pos = self.data.xpos[base_idx]
+        base_rot = self.data.xmat[base_idx].reshape(3, 3)
 
         # Get the original shape
         original_shape = pos.shape
@@ -164,7 +169,10 @@ class MjQuadRobotWrapper:
             pos_reshaped = pos
 
         # Apply transformation to each position
-        transformed = self.world_to_init[:3, :3].T @ (pos_reshaped - self.world_to_init[:3, 3]).T
+        # First subtract the base position to get relative position
+        rel_pos = pos_reshaped - base_pos
+        # Then rotate using the transpose of the base rotation matrix
+        transformed = base_rot.T @ rel_pos.T
         transformed = transformed.T
 
         # Reshape back to original shape if needed
@@ -347,3 +355,109 @@ class MjQuadRobotWrapper:
             raise RuntimeError("Initial feet positions not saved. Call set_initial_world_frame() first.")
 
         return self.initial_feet_positions_init_frame
+
+    def transform_world_to_base_with_quat(self, pos: np.ndarray, quat: np.ndarray) -> np.ndarray:
+        """Transform quantities from the world frame to the base frame using a custom quaternion.
+
+        Args:
+            pos: Array of shape (N,3) or (N,M,3) containing positions in the world frame
+            quat: Quaternion in wxyz format to use for rotation instead of the robot's current orientation
+
+        Returns:
+            Array of the same shape as pos but with positions transformed to the base frame
+        """
+        # Get the base position
+        base_idx = self.body_names.get("base_link", -1)
+        if base_idx < 0:
+            raise ValueError("Base body not found in model")
+
+        base_pos = self.data.xpos[base_idx]
+        
+        # Convert quaternion to rotation matrix
+        from scipy.spatial.transform import Rotation as R
+        if quat.shape[0] == 4:  # wxyz format
+            # Convert to xyzw format for scipy
+            quat_xyzw = np.array([quat[1], quat[2], quat[3], quat[0]])
+            rot = R.from_quat(quat_xyzw)
+        else:  # xyzw format
+            rot = R.from_quat(quat)
+            
+        base_rot = rot.as_matrix()
+
+        # Get the original shape
+        original_shape = pos.shape
+
+        # Reshape to (N*M, 3) if needed
+        if len(original_shape) == 3:
+            # For (N,M,3) shape
+            N, M, _ = original_shape
+            pos_reshaped = pos.reshape(-1, 3)
+        else:
+            # For (N,3) shape
+            pos_reshaped = pos
+
+        # Apply transformation to each position
+        # First subtract the base position to get relative position
+        rel_pos = pos_reshaped - base_pos
+        # Then rotate using the transpose of the base rotation matrix
+        transformed = base_rot.T @ rel_pos.T
+        transformed = transformed.T
+
+        # Reshape back to original shape if needed
+        if len(original_shape) == 3:
+            transformed = transformed.reshape(original_shape)
+
+        return transformed
+
+    def transform_init_to_base_with_quat(self, pos: np.ndarray, quat: np.ndarray) -> np.ndarray:
+        """Transform quantities from the init frame to the base frame using a custom quaternion.
+
+        Args:
+            pos: Array of shape (N,3) or (N,M,3) containing positions in the init frame
+            quat: Quaternion in wxyz format to use for rotation instead of the robot's current orientation
+
+        Returns:
+            Array of the same shape as pos but with positions transformed to the base frame
+        """
+        # Get the base position
+        base_idx = self.body_names.get("base_link", -1)
+        if base_idx < 0:
+            raise ValueError("Base body not found in model")
+
+        base_pos = self.data.xpos[base_idx]
+        
+        # Convert quaternion to rotation matrix
+        from scipy.spatial.transform import Rotation as R
+        if quat.shape[0] == 4:  # wxyz format
+            # Convert to xyzw format for scipy
+            quat_xyzw = np.array([quat[1], quat[2], quat[3], quat[0]])
+            rot = R.from_quat(quat_xyzw)
+        else:  # xyzw format
+            rot = R.from_quat(quat)
+            
+        base_rot = rot.as_matrix()
+
+        # Get the original shape
+        original_shape = pos.shape
+
+        # Reshape to (N*M, 3) if needed
+        if len(original_shape) == 3:
+            # For (N,M,3) shape
+            N, M, _ = original_shape
+            pos_reshaped = pos.reshape(-1, 3)
+        else:
+            # For (N,3) shape
+            pos_reshaped = pos
+
+        # Apply transformation to each position
+        # First subtract the base position to get relative position
+        rel_pos = pos_reshaped - base_pos
+        # Then rotate using the transpose of the base rotation matrix
+        transformed = base_rot.T @ rel_pos.T
+        transformed = transformed.T
+
+        # Reshape back to original shape if needed
+        if len(original_shape) == 3:
+            transformed = transformed.reshape(original_shape)
+
+        return transformed

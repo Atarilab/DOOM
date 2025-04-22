@@ -67,7 +67,7 @@ class ControllerBase(ABC):
         upper_limits = self.mj_model_wrapper.model.jnt_range[1:, 1]
 
         # Conservative limit settings
-        soft_limit_factor = 0.95
+        soft_limit_factor = 0.97
         self.dof_pos_limit = np.array([lower_limits, upper_limits])
 
         # Effort limits
