@@ -167,10 +167,25 @@ class JoystickManager:
                     if self.active_controller and hasattr(self.active_controller, 'get_joystick_mappings'):
                         mappings = self.active_controller.get_joystick_mappings()
                         for button, callback in mappings.items():
-                            if button in self.key_map and key_state[self.key_map[button]]:
+                            # Handle key combinations (e.g. "L1-right")
+                            if "-" in button:
+                                keys = button.split("-")
+                                # Check if all keys in combination are pressed
+                                if all(key in self.key_map and key_state[self.key_map[key]] for key in keys):
+                                    try:
+                                        callback()
+                                        self._last_command_time = current_time
+                                        break
+                                    except Exception as e:
+                                        self.logger.error(f"Error executing joystick mapping for {button}: {e}")
+                            # Handle single keys
+                            elif button in self.key_map and key_state[self.key_map[button]] and not any(
+                                key_state[self.key_map[key]] for key in self.key_map if key != button
+                            ):
                                 try:
                                     callback()
                                     self._last_command_time = current_time
+                                    break
                                 except Exception as e:
                                     self.logger.error(f"Error executing joystick mapping for {button}: {e}")
 
