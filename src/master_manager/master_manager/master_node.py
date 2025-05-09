@@ -6,7 +6,8 @@ import time
 from typing import Optional
 
 import rclpy
-from controllers.rl_controller import RLLocomotionContactController, RLLocomotionVelocityController
+from controllers.rl_controller import RLLocomotionVelocityController
+from controllers.rl_contact_controller import RLLocomotionContactController
 from controllers.stand_controller import (
     IdleController,
     StanceController,
@@ -311,7 +312,7 @@ async def main_async(args=None):
                 "RL-CONTACT",
                 {
                     "STANCE": StanceController(mj_model_wrapper, configs),
-                    "RL-CONTACT": RLLocomotionContactController(mj_model_wrapper=mj_model_wrapper, configs=configs),
+                    "RL-CONTACT": RLLocomotionContactController(mj_model_wrapper=mj_model_wrapper, configs=configs, interface=interface),
                 },
             )
         if "rl-velocity" in args.task:

@@ -1,21 +1,27 @@
-# policy_path: "policies/contact_policy_lowerObs_DR.pt"
-# obs_dim: 82
-policy_path: "policies/contact_policy_numeroUno.pt"
+# policy_path: "policies/contact_policy_actuatorRand.pt"
+# policy_path: "policies/contact_policy_feetRandom.pt"
+policy_path: "policies/contact_policy_stanceSeperate.pt"
+# policy_path: "policies/contact_policy_latest.pt"
+fixed_feet_positions: false
 obs_dim: 82
 control_dt: 0.001
-decimation: 1
+decimation: 3
 action_dim: 12
-action_scale: 0.35
+action_scale: 0.4
 stiffness: 25.0
 damping: 0.5
 feet_step_size: 0.0
 horizon_length: 200
-action_filter_alpha: 0.3
+action_filter_alpha: 0.5
 transition_duration: 0
 visualize: 
   future_feet_positions: false
   current_contact_locations: true
-
+  feet_error: false
+  contact_plan: false
+  foot_forces: false
+  contact_status: false
+  
 default_joint_pos:
   - 0.1
   - 0.8
@@ -58,7 +64,7 @@ JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
     11,
     2,
     6,
-    10,
+    10, 
   ] 
 
 ISAAC_LAB_DEFAULT_JOINT_POS: [

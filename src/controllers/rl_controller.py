@@ -19,10 +19,8 @@ from state_manager.observations import (
     projected_gravity_b,
     velocity_commands,
 )
-from std_msgs.msg import ColorRGBA
 from tf2_ros import StaticTransformBroadcaster
 from utils.helpers import ObservationHistoryStorage
-from visualization_msgs.msg import Marker, MarkerArray
 
 
 class BaseRLLocomotionController(ControllerBase, Node):
