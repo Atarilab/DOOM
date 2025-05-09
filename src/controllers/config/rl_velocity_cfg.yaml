@@ -1,8 +1,9 @@
-policy_path: "policies/velocity_policy.pt"
+policy_path: "policies/velocity_policy_unidirectional.pt"
 control_dt: 0.001
+decimation: 4
 action_dim: 12
 obs_dim: 48
-action_scale: 0.25
+action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
 default_joint_pos:
