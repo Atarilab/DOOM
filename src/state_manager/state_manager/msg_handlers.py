@@ -27,9 +27,25 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
 
     # Extract foot forces directly without reordering
     foot_forces = msg["foot_force"]
+    foot_forces_est = msg["foot_force_est"]
 
     # Extract IMU states
     imu_state = msg["imu_state"]
+    
+    # Filter parameters
+    alpha = 0.5  # Adjust this value based on your needs (higher = more responsive)
+    
+    # Initialize or update filtered joint states
+    if not hasattr(low_state_handler, "filtered_joint_pos"):
+        low_state_handler.filtered_joint_pos = joint_positions
+        low_state_handler.filtered_joint_vel = joint_velocities
+        low_state_handler.filtered_joint_acc = joint_accelerations
+        low_state_handler.filtered_joint_tau = joint_tau_est
+    else:
+        low_state_handler.filtered_joint_pos = alpha * joint_positions + (1 - alpha) * low_state_handler.filtered_joint_pos
+        low_state_handler.filtered_joint_vel = alpha * joint_velocities + (1 - alpha) * low_state_handler.filtered_joint_vel
+        low_state_handler.filtered_joint_acc = alpha * joint_accelerations + (1 - alpha) * low_state_handler.filtered_joint_acc
+        low_state_handler.filtered_joint_tau = alpha * joint_tau_est + (1 - alpha) * low_state_handler.filtered_joint_tau
     
     # Extract and filter IMU data
     try:        
@@ -47,8 +63,6 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
             imu_state.accelerometer[2]
         ])
         
-        alpha = 0.3  # Adjust this value based on your needs (higher = more responsive)
-        
         # Filter gyroscope data
         if not hasattr(low_state_handler, "filtered_gyro"):
             low_state_handler.filtered_gyro = gyroscope
@@ -61,25 +75,49 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         else:
             low_state_handler.filtered_acc = alpha * accelerometer + (1 - alpha) * low_state_handler.filtered_acc
             
+        # Get and filter quaternion
+        quaternion = np.array([
+            imu_state.quaternion[0],
+            imu_state.quaternion[1],
+            imu_state.quaternion[2],
+            imu_state.quaternion[3]
+        ])
+        
+        # Filter quaternion
+        if not hasattr(low_state_handler, "filtered_quat"):
+            low_state_handler.filtered_quat = quaternion
+        else:
+            # For quaternions, we need to ensure the filtered result is still a valid quaternion
+            # We'll use spherical linear interpolation (slerp) for quaternion filtering
+            dot_product = np.dot(low_state_handler.filtered_quat, quaternion)
+            if dot_product < 0:
+                quaternion = -quaternion  # Ensure shortest path
+            low_state_handler.filtered_quat = alpha * quaternion + (1 - alpha) * low_state_handler.filtered_quat
+            # Normalize the filtered quaternion
+            low_state_handler.filtered_quat = low_state_handler.filtered_quat / np.linalg.norm(low_state_handler.filtered_quat)
+            
     except (AttributeError, IndexError) as e:
         if logger:
             logger.warning(f"Error accessing IMU state attributes: {e}")
         # Provide default values if IMU data is not available
         gyroscope = np.zeros(3)
         accelerometer = np.zeros(3)
+        quaternion = np.array([1.0, 0.0, 0.0, 0.0])  # Identity quaternion
         low_state_handler.filtered_gyro = np.zeros(3)
         low_state_handler.filtered_acc = np.zeros(3)
+        low_state_handler.filtered_quat = quaternion
 
     # Construct and return the parsed states dictionary
     states = {
-        "joint_pos": joint_positions,
-        "joint_vel": joint_velocities,
-        "joint_acc": joint_accelerations,
-        "joint_tau_est": joint_tau_est,
+        "joint_pos": low_state_handler.filtered_joint_pos,
+        "joint_vel": low_state_handler.filtered_joint_vel,
+        "joint_acc": low_state_handler.filtered_joint_acc,
+        "joint_tau_est": low_state_handler.filtered_joint_tau,
         "foot_forces": foot_forces,
+        "foot_forces_est": foot_forces_est,
         "gyroscope": low_state_handler.filtered_gyro,
         "accelerometer": low_state_handler.filtered_acc,
-        "base_quat": imu_state.quaternion,
+        "base_quat": low_state_handler.filtered_quat,
     }
 
     return states
@@ -107,13 +145,13 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     # Singleton pattern for velocity estimator
     if not hasattr(vicon_handler, "velocity_estimator"):
-        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.15)
+        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
 
     # Base Position (in m)
     base_pos = np.array(
-        [
+        [   
+            (msg["x_trans"] + x_offset) * 0.001,
             (msg["y_trans"] + y_offset) * 0.001,
-            -(msg["x_trans"] + x_offset) * 0.001,
             (msg["z_trans"] + z_offset) * 0.001,
         ]
     )
@@ -128,50 +166,36 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
         ]
     )
     
-    # Apply a -90-degree rotation around the Z axis to align the robot's frame with the world frame
-    # This creates a rotation quaternion for -90 degrees around Z axis
-    rot_neg90_z = np.array([np.cos(-np.pi/4), 0, 0, np.sin(-np.pi/4)])  # w, x, y, z format
+    # Filter parameters
+    alpha = 0.5  # Same alpha as in low_state_handler for consistency
     
-    # Multiply the quaternions to apply the rotation
-    # Quaternion multiplication formula:
-    # q1 * q2 = [w1*w2 - x1*x2 - y1*y2 - z1*z2,
-    #            w1*x2 + x1*w2 + y1*z2 - z1*y2,
-    #            w1*y2 - x1*z2 + y1*w2 + z1*x2,
-    #            w1*z2 + x1*y2 - y1*x2 + z1*w2]
-    w1, x1, y1, z1 = base_quat
-    w2, x2, y2, z2 = rot_neg90_z
-    
-    base_quat = np.array([
-        w1*w2 - x1*x2 - y1*y2 - z1*z2,
-        w1*x2 + x1*w2 + y1*z2 - z1*y2,
-        w1*y2 - x1*z2 + y1*w2 + z1*x2,
-        w1*z2 + x1*y2 - y1*x2 + z1*w2
-    ])
-    
-    # Swap roll and pitch components to fix orientation
-    # Original: [w, x, y, z] where x is roll, y is pitch, z is yaw
-    # New: [w, y, x, z] where y is now roll, x is now pitch, z is still yaw
-    w, x, y, z = base_quat
-    base_quat = np.array([w, y, x, z])
-    
-    # Invert the pitch component (now at index 2) to fix the pitch direction
-    base_quat[2] = -base_quat[2]
+    # Initialize or update filtered quaternion
+    if not hasattr(vicon_handler, "filtered_quat"):
+        vicon_handler.filtered_quat = base_quat
+    else:
+        # For quaternions, we need to ensure the filtered result is still a valid quaternion
+        # We'll use spherical linear interpolation (slerp) for quaternion filtering
+        dot_product = np.dot(vicon_handler.filtered_quat, base_quat)
+        if dot_product < 0:
+            base_quat = -base_quat  # Ensure shortest path
+        vicon_handler.filtered_quat = alpha * base_quat + (1 - alpha) * vicon_handler.filtered_quat
+        # Normalize the filtered quaternion
+        vicon_handler.filtered_quat = vicon_handler.filtered_quat / np.linalg.norm(vicon_handler.filtered_quat)
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
-    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(base_pos, base_quat, current_timestamp, logger)
+    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(base_pos, vicon_handler.filtered_quat, current_timestamp, logger)
 
     # Convert quaternion to a rotation matrix
-    rotation_matrix = quat_to_rotmatrix(base_quat, order="wxyz")
+    rotation_matrix = quat_to_rotmatrix(vicon_handler.filtered_quat, order="wxyz")
     # Transform linear velocity to base frame
     lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w)
 
     states = {
         "base_pos_w": base_pos,
-        'base_quat': base_quat,
+        'base_quat': vicon_handler.filtered_quat,
         "lin_vel_w": lin_vel_w.tolist(),  # Linear velocities in world frame
         "lin_vel_b": lin_vel_b,
-        # 'ang_vel_w': angular_velocities.tolist(),  # Angular velocities in world frame
     }
 
     return states
