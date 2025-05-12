@@ -1,11 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import Dict, List, Union, TYPE_CHECKING, Type
+from controllers.controller_base import ControllerBase
+
+if TYPE_CHECKING:
+    from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
+
 
 class RobotBase(ABC):
     """
     Abstract base class for robot models.
     Subclasses must define all required properties.
     """
+
+    def __init__(self, task, logger):
+        self.task = task
+        self.logger = logger
 
     @property
     @abstractmethod
@@ -35,6 +44,16 @@ class RobotBase(ABC):
     @property
     @abstractmethod
     def xml_path(self) -> str:
+        pass
+    
+    @property
+    @abstractmethod
+    def subscribers(self)-> "Dict[str, Union[ROS2StateSubscriber, DDSStateSubscriber]]":
+        pass
+    
+    @property
+    @abstractmethod
+    def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":
         pass
     
     def get_joint_names(self) -> List[str]:

@@ -1,25 +1,17 @@
-import argparse
-import asyncio
 import os
 import time
-
 import rclpy
-
-from controllers.stand_controller import IdleController
-
-from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
-from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber, StateManager
-
-# Unitree DDS
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_, SportModeState_
-from utils.initialization import initialize_channel, initialize_robot_controller
-from utils.logger import get_logger
-from utils.mj_wrapper import MjQuadRobotWrapper
+import asyncio
+import argparse
 
 # DOOM Imports
-from utils.ui_interface import ModeManager, RobotControlUI
+from controllers.stand_controller import IdleController
 from master_manager.low_level_cmd_publisher import LowLevelCmdPublisher
 from robots.go2.go2 import Go2
+from state_manager.state_manager import StateManager
+from utils.ui_interface import ModeManager, RobotControlUI
+from utils.initialization import initialize_channel, initialize_robot_controller
+from utils.logger import get_logger
 
 node = None
 state_manager = None
@@ -29,10 +21,10 @@ async def main_async(args=None):
     Asynchronous entry point for initializing and running the DOOM robot controller system.
 
     - Parses command-line arguments for task selection, logging directory, and debug options.
-    - Sets up logging and configurations for the controller and the interface (sim/real).
-    - Initializes communication channels and state managers for robot state feedback.
-    - Instantiates the robot model and all controllers for supported operation modes.
-    - Registers all controllers and modes with the mode manager.
+    - Sets up logging, communication channels (sim/real), and configurations for the controller.
+    - Instantiates the robot model which has subscribers and controllers desired for the specified task.
+    - Registers controllers desired for the specified task with the mode manager.
+    - Registers subscribers desired for the specified task to the state manager.
     - Launches the low-level command publisher and the user interface.
     - Starts the main event loop for concurrent robot control and UI operation.
 
@@ -66,68 +58,29 @@ async def main_async(args=None):
 
         # Initialize state manager - responsible for handling ROS/DDS raw messages
         state_manager = StateManager(logger=logger)
+        
+        # Initialize robot model
+        robot = Go2(task=args.task, logger=logger)
+        
+        # Add subscribers desired for the specified task to state manager from robot model
+        for name, subscriber in robot.subscribers.items():
+            state_manager.add_subscriber(name, subscriber)
 
-        dds_low_state_sub = DDSStateSubscriber(
-            topic="rt/lowstate",
-            msg_type=LowState_,
-            handler_func=low_state_handler,
-            logger=logger,
-        )
-
-        # ros2_low_state_sub = ROS2StateSubscriber(
-        #     topic="/lowstate",
-        #     node_name="low_state",
-        #     msg_type=LowState,
-        #     handler_func=low_state_handler
-        # )
-        # state_manager.add_subscriber("low_state", ros2_low_state_sub)
-
-        state_manager.add_subscriber("low_state", dds_low_state_sub)
-
-        if "sim" in args.task:
-            #     ros2_sportsmode_state_sub = ROS2StateSubscriber(
-            #         topic="/sportmodestate",
-            #         node_name="sportmodestate",
-            #         msg_type=SportModeState,
-            #         handler_func=sport_mode_state_handler
-            #     )
-            #     state_manager.add_subscriber("sports_mode_state", ros2_sportsmode_state_sub)
-
-            dds_sportsmode_state_sub = DDSStateSubscriber(
-                topic="rt/sportmodestate",
-                msg_type=SportModeState_,
-                handler_func=sport_mode_state_handler,
-                logger=logger,
-            )
-            state_manager.add_subscriber("sports_mode_state", dds_sportsmode_state_sub)
-        else:
-            from vicon_receiver.msg import Position
-            ros2_vicon_sub = ROS2StateSubscriber(
-                # topic="/vicon/Go2with6markers/Go2with6markers",
-                topic="/vicon/Go2/Go2",
-                node_name="vicon_state",
-                msg_type=Position,
-                handler_func=vicon_handler,
-                logger=logger,
-            )
-            state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
-            
-        robot = Go2(task=args.task)
-
-        # Create mode manager and register controllers
+        # Create mode manager and register idle (damping) controller
         mode_manager = ModeManager(logger=logger)
         mode_manager.register_mode("IDLE", {"default": IdleController(robot, configs)})
         
         # Register controllers available for the robot
-        controllers = getattr(robot, "AVAILABLE_CONTROLLERS")
-        for controller_type, controllers in controllers.items():
+        for controller_type, controllers in robot.available_controllers.items():
             controller_dict = {}
             for controller_name, controller_class in controllers.items():
                 controller_dict[controller_name] = controller_class(robot, configs)
             mode_manager.register_mode(controller_type, controller_dict)
 
+        # Set idle mode by default
         mode_manager.set_mode("IDLE")
 
+        # Create low level command publisher node
         node = LowLevelCmdPublisher(
             dt=configs["controller_config"]["control_dt"],
             robot=robot,
@@ -139,11 +92,12 @@ async def main_async(args=None):
         async def run():
             logger.info("Starting concurrent tasks")
 
+            # Create robot control UI
             app_task = asyncio.create_task(RobotControlUI(mode_manager).run_async())
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
-                spin_dt = 0.0005
+                spin_dt = 0.00025
                 last_spin_time = time.time()
 
                 while rclpy.ok():
