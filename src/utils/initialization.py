@@ -19,7 +19,6 @@ async def initialize_robot_controller(task: str, logger: logging.Logger) -> Dict
     return {
         "controller_config": load_config(task_configs["controller"]),
         "robot_interface_config": load_config(task_configs["robot_interface"]),
-        "robot_config": load_config(task_configs["robot"]),
     }
 
 

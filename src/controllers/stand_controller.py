@@ -1,19 +1,20 @@
-from typing import Any, Dict
+from typing import Any, Dict, TYPE_CHECKING
 
 import numpy as np
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import starting_time
-from utils.mj_wrapper import MjQuadRobotWrapper
 
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
 
 class IdleController(ControllerBase):
     """
     Used to set zero commands to the motor. This is particularly useful when exiting the controller to reset the torques to 0.
     """
 
-    def __init__(self, mj_model_wrapper, configs):
-        super().__init__(mj_model_wrapper, configs=configs)
+    def __init__(self, robot, configs):
+        super().__init__(robot, configs=configs)
 
     def register_observations(self):
         """
@@ -46,12 +47,12 @@ class StandUpController(ControllerBase):
     to the stand up joint positions which are constants.
     """
 
-    def __init__(self, mj_model_wrapper: MjQuadRobotWrapper, configs: Dict[str, Any]):
-        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
 
         self.name = "StandUpController"
-        self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
-        self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
+        self.stand_up_joint_pos = robot.stand_up_joint_pos
+        self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
 
     def register_observations(self):
@@ -92,11 +93,11 @@ class StandDownController(ControllerBase):
     to the stand down joint positions which are constants.
     """
 
-    def __init__(self, mj_model_wrapper, configs):
-        super().__init__(mj_model_wrapper, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
 
-        self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
-        self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
+        self.stand_up_joint_pos = robot.stand_up_joint_pos
+        self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
 
     def register_observations(self):
@@ -136,10 +137,10 @@ class StayDownController(ControllerBase):
     The Stay Down Controller is used to stay down close the ground, to prepare to get up.
     """
 
-    def __init__(self, mj_model_wrapper, configs):
-        super().__init__(mj_model_wrapper, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
 
-        self.stand_down_joint_pos = configs["robot_config"]["stand_down_joint_pos"]
+        self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
 
     def register_observations(self):
@@ -175,10 +176,10 @@ class StanceController(ControllerBase):
     The Stance Controller is used to stay in stance. Used to prepare to go to rest from other controllers.
     """
 
-    def __init__(self, mj_model_wrapper, configs):
-        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
 
-        self.stand_up_joint_pos = configs["robot_config"]["stand_up_joint_pos"]
+        self.stand_up_joint_pos = robot.stand_up_joint_pos
         self.start_time = 0.0
 
     def register_observations(self):
@@ -193,7 +194,7 @@ class StanceController(ControllerBase):
                 starting_time,
             ),
         )
-
+    
     def compute_torques(self, state, desired_goal):
         super().compute_torques(state, desired_goal=desired_goal)
         cmd = {}

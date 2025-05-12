@@ -1,0 +1,179 @@
+import logging
+from typing import Optional, TYPE_CHECKING
+
+from geometry_msgs.msg import TransformStamped
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from state_manager.state_manager import StateManager
+from tf2_ros import TransformBroadcaster
+
+# Unitree DDS
+from unitree_sdk2py.core.channel import ChannelPublisher
+from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
+from unitree_sdk2py.utils.crc import CRC
+
+# DOOM Imports
+from utils.ui_interface import ModeManager
+from utils.joystick_interface import JoystickManager
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
+
+class LowLevelCmdPublisher(Node):
+    """Manages low-level robot command publishing."""
+
+    def __init__(
+        self,
+        dt: float,
+        robot: "RobotBase",
+        mode_manager: ModeManager,
+        state_manager: StateManager,
+        logger: Optional[logging.Logger] = None,
+    ):
+        super().__init__("low_level_cmd")
+
+        self.robot = robot
+        self.mode_manager = mode_manager
+        self.state_manager = state_manager
+        self.logger = logger or logging.getLogger(__name__)
+
+        # Control parameters
+        self.dt = dt  # This should be 0.005 for 200Hz control
+        self.running_time = 0.0
+
+        # DDS Publisher setup
+        self.dds_pub = ChannelPublisher("rt/lowcmd", LowCmd_)
+        self.dds_pub.Init()
+
+        # Setup ROS publishers for visualization
+        self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+        # Initialize joystick manager
+        self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, logger=self.logger)
+
+        # Create timer for periodic command publishing
+        self.timer = self.create_timer(dt, self.low_level_cmd_callback, clock=self.get_clock())
+
+        # Initialize command message
+        self.dds_cmd = unitree_go_msg_dds__LowCmd_()
+        self.crc = CRC()
+        self._init_cmd()
+
+        self.last_callback_time = self.get_clock().now().nanoseconds / 1e9
+
+    def _init_cmd(self):
+        """Initialize command message with default values."""
+        self.dds_cmd.head[0] = 0xFE
+        self.dds_cmd.head[1] = 0xEF
+        self.dds_cmd.level_flag = 0xFF
+        self.dds_cmd.gpio = 0
+
+        for i in range(20):
+            motor_cmd = self.dds_cmd.motor_cmd[i]
+            motor_cmd.mode = 0x01  # PMSM mode
+            motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
+
+    def low_level_cmd_callback(self):
+        """Periodic callback to compute and send motor commands."""
+        self.running_time += self.dt
+
+        # Get active controller and compute torques
+        active_controller = self.mode_manager.get_active_controller()
+        active_obs_manager = self.mode_manager.get_active_obs_manager()
+
+        try:
+            current_time = self.get_clock().now().nanoseconds / 1e9
+
+            # Calculate actual time since last callback
+            time_since_last_callback = current_time - self.last_callback_time
+
+            # Update joystick state and handle mode switching
+            _ = self.joystick_manager.update()
+
+            # Retrieve states from state manager
+            try:
+                combined_state = self.state_manager.get_combined_state()
+            except Exception as e:
+                self.logger.error(f"Error getting combined state: {e}")
+                return
+
+            try:
+                active_controller.update_state(combined_state)
+            except Exception as e:
+                self.logger.error(f"Error updating controller state: {e}")
+                return
+
+            # Compute motor commands
+            try:
+                motor_commands = active_controller.compute_torques(combined_state, {})
+            except Exception as e:
+                self.logger.error(f"Error computing motor commands: {e}")
+                return
+
+            try:
+                # Update low-level command to the robot
+                for i in range(12):
+                    motor = motor_commands[f"motor_{i}"]
+                    for attr in ["q", "kp", "dq", "kd", "tau"]:
+                        setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
+            except Exception as e:
+                self.logger.error(f"Error updating motor commands: {e}")
+                return
+
+            # Publish robot state for visualization
+            self.publish_robot_state()
+
+            # Publish the command
+            self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
+            self.dds_pub.Write(self.dds_cmd)
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error in low level callback computation: {e}")
+
+        self.last_callback_time = current_time
+
+    def publish_robot_state(self):
+        """Publish robot state for visualization in RViz."""
+        current_time = self.get_clock().now()
+
+        combined_state = self.state_manager.get_combined_state()
+        # Publish joint states
+        joint_state_msg = JointState()
+        joint_state_msg.header.stamp = current_time.to_msg()
+        joint_state_msg.name = self.robot.get_joint_names()
+
+        # Convert numpy arrays to Python lists of floats
+        joint_pos = combined_state.get("joint_pos", [0.0] * 12)
+        joint_vel = combined_state.get("joint_vel", [0.0] * 12)
+
+        joint_state_msg.position = [float(x) for x in joint_pos]
+        joint_state_msg.velocity = [float(x) for x in joint_vel]
+
+        self.joint_state_pub.publish(joint_state_msg)
+
+        # Publish base transform
+        transform = TransformStamped()
+        transform.header.stamp = current_time.to_msg()
+        transform.header.frame_id = "world"
+        transform.child_frame_id = "base_link"
+
+        # Set translation from base_pos_w
+        transform.transform.translation.x = float(combined_state["base_pos_w"][0])
+        transform.transform.translation.y = float(combined_state["base_pos_w"][1])
+        transform.transform.translation.z = float(combined_state["base_pos_w"][2])
+
+        # Set rotation from base_quat
+        transform.transform.rotation.x = float(combined_state["base_quat"][1])
+        transform.transform.rotation.y = float(combined_state["base_quat"][2])
+        transform.transform.rotation.z = float(combined_state["base_quat"][3])
+        transform.transform.rotation.w = float(combined_state["base_quat"][0])
+
+        # Broadcast the transform
+        self.tf_broadcaster.sendTransform(transform)
+
+    def cleanup(self):
+        """Clean up resources."""
+        if hasattr(self, 'joystick_manager'):
+            self.joystick_manager.cleanup()

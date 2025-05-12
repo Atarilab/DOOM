@@ -1,11 +1,13 @@
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, TYPE_CHECKING
 
 import numpy as np
 from commands.command_manager import CommandManager
 from state_manager.obs_manager import ObservationManager
 
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
 
 class ControllerBase(ABC):
     """
@@ -17,13 +19,13 @@ class ControllerBase(ABC):
 
     def __init__(
         self,
-        mj_model_wrapper: "MjQuadRobotWrapper" = None,
+        robot: "RobotBase",
         configs: Dict[str, Any] = None,
     ):
         """
-        Initialize the base controller with model wrapper and configuration.
+        Initialize the base controller with robot and configuration.
 
-        :param mj_model_wrapper: MuJoCo model wrapper for additional computations
+        :param robot: Robot model wrapper for additional computations
         :param configs: Configuration dictionary containing robot-specific parameters
         """
         # Timing and synchronization
@@ -31,7 +33,8 @@ class ControllerBase(ABC):
         self._lock = threading.Lock()
 
         # Model and manager initialization
-        self.mj_model_wrapper = mj_model_wrapper
+        self.robot = robot
+        self.mj_model_wrapper = robot.mj_model_wrapper
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
         self.mode_manager = None  # Will be set by the mode manager when registering
@@ -41,7 +44,7 @@ class ControllerBase(ABC):
         self.active = False
 
         # Joint mapping and limits
-        self._setup_joint_limits(configs)
+        self._setup_joint_limits()
 
     def get_joystick_mappings(self) -> Dict[str, Callable[[], None]]:
         """
@@ -54,14 +57,10 @@ class ControllerBase(ABC):
         """
         return {}
 
-    def _setup_joint_limits(self, configs: Dict[str, Any]):
+    def _setup_joint_limits(self):
         """
         Set up joint position and effort limits with conservative safety margins.
-
-        :param configs: Configuration dictionary
         """
-        # Extract joint mappings
-
         # Position limits (excluding first 7 DOFs for floating base)
         lower_limits = self.mj_model_wrapper.model.jnt_range[1:, 0]
         upper_limits = self.mj_model_wrapper.model.jnt_range[1:, 1]
@@ -71,7 +70,7 @@ class ControllerBase(ABC):
         self.dof_pos_limit = np.array([lower_limits, upper_limits])
 
         # Effort limits
-        self.effort_limit = configs["robot_config"]["effort_limit"]
+        self.effort_limit = self.robot.effort_limit
 
         # Soft joint position limits
         joint_pos_mean = (lower_limits + upper_limits) / 2

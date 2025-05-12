@@ -1,7 +1,7 @@
 import os
 import threading
 import time
-from typing import Any, Dict, Callable
+from typing import Any, Dict, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -22,6 +22,8 @@ from state_manager.observations import (
 from tf2_ros import StaticTransformBroadcaster
 from utils.helpers import ObservationHistoryStorage
 
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
 
 class BaseRLLocomotionController(ControllerBase, Node):
     """
@@ -31,17 +33,17 @@ class BaseRLLocomotionController(ControllerBase, Node):
     with concurrent observation processing and policy inference.
     """
 
-    def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]):
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         """
         Initialize the RL locomotion controller with model and configuration.
 
-        :param mj_model_wrapper: Mujoco model wrapper for kinematics
+        :param robot: Robot model
         :param configs: Configuration dictionary
         """
         # Initialize ROS2 node
         Node.__init__(self, "rl_locomotion_controller")
         # Initialize controller base
-        ControllerBase.__init__(self, mj_model_wrapper=mj_model_wrapper, configs=configs)
+        ControllerBase.__init__(self, robot=robot, configs=configs)
 
         # Create static transform publisher for map frame
         self.tf_broadcaster = StaticTransformBroadcaster(self)

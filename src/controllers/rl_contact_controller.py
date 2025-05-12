@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -12,15 +12,18 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from controllers.rl_controller import BaseRLLocomotionController
 
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
+
 class RLLocomotionContactController(BaseRLLocomotionController):
     """
     Contact-conditioned RL Locomotion Controller
     Uses contact-explicit reinforcement learning policy
     """
 
-    def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any], interface: str = "sim"):
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         self.init_completed = False
-        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs, interface=interface)
+        super().__init__(robot=robot, configs=configs)
 
         # Initialize publshers for visualization
         self._init_publishers(configs)
@@ -341,20 +344,20 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             if elapsed >= self.command_duration:
                 self.command_start_time = current_time
                 self._resample_commands()
-                self._update_desired_ee_positions()
+                # self._update_desired_ee_positions()
                 self._update_action_scale()
                 
-                if self.visualize_feet_error:
+                if self.visualize["feet_error"]:
                     self.pub_feet_error()
                     self.pub_feet_error_norm()
 
-        if self.visualize_current_contact_locations:
+        if self.visualize["current_contact_locations"]:
             self.pub_current_contact_locations()
 
-        if self.visualize_foot_forces:
+        if self.visualize["foot_forces"]:
             self.pub_foot_forces(state["foot_forces"])
             self.pub_contact_status(state["foot_forces"])
-        if self.visualize_contact_plan:
+        if self.visualize["contact_plan"]:
             self.pub_contact_plan()
 
         # self.command_manager.logger.debug(f"Time left: {self.time_left:.2f} seconds")
@@ -606,7 +609,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         )
        
         
-        if self.visualize_future_feet_positions:
+        if self.visualize["future_feet_positions"]:
             self.pub_future_feet_positions()
     
     """
@@ -823,24 +826,20 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         Initialize publishers for visualization.
         """
         # Initialize visualization flags from configs
-        self.visualize_future_feet_positions = configs["controller_config"]["visualize"]["future_feet_positions"]
-        self.visualize_current_contact_locations = configs["controller_config"]["visualize"]["current_contact_locations"]
-        self.visualize_feet_error = configs["controller_config"]["visualize"]["feet_error"]
-        self.visualize_contact_plan = configs["controller_config"]["visualize"]["contact_plan"]
-        self.visualize_foot_forces = configs["controller_config"]["visualize"]["foot_forces"]
-        self.visualize_contact_status = configs["controller_config"]["visualize"]["contact_status"]
-        if self.visualize_future_feet_positions:
+        self.visualize = {key: configs["controller_config"]["visualize"][key] for key in configs["controller_config"]["visualize"]}
+        
+        if self.visualize["future_feet_positions"]:
             self.feet_trajectory_pub = self.create_publisher(MarkerArray, "feet_trajectories", 10)
-        if self.visualize_current_contact_locations:
+        if self.visualize["current_contact_locations"]:
             self.contact_locations_pub = self.create_publisher(MarkerArray, "contact_locations", 10)
-        if self.visualize_feet_error:
+        if self.visualize["feet_error"]:
             self.feet_error_pub = self.create_publisher(MarkerArray, "feet_error", 10)
             self.feet_error_norm_pub = self.create_publisher(Float32MultiArray, "feet_error_norm", 10)
-        if self.visualize_contact_plan:
+        if self.visualize["contact_plan"]:
             self.contact_plan_pub = self.create_publisher(Float32MultiArray, "contact_plan", 10)
-        if self.visualize_foot_forces:
+        if self.visualize["foot_forces"]:
             self.foot_forces_pub = self.create_publisher(Float32MultiArray, "foot_forces", 10)
-        if self.visualize_contact_status:
+        if self.visualize["contact_status"]:
             self.contact_status_pub = self.create_publisher(Float32MultiArray, "contact_status", 10)
             
     def pub_feet_error(self):
