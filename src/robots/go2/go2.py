@@ -1,11 +1,52 @@
 from robots.robot_base import RobotBase
 from utils.mj_wrapper import MjQuadRobotWrapper
+from controllers.stand_controller import (
+    StayDownController,
+    StandUpController,
+    StandDownController,
+)
+from controllers.rl_contact_controller import RLLocomotionContactController
+from controllers.rl_controller import RLLocomotionVelocityController
+
+from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
+
 
 class Go2(RobotBase):
-    def __init__(self):
+    """
+    This class provides robot-specific data and available controllers for the Go2 robot based on the desired task.
+    """
+    def __init__(self, task):
         super().__init__()
         self.mj_model_wrapper = MjQuadRobotWrapper(self.xml_path)
-        
+        self.low_cmd_msg = unitree_go_msg_dds__LowCmd_
+        self.low_cmd_msg_type = LowCmd_
+
+        if "contact" in task:
+            self.AVAILABLE_CONTROLLERS = {
+                "STAND": {
+                    "STAY_DOWN": StayDownController,
+                    "STAND_UP": StandUpController,
+                    "STAND_DOWN": StandDownController,
+                },
+                "LOCOMOTION": {
+                    "RL-CONTACT": RLLocomotionContactController,
+                },
+            }
+        elif "velocity" in task:
+            self.AVAILABLE_CONTROLLERS = {
+                "STAND": {
+                    "STAY_DOWN": StayDownController,
+                    "STAND_UP": StandUpController,
+                    "STAND_DOWN": StandDownController,
+                },
+                "LOCOMOTION": {
+                    "RL-VELOCITY": RLLocomotionVelocityController,
+                },
+            }
+        else:
+            self.AVAILABLE_CONTROLLERS = {}
+
         self.stand_down_joint_pos = [
             0.0473455,
             1.22187,
@@ -72,4 +113,3 @@ class Go2(RobotBase):
     @property
     def xml_path(self):
         return "/home/atari/workspace/DOOM/src/robots/go2/go2.xml"
-        

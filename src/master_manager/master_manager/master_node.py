@@ -4,15 +4,9 @@ import os
 import time
 
 import rclpy
-from controllers.rl_controller import RLLocomotionVelocityController
-from controllers.rl_contact_controller import RLLocomotionContactController
-from controllers.stand_controller import (
-    IdleController,
-    StanceController,
-    StandDownController,
-    StandUpController,
-    StayDownController,
-)
+
+from controllers.stand_controller import IdleController
+
 from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber, StateManager
 
@@ -31,7 +25,20 @@ node = None
 state_manager = None
 
 async def main_async(args=None):
-    """Main asynchronous entry point for robot controller."""
+    """
+    Asynchronous entry point for initializing and running the DOOM robot controller system.
+
+    - Parses command-line arguments for task selection, logging directory, and debug options.
+    - Sets up logging and configurations for the controller and the interface (sim/real).
+    - Initializes communication channels and state managers for robot state feedback.
+    - Instantiates the robot model and all controllers for supported operation modes.
+    - Registers all controllers and modes with the mode manager.
+    - Launches the low-level command publisher and the user interface.
+    - Starts the main event loop for concurrent robot control and UI operation.
+
+    Args:
+        args: Optional command-line arguments to override defaults.
+    """
     global node
     global state_manager
     rclpy.init(args=args)
@@ -57,6 +64,7 @@ async def main_async(args=None):
         # Initialize communication channel
         await initialize_channel(args.task, configs["robot_interface_config"], logger)
 
+        # Initialize state manager - responsible for handling ROS/DDS raw messages
         state_manager = StateManager(logger=logger)
 
         dds_low_state_sub = DDSStateSubscriber(
@@ -94,7 +102,6 @@ async def main_async(args=None):
             state_manager.add_subscriber("sports_mode_state", dds_sportsmode_state_sub)
         else:
             from vicon_receiver.msg import Position
-
             ros2_vicon_sub = ROS2StateSubscriber(
                 # topic="/vicon/Go2with6markers/Go2with6markers",
                 topic="/vicon/Go2/Go2",
@@ -105,39 +112,20 @@ async def main_async(args=None):
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
             
-        robot = Go2()
+        robot = Go2(task=args.task)
 
         # Create mode manager and register controllers
         mode_manager = ModeManager(logger=logger)
         mode_manager.register_mode("IDLE", {"default": IdleController(robot, configs)})
+        
+        # Register controllers available for the robot
+        controllers = getattr(robot, "AVAILABLE_CONTROLLERS")
+        for controller_type, controllers in controllers.items():
+            controller_dict = {}
+            for controller_name, controller_class in controllers.items():
+                controller_dict[controller_name] = controller_class(robot, configs)
+            mode_manager.register_mode(controller_type, controller_dict)
 
-        mode_manager.register_mode(
-            "STANDING",
-            {
-                "STAY_DOWN": StayDownController(robot, configs),
-                "STAND_UP": StandUpController(robot, configs),
-                "STAND_DOWN": StandDownController(robot, configs),
-            },
-        )
-
-        mode_manager.register_mode("STANCE", {"STANCE": StanceController(robot, configs)})
-        if "rl-contact" in args.task:
-            mode_manager.register_mode(
-                "RL-CONTACT",
-                {
-                    "STANCE": StanceController(robot, configs),
-                    "RL-CONTACT": RLLocomotionContactController(robot=robot, configs=configs),
-                },
-            )
-
-        if "rl-velocity" in args.task:
-            mode_manager.register_mode(
-                "RL-VELOCITY",
-                {
-                    "STANCE": StanceController(robot, configs),
-                    "RL-VELOCITY": RLLocomotionVelocityController(robot=robot, configs=configs),
-                },
-            )
         mode_manager.set_mode("IDLE")
 
         node = LowLevelCmdPublisher(
@@ -155,7 +143,7 @@ async def main_async(args=None):
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
-                spin_dt = 0.0001
+                spin_dt = 0.0005
                 last_spin_time = time.time()
 
                 while rclpy.ok():

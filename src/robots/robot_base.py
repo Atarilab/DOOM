@@ -39,4 +39,8 @@ class RobotBase(ABC):
     
     def get_joint_names(self) -> List[str]:
         return self.joint_names
+    
+    def get_num_joints(self) -> int:
+        return self.num_joints
+        
         

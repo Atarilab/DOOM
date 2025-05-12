@@ -95,7 +95,6 @@ class DDSStateSubscriber(StateSubscriber):
 
     def stop_subscription(self):
         """Stop DDS subscription."""
-        # Implementation depends on Unitree SDK's unsubscribe mechanism
         pass
 
     def get_latest_state(self) -> Dict[str, Any]:

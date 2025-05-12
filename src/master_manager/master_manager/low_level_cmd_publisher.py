@@ -9,13 +9,12 @@ from tf2_ros import TransformBroadcaster
 
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
-from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_
 from unitree_sdk2py.utils.crc import CRC
 
 # DOOM Imports
 from utils.ui_interface import ModeManager
 from utils.joystick_interface import JoystickManager
+
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
 
@@ -38,11 +37,11 @@ class LowLevelCmdPublisher(Node):
         self.logger = logger or logging.getLogger(__name__)
 
         # Control parameters
-        self.dt = dt  # This should be 0.005 for 200Hz control
+        self.dt = dt
         self.running_time = 0.0
 
         # DDS Publisher setup
-        self.dds_pub = ChannelPublisher("rt/lowcmd", LowCmd_)
+        self.dds_pub = ChannelPublisher("rt/lowcmd", self.robot.low_cmd_msg_type)
         self.dds_pub.Init()
 
         # Setup ROS publishers for visualization
@@ -56,7 +55,7 @@ class LowLevelCmdPublisher(Node):
         self.timer = self.create_timer(dt, self.low_level_cmd_callback, clock=self.get_clock())
 
         # Initialize command message
-        self.dds_cmd = unitree_go_msg_dds__LowCmd_()
+        self.dds_cmd = self.robot.low_cmd_msg()
         self.crc = CRC()
         self._init_cmd()
 
@@ -69,7 +68,7 @@ class LowLevelCmdPublisher(Node):
         self.dds_cmd.level_flag = 0xFF
         self.dds_cmd.gpio = 0
 
-        for i in range(20):
+        for i in range(self.robot.get_num_joints() + 8):
             motor_cmd = self.dds_cmd.motor_cmd[i]
             motor_cmd.mode = 0x01  # PMSM mode
             motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
@@ -113,7 +112,8 @@ class LowLevelCmdPublisher(Node):
 
             try:
                 # Update low-level command to the robot
-                for i in range(12):
+                num_joints = self.robot.get_num_joints()
+                for i in range(num_joints):
                     motor = motor_commands[f"motor_{i}"]
                     for attr in ["q", "kp", "dq", "kd", "tau"]:
                         setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
@@ -145,8 +145,8 @@ class LowLevelCmdPublisher(Node):
         joint_state_msg.name = self.robot.get_joint_names()
 
         # Convert numpy arrays to Python lists of floats
-        joint_pos = combined_state.get("joint_pos", [0.0] * 12)
-        joint_vel = combined_state.get("joint_vel", [0.0] * 12)
+        joint_pos = combined_state.get("joint_pos", [0.0] * self.robot.get_num_joints())
+        joint_vel = combined_state.get("joint_vel", [0.0] * self.robot.get_num_joints())
 
         joint_state_msg.position = [float(x) for x in joint_pos]
         joint_state_msg.velocity = [float(x) for x in joint_vel]

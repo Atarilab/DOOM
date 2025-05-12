@@ -295,8 +295,8 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     Uses contact-implicit reinforcement learning policy
     """
 
-    def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]):
-        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
 
         # Default velocity commands
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0])
