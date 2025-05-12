@@ -4,19 +4,18 @@ from typing import Optional, TYPE_CHECKING
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from state_manager.state_manager import StateManager
 from tf2_ros import TransformBroadcaster
 
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
 
-# DOOM Imports
-from utils.ui_interface import ModeManager
 from utils.joystick_interface import JoystickManager
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
+    from state_manager.state_manager import StateManager
+    from utils.ui_interface import ModeManager
 
 class LowLevelCmdPublisher(Node):
     """Manages low-level robot command publishing."""
@@ -25,8 +24,8 @@ class LowLevelCmdPublisher(Node):
         self,
         dt: float,
         robot: "RobotBase",
-        mode_manager: ModeManager,
-        state_manager: StateManager,
+        mode_manager: "ModeManager",
+        state_manager: "StateManager",
         logger: Optional[logging.Logger] = None,
     ):
         super().__init__("low_level_cmd")

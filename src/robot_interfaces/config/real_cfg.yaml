@@ -1,6 +1,0 @@
-model_path: "path/to/mujoco/model.xml"
-time_step: 0.01
-ros_node_name: "unitree_robot_node"
-topics:
-  command: "/robot/command"
-  state: "/robot/state"

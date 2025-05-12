@@ -24,9 +24,8 @@ async def main_async(args=None):
     - Sets up logging, communication channels (sim/real), and configurations for the controller.
     - Instantiates the robot model which has subscribers and controllers desired for the specified task.
     - Registers controllers desired for the specified task with the mode manager.
-    - Registers subscribers desired for the specified task to the state manager.
-    - Launches the low-level command publisher and the user interface.
-    - Starts the main event loop for concurrent robot control and UI operation.
+    - Registers subscribers desired for the specified task with the state manager.
+    - Launches the low-level command publisher and the user interface concurrently.
 
     Args:
         args: Optional command-line arguments to override defaults.
