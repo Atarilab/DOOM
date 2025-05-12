@@ -1,5 +1,7 @@
 ROBOT: "g1"
-SCENE: "scene_29dof_with_hand.xml"
+SCENE: "scene_23dof.xml"
+ELASTIC_BAND: True
+BASE_LINK: "torso_link"
 
 SIMULATION_DT: 0.005
 VIEWER_DT: 0.02  # 50 fps for viewer

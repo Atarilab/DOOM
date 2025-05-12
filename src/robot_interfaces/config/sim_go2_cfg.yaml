@@ -1,5 +1,7 @@
 ROBOT: "go2"
 SCENE: "scene.xml"
+ELASTIC_BAND: False
+BASE_LINK: "base_link"
 
 SIMULATION_DT: 0.005
 VIEWER_DT: 0.02  # 50 fps for viewer

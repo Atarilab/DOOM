@@ -33,7 +33,7 @@ def main():
     log_file = os.path.join("logs", args.log, f"{args.task}_simulate.log")
     logger = get_logger(f"{args.task}_simulate", log_file)
     logger.info(f"Task Name: {args.task}")
-    logger.info(f"Robot Config: {task_configs['robot_interface']}")
+    logger.info(f"Robot Config: {robot_interface_config}")
 
     # Initialize robot interface
     robot_interface = SimRobotInterface(robot_interface_config)

@@ -6,6 +6,7 @@ from threading import Thread
 
 import mujoco
 import mujoco.viewer
+import numpy as np
 from robot_interfaces.robot_interface_base import RobotInterfaceBase
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
 from utils.unitree_sdk2py_bridge import UnitreeSdk2Bridge
@@ -24,11 +25,22 @@ class SimRobotInterface(RobotInterfaceBase):
         # Set the timestep for the simulation
         self.mj_model.opt.timestep = config["SIMULATION_DT"]
 
-        # Initialize the viewer based on configuration
-        self.viewer = mujoco.viewer.launch_passive(self.mj_model, self.mj_data, show_left_ui=False, show_right_ui=False)
+        # Base link
+        self.base_link_name = config["BASE_LINK"]
 
-        # Running flag for thread control
-        self.running = True
+        # Elastic band
+        use_elastic_band = config.get("ELASTIC_BAND", False)
+        self.elastic_band = ElasticBand() if use_elastic_band else None
+        # Initialize the viewer based on configuration
+        viewer_kwargs = {
+            "show_left_ui": False,
+            "show_right_ui": False,
+        }
+        if use_elastic_band:
+            self.band_link = self.mj_model.body(self.base_link_name)
+            viewer_kwargs["key_callback"] = self.elastic_band.MujuocoKeyCallback
+
+        self.viewer = mujoco.viewer.launch_passive(self.mj_model, self.mj_data, **viewer_kwargs)
 
         self.dim_motor_sensor_ = 3 * self.mj_model.nu
         self.locker = threading.Lock()
@@ -50,7 +62,7 @@ class SimRobotInterface(RobotInterfaceBase):
 
     def _simulation_thread(self):
         ChannelFactoryInitialize(self.domain_id, self.interface)
-        unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data)
+        unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data, robot=self.robot_name)
 
         if self.print_scene_info:
             unitree.PrintSceneInformation()
@@ -59,6 +71,11 @@ class SimRobotInterface(RobotInterfaceBase):
             step_start = time.perf_counter()
 
             self.locker.acquire()
+
+            if self.elastic_band:
+                if self.elastic_band.enable:
+                    force = self.elastic_band.Advance(self.mj_data.qpos[:3], self.mj_data.qvel[:3])
+                    self.mj_data.xfrc_applied[self.band_link.id][:3] = force
 
             mujoco.mj_step(self.mj_model, self.mj_data)
 
@@ -74,7 +91,7 @@ class SimRobotInterface(RobotInterfaceBase):
         while self.viewer.is_running():
             self.locker.acquire()
             # Find the robot body (might need adjustment based on your exact model)
-            robot_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
+            robot_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, self.base_link_name)
             if robot_body_id >= 0:
                 robot_pos = self.mj_data.xpos[robot_body_id]
 
@@ -98,10 +115,40 @@ class SimRobotInterface(RobotInterfaceBase):
 
     def stop(self, logger):
         """Gracefully stop the simulation and viewer threads."""
-        self.running = False
         if self.viewer.is_running():
             self.viewer.close()
 
         self.viewer_thread.join()
         self.sim_thread.join()
         logger.info("Simulation exited successfully.")
+
+class ElasticBand:
+
+    def __init__(self):
+        self.stiffness = 200
+        self.damping = 100
+        self.point = np.array([0, 0, 3])
+        self.length = 0
+        self.enable = True
+
+    def Advance(self, x, dx):
+        """
+        Args:
+          δx: desired position - current position
+          dx: current velocity
+        """
+        δx = self.point - x
+        distance = np.linalg.norm(δx)
+        direction = δx / distance
+        v = np.dot(dx, direction)
+        f = (self.stiffness * (distance - self.length) - self.damping * v) * direction
+        return f
+
+    def MujuocoKeyCallback(self, key):
+        glfw = mujoco.glfw.glfw
+        if key == glfw.KEY_7:
+            self.length -= 0.1
+        if key == glfw.KEY_8:
+            self.length += 0.1
+        if key == glfw.KEY_9:
+            self.enable = not self.enable
