@@ -1,4 +1,5 @@
 ROBOT: "go2"
+SCENE: "scene.xml"
 
 SIMULATION_DT: 0.005
 VIEWER_DT: 0.02  # 50 fps for viewer

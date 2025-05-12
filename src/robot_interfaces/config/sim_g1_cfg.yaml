@@ -1,4 +1,5 @@
 ROBOT: "g1"
+SCENE: "scene_29dof_with_hand.xml"
 
 SIMULATION_DT: 0.005
 VIEWER_DT: 0.02  # 50 fps for viewer
