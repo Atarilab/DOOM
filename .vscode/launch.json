@@ -44,6 +44,28 @@
                 "ROS_VERSION": "2"
             },
             "justMyCode": false
+        },
+        {
+            "name": "Launch G1 Simulation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/simulate.py",
+            "args": [
+                "--task",
+                "rl-contact-sim-g1",
+                "--log",
+                "test"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/DOOM/src",
+            "preLaunchTask": "build_ros2_workspace",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/DOOM/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/DOOM/install/lib:${env:LD_LIBRARY_PATH}",
+                "ROS_DISTRO": "humble",
+                "ROS_VERSION": "2"
+            },
+            "justMyCode": false
         }
     ]
 }
