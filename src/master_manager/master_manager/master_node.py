@@ -39,6 +39,7 @@ async def main_async(args=None):
     parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run")
     parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
+    parser.add_argument("--enable-ui", action="store_true", help="Enable the Robot Control UI")
 
     args = parser.parse_args()
 
@@ -91,8 +92,11 @@ async def main_async(args=None):
         async def run():
             logger.info("Starting concurrent tasks")
 
-            # Create robot control UI
-            app_task = asyncio.create_task(RobotControlUI(mode_manager).run_async())
+            # Create robot control UI if not disabled
+            if args.enable_ui:
+                app_task = asyncio.create_task(RobotControlUI(mode_manager).run_async())
+            else:
+                app_task = None
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
@@ -113,7 +117,10 @@ async def main_async(args=None):
 
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
             try:
-                await asyncio.gather(app_task, node_task)
+                if app_task is not None:
+                    await asyncio.gather(app_task, node_task)
+                else:
+                    await node_task
             except asyncio.CancelledError:
                 logger.info("Tasks were cancelled")
                 raise

@@ -1,5 +1,5 @@
 ROBOT: "g1"
-SCENE: "scene_23dof.xml"
+SCENE: "scene_29dof.xml"
 ELASTIC_BAND: True
 BASE_LINK: "torso_link"
 

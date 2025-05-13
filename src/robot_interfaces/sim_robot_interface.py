@@ -40,6 +40,7 @@ class SimRobotInterface(RobotInterfaceBase):
             self.band_link = self.mj_model.body(self.base_link_name)
             viewer_kwargs["key_callback"] = self.elastic_band.MujuocoKeyCallback
 
+        # Set up viewer
         self.viewer = mujoco.viewer.launch_passive(self.mj_model, self.mj_data, **viewer_kwargs)
 
         self.dim_motor_sensor_ = 3 * self.mj_model.nu

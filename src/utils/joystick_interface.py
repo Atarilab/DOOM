@@ -145,22 +145,22 @@ class JoystickManager:
                 if time_since_last_command >= self._command_cooldown:
                     # Handle mode switching based on button combinations
                     if key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ == "IdleController":
-                        self.mode_manager.set_mode("STANDING", "STAY_DOWN")
+                        self.mode_manager.set_mode("STAND", "STAY_DOWN")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["start"]] and not self.active_controller.__class__.__name__ == "IdleController":
                         self.mode_manager.set_mode("IDLE")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in ["StayDownController", "StandDownController"]:
-                        self.mode_manager.set_mode("STANDING", "STAND_UP")
+                        self.mode_manager.set_mode("STAND", "STAND_UP")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["down"]] and self.active_controller.__class__.__name__ == "StandUpController":
-                        self.mode_manager.set_mode("STANDING", "STAND_DOWN")
+                        self.mode_manager.set_mode("STAND", "STAND_DOWN")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "StandDownController":
-                        self.mode_manager.set_mode("STANDING", "STAY_DOWN")
+                        self.mode_manager.set_mode("STAND", "STAY_DOWN")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "StandUpController":
-                        self.mode_manager.set_mode("RL-CONTACT", "RL-CONTACT")
+                        self.mode_manager.set_mode("LOCOMOTION", "RL-CONTACT")
                         self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available
