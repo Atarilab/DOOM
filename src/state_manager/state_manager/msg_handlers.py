@@ -224,3 +224,40 @@ def go2_sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.
     }
 
     return states
+
+def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
+    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
+
+    Args:
+        msg (Dict): Low Level State Unitree Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Low level states directly from the robot
+    """
+    # # Wait for the first message
+    # while msg["tick"] == 0:
+    #     time.sleep(0.01)
+
+    leg_joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    arm_waist_joint2motor_idx = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
+
+    # Extract motor states
+    motor_states = msg["motor_state"]
+    
+    # Extract IMU states
+    imu_state = msg["imu_state"]
+    
+    states = {
+        "mode_machine": msg["mode_machine"],
+        "joint_pos": [motor_states[i].q for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))],
+        "joint_vel": [motor_states[i].dq for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))],
+        "joint_tau_est": [motor_states[i].tau_est for i in leg_joint2motor_idx + arm_waist_joint2motor_idx],
+        "gyroscope": imu_state.gyroscope,
+        "accelerometer": imu_state.accelerometer,
+        "base_quat": imu_state.quaternion,
+        "base_rpy": imu_state.rpy,
+    }
+    
+    return states

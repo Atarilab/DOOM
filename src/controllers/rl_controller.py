@@ -258,7 +258,8 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 )
 
             # Clip the joint pos targets for safety
-            joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
+            if hasattr(self, "soft_dof_pos_limit"):
+                joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
             # Prepare motor commands
             self.cmd = {
