@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional, TYPE_CHECKING
 
 from geometry_msgs.msg import TransformStamped
@@ -9,6 +10,9 @@ from tf2_ros import TransformBroadcaster
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
+from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
+from unitree_sdk2py.go2.sport.sport_client import SportClient
+
 
 from utils.joystick_interface import JoystickManager
 
@@ -38,6 +42,32 @@ class LowLevelCmdPublisher(Node):
         # Control parameters
         self.dt = dt
         self.running_time = 0.0
+        
+        # Initialize command message
+        self.dds_cmd = self.robot.low_cmd_msg()
+        self.crc = CRC()
+        
+        if self.robot.name == "g1":
+            self.motor_mode = MotorMode.PR
+            self.mode_machine_ = 0
+            self._init_cmd_g1(self.mode_machine_, self.motor_mode)
+        elif self.robot.name == "go2":
+            self._init_cmd_go2()
+        
+        # self.sc = SportClient()  
+        # self.sc.SetTimeout(5.0)
+        # self.sc.Init()
+
+        # self.msc = MotionSwitcherClient()
+        # self.msc.SetTimeout(5.0)
+        # self.msc.Init()
+
+        # status, result = self.msc.CheckMode()
+        # while result['name']:
+        #     self.sc.StandDown()
+        #     self.msc.ReleaseMode()
+        #     status, result = self.msc.CheckMode()
+        #     time.sleep(1)
 
         # DDS Publisher setup
         self.dds_pub = ChannelPublisher("rt/lowcmd", self.robot.low_cmd_msg_type)
@@ -51,26 +81,30 @@ class LowLevelCmdPublisher(Node):
         self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, logger=self.logger)
 
         # Create timer for periodic command publishing
-        self.timer = self.create_timer(dt, self.low_level_cmd_callback, clock=self.get_clock())
-
-        # Initialize command message
-        self.dds_cmd = self.robot.low_cmd_msg()
-        self.crc = CRC()
-        self._init_cmd()
+        self.timer = self.create_timer(self.dt, self.low_level_cmd_callback, clock=self.get_clock())
 
         self.last_callback_time = self.get_clock().now().nanoseconds / 1e9
 
-    def _init_cmd(self):
-        """Initialize command message with default values."""
+    def _init_cmd_go2(self):
+        """Initialize command message with default values for go2."""
         self.dds_cmd.head[0] = 0xFE
         self.dds_cmd.head[1] = 0xEF
         self.dds_cmd.level_flag = 0xFF
         self.dds_cmd.gpio = 0
 
-        for i in range(self.robot.get_num_joints() + 8):
-            motor_cmd = self.dds_cmd.motor_cmd[i]
-            motor_cmd.mode = 0x01  # PMSM mode
-            motor_cmd.q = motor_cmd.kp = motor_cmd.dq = motor_cmd.kd = motor_cmd.tau = 0.0
+        for i in range(len(self.dds_cmd.motor_cmd)):
+            self.dds_cmd.motor_cmd[i].mode = 0x01  # PMSM mode
+            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
+
+    def _init_cmd_g1(self, mode_machine, mode_pr):
+        """Initialize command message with default values for g1."""
+        
+        self.dds_cmd.mode_machine = mode_machine
+        self.dds_cmd.mode_pr = mode_pr
+        
+        for i in range(len(self.dds_cmd.motor_cmd)):
+            self.dds_cmd.motor_cmd[i].mode = 1
+            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
@@ -120,8 +154,9 @@ class LowLevelCmdPublisher(Node):
                 self.logger.error(f"Error updating motor commands: {e}")
                 return
 
-            # Publish robot state for visualization
-            self.publish_robot_state()
+            if combined_state.get("base_pos_w", None) is not None:
+                # Publish robot state for visualization
+                self.publish_robot_state()
 
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
@@ -176,3 +211,8 @@ class LowLevelCmdPublisher(Node):
         """Clean up resources."""
         if hasattr(self, 'joystick_manager'):
             self.joystick_manager.cleanup()
+            
+            
+class MotorMode:
+    PR = 0  # Series Control for Pitch/Roll Joints
+    AB = 1  # Parallel Control for A/B Joints
