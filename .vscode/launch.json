@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Contact Sim debug",
+            "name": "Contact Sim Go2 debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/DOOM/src/master_manager/master_manager/master_node.py",
+            "program": "${workspaceFolder}/src/master_manager/master_manager/master_node.py",
             "args": [
                 "--task",
                 "rl-contact-sim-go2",
@@ -13,21 +13,21 @@
                 "test"
             ],
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/DOOM",
+            "cwd": "${workspaceFolder}",
             "preLaunchTask": "build_ros2_workspace",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/DOOM/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
-                "LD_LIBRARY_PATH": "${workspaceFolder}/DOOM/install/lib:${env:LD_LIBRARY_PATH}",
+                "PYTHONPATH": "${workspaceFolder}/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/install/lib:${env:LD_LIBRARY_PATH}",
                 "ROS_DISTRO": "humble",
                 "ROS_VERSION": "2"
             },
             "justMyCode": false
         },
         {
-            "name": "Contact Real debug",
+            "name": "Contact Real Go2 debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/DOOM/src/master_manager/master_manager/master_node.py",
+            "program": "${workspaceFolder}/src/master_manager/master_manager/master_node.py",
             "args": [
                 "--task",
                 "rl-contact-real-go2",
@@ -35,11 +35,55 @@
                 "test"
             ],
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/DOOM",
+            "cwd": "${workspaceFolder}",
             "preLaunchTask": "build_ros2_workspace",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/DOOM/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
-                "LD_LIBRARY_PATH": "${workspaceFolder}/DOOM/install/lib:${env:LD_LIBRARY_PATH}",
+                "PYTHONPATH": "${workspaceFolder}/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/install/lib:${env:LD_LIBRARY_PATH}",
+                "ROS_DISTRO": "humble",
+                "ROS_VERSION": "2"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Contact Sim G1 debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/master_manager/master_manager/master_node.py",
+            "args": [
+                "--task",
+                "rl-contact-sim-g1",
+                "--log",
+                "test"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build_ros2_workspace",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/install/lib:${env:LD_LIBRARY_PATH}",
+                "ROS_DISTRO": "humble",
+                "ROS_VERSION": "2"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Contact Real G1 debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/master_manager/master_manager/master_node.py",
+            "args": [
+                "--task",
+                "rl-contact-real-g1",
+                "--log",
+                "test"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "build_ros2_workspace",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/install/lib:${env:LD_LIBRARY_PATH}",
                 "ROS_DISTRO": "humble",
                 "ROS_VERSION": "2"
             },
@@ -57,11 +101,33 @@
                 "test"
             ],
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/DOOM/src",
+            "cwd": "${workspaceFolder}/src",
             "preLaunchTask": "build_ros2_workspace",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/DOOM/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
-                "LD_LIBRARY_PATH": "${workspaceFolder}/DOOM/install/lib:${env:LD_LIBRARY_PATH}",
+                "PYTHONPATH": "${workspaceFolder}/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/install/lib:${env:LD_LIBRARY_PATH}",
+                "ROS_DISTRO": "humble",
+                "ROS_VERSION": "2"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Launch Go2 Simulation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/simulate.py",
+            "args": [
+                "--task",
+                "rl-contact-sim-go2",
+                "--log",
+                "test"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "preLaunchTask": "build_ros2_workspace",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/install/lib/python3.10/site-packages:${env:PYTHONPATH}",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/install/lib:${env:LD_LIBRARY_PATH}",
                 "ROS_DISTRO": "humble",
                 "ROS_VERSION": "2"
             },
