@@ -33,12 +33,12 @@ class ControllerBase(ABC):
         self._lock = threading.Lock()
 
         # Model and manager initialization
-        self.robot = robot
-        self.mj_model_wrapper = robot.mj_model_wrapper
+        self.robot: "RobotBase" = robot
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
         self.mode_manager = None  # Will be set by the mode manager when registering
         self.configs = configs
+        self.control_dt = configs["controller_config"]["control_dt"]
         self.latest_state = None
         self.name = None
         self.active = False
@@ -62,8 +62,8 @@ class ControllerBase(ABC):
         Set up joint position and effort limits with conservative safety margins.
         """
         # Position limits (excluding first 7 DOFs for floating base)
-        lower_limits = self.mj_model_wrapper.model.jnt_range[1:, 0]
-        upper_limits = self.mj_model_wrapper.model.jnt_range[1:, 1]
+        lower_limits = self.robot.mj_model.model.jnt_range[1:, 0]
+        upper_limits = self.robot.mj_model.model.jnt_range[1:, 1]
 
         # Conservative limit settings
         soft_limit_factor = 0.97
@@ -105,14 +105,6 @@ class ControllerBase(ABC):
         if hasattr(self, "register_commands"):
             self.register_commands()
 
-    def set_start_time(self, start_time: float):
-        """
-        Record the start time for the current controller mode.
-
-        :param start_time: Controller start timestamp
-        """
-        self.start_time = start_time
-
     def update_state(self, state: Dict[str, Any]) -> None:
         """
         Sets the latest state received from the subscribers. This is done such that the mode-specific
@@ -141,19 +133,19 @@ class ControllerBase(ABC):
         """
         return np.clip(joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
 
-    @abstractmethod
-    def register_observations(self):
-        """
-        Register required observations for the specific controller mode.
-        Implementations should maintain a consistent observation order.
-        """
-        pass
-
     def register_commands(self):
         """
         Register commands for the controller.
         This method can be overridden by subclasses to register specific commands.
         By default, it does nothing.
+        """
+        pass
+    
+    @abstractmethod
+    def register_observations(self):
+        """
+        Register required observations for the specific controller mode.
+        Implementations should maintain a consistent observation order.
         """
         pass
 
@@ -166,5 +158,12 @@ class ControllerBase(ABC):
         :param desired_goal: Target state or task objective
         :return: Control torques for robot actuation
         """
-        if self.mj_model_wrapper is not None:
-            self.mj_model_wrapper.update(state)
+        if self.robot.mj_model is not None:
+            self.robot.mj_model.update(state)
+            
+    @abstractmethod
+    def set_mode(self):
+        """
+        When the mode is set, this method is called to initialize the controller and set up initial values.
+        """
+        pass

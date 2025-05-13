@@ -146,16 +146,16 @@ def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> to
     return torch.tensor([contact_time_left()])
 
 
-def base_height(states: Dict[str, Any], mj_model_wrapper: "MjQuadRobotWrapper") -> torch.Tensor:
+def base_height(states: Dict[str, Any], mj_model: "MjQuadRobotWrapper") -> torch.Tensor:
     """
     The height of the base of the robot.
     """
-    return torch.tensor([mj_model_wrapper.get_base_height_init_frame()])
+    return torch.tensor([mj_model.get_base_height_init_frame()])
 
 
 def ee_pos_rel_b(
     states: Dict[str, Any],
-    mj_model_wrapper: "MjQuadRobotWrapper",
+    mj_model: "MjQuadRobotWrapper",
     future_feet_positions_w: Callable,
     current_goal_idx: Callable,
 ) -> torch.Tensor:
@@ -164,7 +164,7 @@ def ee_pos_rel_b(
 
     Args:
         states: Dictionary of states
-        mj_model_wrapper: MuJoCo model wrapper
+        mj_model: MuJoCo model wrapper
         future_feet_positions_w: Function to get future feet positions
         current_goal_idx: Function to get current goal index
 
@@ -172,7 +172,7 @@ def ee_pos_rel_b(
         End-effector positions relative to base frame
     """
     # Get current feet positions in world frame
-    feet_positions_w = mj_model_wrapper.get_feet_positions_world()
+    feet_positions_w = mj_model.get_feet_positions_world()
     # Get future feet positions in init frame
     desired_feet_positions = future_feet_positions_w()[:, current_goal_idx()]
     # Compute the distance between the current feet positions and the desired feet positions
@@ -183,7 +183,7 @@ def ee_pos_rel_b(
 
 def contact_locations(
     states: Dict[str, Any],
-    mj_model_wrapper: "MjQuadRobotWrapper",
+    mj_model: "MjQuadRobotWrapper",
     future_feet_positions_init_frame: Callable,
     current_goal_idx: Callable,
     obs_horizon: int,
@@ -192,7 +192,7 @@ def contact_locations(
     The future desired feet positions in the base frame.
     """
     return torch.tensor(
-        mj_model_wrapper.transform_init_to_base(
+        mj_model.transform_init_to_base(
             future_feet_positions_init_frame()[:, current_goal_idx() : current_goal_idx() + obs_horizon]
         ).flatten()
     )
@@ -200,7 +200,7 @@ def contact_locations(
 
 def contact_locations_b(
     states: Dict[str, Any],
-    mj_model_wrapper: "MjQuadRobotWrapper",
+    mj_model: "MjQuadRobotWrapper",
     future_feet_positions_w: Callable,
     current_goal_idx: Callable,
     obs_horizon: int,
@@ -210,7 +210,7 @@ def contact_locations_b(
     """
     current_base_index = current_goal_idx() // 2
     return torch.tensor(
-        mj_model_wrapper.transform_world_to_base(
+        mj_model.transform_world_to_base(
             future_feet_positions_w()[:, current_goal_idx() : current_goal_idx() + obs_horizon].numpy()
         ).flatten()
     )

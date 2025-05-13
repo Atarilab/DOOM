@@ -15,6 +15,7 @@ class RobotBase(ABC):
     def __init__(self, task, logger):
         self.task = task
         self.logger = logger
+        self.mj_model = None
 
     @property
     @abstractmethod

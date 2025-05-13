@@ -3,17 +3,18 @@ from typing import Dict, TYPE_CHECKING
 from robots.robot_base import RobotBase
 from utils.mj_wrapper import MjQuadRobotWrapper
 from controllers.stand_controller import (
-    StayDownController,
-    StandUpController,
-    StandDownController,
+    Go2StayDownController,
+    Go2StandUpController,
+    Go2StandDownController,
 )
 from controllers.rl_contact_controller import RLLocomotionContactController
 from controllers.rl_controller import RLLocomotionVelocityController
 
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_, LowCmd_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as Go2LowState_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_ as Go2LowCmd_
 
-from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
+from state_manager.msg_handlers import go2_low_state_handler, go2_sport_mode_state_handler, go2_vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 
 if TYPE_CHECKING:
@@ -26,9 +27,9 @@ class Go2(RobotBase):
     def __init__(self, task, logger):
         super().__init__(task=task, logger=logger)
         
-        self.mj_model_wrapper = MjQuadRobotWrapper(self.xml_path)
+        self.mj_model = MjQuadRobotWrapper(self.xml_path)
         self.low_cmd_msg = unitree_go_msg_dds__LowCmd_
-        self.low_cmd_msg_type = LowCmd_
+        self.low_cmd_msg_type = Go2LowCmd_
         
         self.stand_down_joint_pos = [ 0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375, 0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375, ]
         self.stand_up_joint_pos = [ 0.1, 0.8, -1.5, -0.1, 0.8, -1.5, 0.1, 1.0, -1.5, -0.1, 1.0, -1.5, ]
@@ -76,9 +77,9 @@ class Go2(RobotBase):
         if "contact" in self.task:
             controllers = {
                 "STAND": {
-                    "STAY_DOWN": StayDownController,
-                    "STAND_UP": StandUpController,
-                    "STAND_DOWN": StandDownController,
+                    "STAY_DOWN": Go2StayDownController,
+                    "STAND_UP": Go2StandUpController,
+                    "STAND_DOWN": Go2StandDownController,
                 },
                 "LOCOMOTION": {
                     "RL-CONTACT": RLLocomotionContactController,
@@ -87,9 +88,9 @@ class Go2(RobotBase):
         elif "velocity" in self.task:
             controllers = {
                 "STAND": {
-                    "STAY_DOWN": StayDownController,
-                    "STAND_UP": StandUpController,
-                    "STAND_DOWN": StandDownController,
+                    "STAY_DOWN": Go2StayDownController,
+                    "STAND_UP": Go2StandUpController,
+                    "STAND_DOWN": Go2StandDownController,
                 },
                 "LOCOMOTION": {
                     "RL-VELOCITY": RLLocomotionVelocityController,
@@ -105,34 +106,18 @@ class Go2(RobotBase):
 
         dds_low_state_sub = DDSStateSubscriber(
             topic="rt/lowstate",
-            msg_type=LowState_,
-            handler_func=low_state_handler,
+            msg_type=Go2LowState_,
+            handler_func=go2_low_state_handler,
             logger=self.logger,
         )
         _subscribers["low_state"] = dds_low_state_sub
-        
-        # ros2_low_state_sub = ROS2StateSubscriber(
-        #     topic="/lowstate",
-        #     node_name="low_state",
-        #     msg_type=LowState,
-        #     handler_func=low_state_handler
-        # )
-        # state_manager.add_subscriber("low_state", ros2_low_state_sub)
 
         if "sim" in self.task:
-            #     ros2_sportsmode_state_sub = ROS2StateSubscriber(
-            #         topic="/sportmodestate",
-            #         node_name="sportmodestate",
-            #         msg_type=SportModeState,
-            #         handler_func=sport_mode_state_handler
-            #     )
-            #     state_manager.add_subscriber("sports_mode_state", ros2_sportsmode_state_sub)
             from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_
-
             dds_sportsmode_state_sub = DDSStateSubscriber(
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
-                handler_func=sport_mode_state_handler,
+                handler_func=go2_sport_mode_state_handler,
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
@@ -142,7 +127,7 @@ class Go2(RobotBase):
                 topic="/vicon/Go2/Go2",
                 node_name="vicon_state",
                 msg_type=Position,
-                handler_func=vicon_handler,
+                handler_func=go2_vicon_handler,
                 logger=self.logger,
             )
             _subscribers["vicon_state"] = ros2_vicon_sub

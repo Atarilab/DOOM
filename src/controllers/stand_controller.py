@@ -4,6 +4,7 @@ import numpy as np
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import starting_time
+import time
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
@@ -21,16 +22,20 @@ class IdleController(ControllerBase):
         Register observations for this controller.
         """
         pass
+    
+    def set_mode(self):
+        pass
 
     def compute_torques(self, state, desired_goal):
 
         # When Init Controller is called, set the init frame
-        self.mj_model_wrapper.set_initial_world_frame(state, caller=self.__class__.__name__)
+        if self.robot.mj_model is not None:
+            self.robot.mj_model.set_initial_world_frame(state, caller=self.__class__.__name__)
 
         super().compute_torques(state, desired_goal=desired_goal)
 
         cmd = {}
-        for i in range(12):
+        for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
                 "q": 0.0,
                 "kp": 0.0,
@@ -41,7 +46,7 @@ class IdleController(ControllerBase):
         return cmd
 
 
-class StandUpController(ControllerBase):
+class Go2StandUpController(ControllerBase):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
@@ -50,10 +55,13 @@ class StandUpController(ControllerBase):
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         super().__init__(robot=robot, configs=configs)
 
-        self.name = "StandUpController"
+        self.name = "Go2StandUpController"
         self.stand_up_joint_pos = robot.stand_up_joint_pos
         self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
+
+    def set_mode(self):
+        self.start_time = time.time()
 
     def register_observations(self):
         """
@@ -76,7 +84,7 @@ class StandUpController(ControllerBase):
         phase = np.tanh(time / 1.2)
 
         cmd = {}
-        for i in range(12):
+        for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
                 "q": phase * self.stand_up_joint_pos[i] + (1 - phase) * self.stand_down_joint_pos[i],
                 "kp": phase * 50.0 + (1 - phase) * 20.0,
@@ -87,7 +95,7 @@ class StandUpController(ControllerBase):
         return cmd
 
 
-class StandDownController(ControllerBase):
+class Go2StandDownController(ControllerBase):
     """
     The Stand Down Controller is used to sit down from the nominal position. It is an interpolation from the stand up joint positions
     to the stand down joint positions which are constants.
@@ -100,6 +108,9 @@ class StandDownController(ControllerBase):
         self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
 
+    def set_mode(self):
+        self.start_time = time.time()
+
     def register_observations(self):
         """
         Register observations for this controller.
@@ -121,7 +132,7 @@ class StandDownController(ControllerBase):
         time = obs["time"] - self.start_time
         phase = np.tanh(time / 1.2)
         cmd = {}
-        for i in range(12):
+        for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
                 "q": phase * self.stand_down_joint_pos[i] + (1 - phase) * self.stand_up_joint_pos[i],
                 "kp": phase * 50.0 + (1 - phase) * 20.0,
@@ -132,7 +143,7 @@ class StandDownController(ControllerBase):
         return cmd
 
 
-class StayDownController(ControllerBase):
+class Go2StayDownController(ControllerBase):
     """
     The Stay Down Controller is used to stay down close the ground, to prepare to get up.
     """
@@ -142,6 +153,9 @@ class StayDownController(ControllerBase):
 
         self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
+
+    def set_mode(self):
+        self.start_time = time.time()
 
     def register_observations(self):
         """
@@ -160,7 +174,7 @@ class StayDownController(ControllerBase):
         super().compute_torques(state, desired_goal=desired_goal)
 
         cmd = {}
-        for i in range(12):
+        for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
                 "q": self.stand_down_joint_pos[i],
                 "kp": 15.0,
@@ -171,7 +185,7 @@ class StayDownController(ControllerBase):
         return cmd
 
 
-class StanceController(ControllerBase):
+class Go2StanceController(ControllerBase):
     """
     The Stance Controller is used to stay in stance. Used to prepare to go to rest from other controllers.
     """
@@ -181,6 +195,9 @@ class StanceController(ControllerBase):
 
         self.stand_up_joint_pos = robot.stand_up_joint_pos
         self.start_time = 0.0
+
+    def set_mode(self):
+        self.start_time = time.time()
 
     def register_observations(self):
         """
@@ -198,7 +215,7 @@ class StanceController(ControllerBase):
     def compute_torques(self, state, desired_goal):
         super().compute_torques(state, desired_goal=desired_goal)
         cmd = {}
-        for i in range(12):
+        for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
                 "q": self.stand_up_joint_pos[i],
                 "kp": 15.0,

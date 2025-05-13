@@ -7,7 +7,7 @@ from utils.logger import logging
 from utils.math import quat_to_rotmatrix
 
 
-def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def go2_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
@@ -36,16 +36,16 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
     alpha = 0.5  # Adjust this value based on your needs (higher = more responsive)
     
     # Initialize or update filtered joint states
-    if not hasattr(low_state_handler, "filtered_joint_pos"):
-        low_state_handler.filtered_joint_pos = joint_positions
-        low_state_handler.filtered_joint_vel = joint_velocities
-        low_state_handler.filtered_joint_acc = joint_accelerations
-        low_state_handler.filtered_joint_tau = joint_tau_est
+    if not hasattr(go2_low_state_handler, "filtered_joint_pos"):
+        go2_low_state_handler.filtered_joint_pos = joint_positions
+        go2_low_state_handler.filtered_joint_vel = joint_velocities
+        go2_low_state_handler.filtered_joint_acc = joint_accelerations
+        go2_low_state_handler.filtered_joint_tau = joint_tau_est
     else:
-        low_state_handler.filtered_joint_pos = alpha * joint_positions + (1 - alpha) * low_state_handler.filtered_joint_pos
-        low_state_handler.filtered_joint_vel = alpha * joint_velocities + (1 - alpha) * low_state_handler.filtered_joint_vel
-        low_state_handler.filtered_joint_acc = alpha * joint_accelerations + (1 - alpha) * low_state_handler.filtered_joint_acc
-        low_state_handler.filtered_joint_tau = alpha * joint_tau_est + (1 - alpha) * low_state_handler.filtered_joint_tau
+        go2_low_state_handler.filtered_joint_pos = alpha * joint_positions + (1 - alpha) * go2_low_state_handler.filtered_joint_pos
+        go2_low_state_handler.filtered_joint_vel = alpha * joint_velocities + (1 - alpha) * go2_low_state_handler.filtered_joint_vel
+        go2_low_state_handler.filtered_joint_acc = alpha * joint_accelerations + (1 - alpha) * go2_low_state_handler.filtered_joint_acc
+        go2_low_state_handler.filtered_joint_tau = alpha * joint_tau_est + (1 - alpha) * go2_low_state_handler.filtered_joint_tau
     
     # Extract and filter IMU data
     try:        
@@ -64,16 +64,16 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         ])
         
         # Filter gyroscope data
-        if not hasattr(low_state_handler, "filtered_gyro"):
-            low_state_handler.filtered_gyro = gyroscope
+        if not hasattr(go2_low_state_handler, "filtered_gyro"):
+            go2_low_state_handler.filtered_gyro = gyroscope
         else:
-            low_state_handler.filtered_gyro = alpha * gyroscope + (1 - alpha) * low_state_handler.filtered_gyro
+            go2_low_state_handler.filtered_gyro = alpha * gyroscope + (1 - alpha) * go2_low_state_handler.filtered_gyro
             
         # Filter accelerometer data
-        if not hasattr(low_state_handler, "filtered_acc"):
-            low_state_handler.filtered_acc = accelerometer
+        if not hasattr(go2_low_state_handler, "filtered_acc"):
+            go2_low_state_handler.filtered_acc = accelerometer
         else:
-            low_state_handler.filtered_acc = alpha * accelerometer + (1 - alpha) * low_state_handler.filtered_acc
+            go2_low_state_handler.filtered_acc = alpha * accelerometer + (1 - alpha) * go2_low_state_handler.filtered_acc
             
         # Get and filter quaternion
         quaternion = np.array([
@@ -84,17 +84,17 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         ])
         
         # Filter quaternion
-        if not hasattr(low_state_handler, "filtered_quat"):
-            low_state_handler.filtered_quat = quaternion
+        if not hasattr(go2_low_state_handler, "filtered_quat"):
+            go2_low_state_handler.filtered_quat = quaternion
         else:
             # For quaternions, we need to ensure the filtered result is still a valid quaternion
             # We'll use spherical linear interpolation (slerp) for quaternion filtering
-            dot_product = np.dot(low_state_handler.filtered_quat, quaternion)
+            dot_product = np.dot(go2_low_state_handler.filtered_quat, quaternion)
             if dot_product < 0:
                 quaternion = -quaternion  # Ensure shortest path
-            low_state_handler.filtered_quat = alpha * quaternion + (1 - alpha) * low_state_handler.filtered_quat
+            go2_low_state_handler.filtered_quat = alpha * quaternion + (1 - alpha) * go2_low_state_handler.filtered_quat
             # Normalize the filtered quaternion
-            low_state_handler.filtered_quat = low_state_handler.filtered_quat / np.linalg.norm(low_state_handler.filtered_quat)
+            go2_low_state_handler.filtered_quat = go2_low_state_handler.filtered_quat / np.linalg.norm(go2_low_state_handler.filtered_quat)
             
     except (AttributeError, IndexError) as e:
         if logger:
@@ -103,27 +103,27 @@ def low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = N
         gyroscope = np.zeros(3)
         accelerometer = np.zeros(3)
         quaternion = np.array([1.0, 0.0, 0.0, 0.0])  # Identity quaternion
-        low_state_handler.filtered_gyro = np.zeros(3)
-        low_state_handler.filtered_acc = np.zeros(3)
-        low_state_handler.filtered_quat = quaternion
+        go2_low_state_handler.filtered_gyro = np.zeros(3)
+        go2_low_state_handler.filtered_acc = np.zeros(3)
+        go2_low_state_handler.filtered_quat = quaternion
 
     # Construct and return the parsed states dictionary
     states = {
-        "joint_pos": low_state_handler.filtered_joint_pos,
-        "joint_vel": low_state_handler.filtered_joint_vel,
-        "joint_acc": low_state_handler.filtered_joint_acc,
-        "joint_tau_est": low_state_handler.filtered_joint_tau,
+        "joint_pos": go2_low_state_handler.filtered_joint_pos,
+        "joint_vel": go2_low_state_handler.filtered_joint_vel,
+        "joint_acc": go2_low_state_handler.filtered_joint_acc,
+        "joint_tau_est": go2_low_state_handler.filtered_joint_tau,
         "foot_forces": foot_forces,
         "foot_forces_est": foot_forces_est,
-        "gyroscope": low_state_handler.filtered_gyro,
-        "accelerometer": low_state_handler.filtered_acc,
-        "base_quat": low_state_handler.filtered_quat,
+        "gyroscope": go2_low_state_handler.filtered_gyro,
+        "accelerometer": go2_low_state_handler.filtered_acc,
+        "base_quat": go2_low_state_handler.filtered_quat,
     }
 
     return states
 
 
-def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None):
+def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None):
     """
     Vicon msg handler with velocity estimation.
 
@@ -144,8 +144,8 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     z_offset = 0.0
 
     # Singleton pattern for velocity estimator
-    if not hasattr(vicon_handler, "velocity_estimator"):
-        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
+    if not hasattr(go2_vicon_handler, "velocity_estimator"):
+        go2_vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
 
     # Base Position (in m)
     base_pos = np.array(
@@ -167,33 +167,33 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     )
     
     # Filter parameters
-    alpha = 0.5  # Same alpha as in low_state_handler for consistency
+    alpha = 0.5  # Same alpha as in go2_low_state_handler for consistency
     
     # Initialize or update filtered quaternion
-    if not hasattr(vicon_handler, "filtered_quat"):
-        vicon_handler.filtered_quat = base_quat
+    if not hasattr(go2_vicon_handler, "filtered_quat"):
+        go2_vicon_handler.filtered_quat = base_quat
     else:
         # For quaternions, we need to ensure the filtered result is still a valid quaternion
         # We'll use spherical linear interpolation (slerp) for quaternion filtering
-        dot_product = np.dot(vicon_handler.filtered_quat, base_quat)
+        dot_product = np.dot(go2_vicon_handler.filtered_quat, base_quat)
         if dot_product < 0:
             base_quat = -base_quat  # Ensure shortest path
-        vicon_handler.filtered_quat = alpha * base_quat + (1 - alpha) * vicon_handler.filtered_quat
+        go2_vicon_handler.filtered_quat = alpha * base_quat + (1 - alpha) * go2_vicon_handler.filtered_quat
         # Normalize the filtered quaternion
-        vicon_handler.filtered_quat = vicon_handler.filtered_quat / np.linalg.norm(vicon_handler.filtered_quat)
+        go2_vicon_handler.filtered_quat = go2_vicon_handler.filtered_quat / np.linalg.norm(go2_vicon_handler.filtered_quat)
 
     # Estimate velocities using EKF
     current_timestamp = time.time()
-    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(base_pos, vicon_handler.filtered_quat, current_timestamp, logger)
+    lin_vel_w, ang_vel_w = go2_vicon_handler.velocity_estimator.update(base_pos, go2_vicon_handler.filtered_quat, current_timestamp, logger)
 
     # Convert quaternion to a rotation matrix
-    rotation_matrix = quat_to_rotmatrix(vicon_handler.filtered_quat, order="wxyz")
+    rotation_matrix = quat_to_rotmatrix(go2_vicon_handler.filtered_quat, order="wxyz")
     # Transform linear velocity to base frame
     lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w)
 
     states = {
         "base_pos_w": base_pos,
-        'base_quat': vicon_handler.filtered_quat,
+        'base_quat': go2_vicon_handler.filtered_quat,
         "lin_vel_w": lin_vel_w.tolist(),  # Linear velocities in world frame
         "lin_vel_b": lin_vel_b,
     }
@@ -201,7 +201,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     return states
 
 
-def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def go2_sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:
@@ -212,8 +212,8 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
         Dict: High level states directly from the robot
     """
     # Singleton pattern for velocity estimator
-    if not hasattr(sport_mode_state_handler, "velocity_estimator"):
-        sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
+    if not hasattr(go2_sport_mode_state_handler, "velocity_estimator"):
+        go2_sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
     base_pos_w = msg["position"]
     base_quat = msg["imu_state"].quaternion

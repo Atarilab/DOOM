@@ -203,7 +203,6 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         self.goal_completion_counter = 0
 
         self.init_completed = True
-        self.active = True
         
     def register_observations(self):
         """
@@ -230,7 +229,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             ObsTerm(
                 contact_locations_b,
                 params={
-                    "mj_model_wrapper": self.mj_model_wrapper,
+                    "mj_model": self.robot.mj_model,
                     "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "obs_horizon": 2,
                     "current_goal_idx": lambda: self.current_goal_idx,
@@ -267,7 +266,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             ObsTerm(
                 ee_pos_rel_b,
                 params={
-                    "mj_model_wrapper": self.mj_model_wrapper,
+                    "mj_model": self.robot.mj_model,
                     "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
@@ -317,7 +316,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             self.pending_step_size = 0.0
             self.pending_lateral_pos = 0.0
 
-        base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
+        base_pos_w = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32)
         self.lateral_pos = base_pos_w[1]
         self.generate_future_feet_positions(pos=base_pos_w)
 
@@ -329,8 +328,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         :param desired_goal: Desired goal state (not used in this implementation)
         :return: Motor commands dictionary
         """
-        if self.mj_model_wrapper is not None:
-            self.mj_model_wrapper.update(state)
+        if self.robot.mj_model is not None:
+            self.robot.mj_model.update(state)
 
         # Update the latest state for the observation processing thread
         with self._lock:
@@ -528,7 +527,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
                 
                 # Safety mechanism, if the goal index exceeds the horizon length, reset the goal index and replan feet sequences
                 if self.current_goal_idx >= self.horizon_length:
-                    base_pos_w = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
+                    base_pos_w = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32)
                     self.generate_future_feet_positions(pos=base_pos_w)
                         
             # if self.current_gait == "jump" and self.current_contact_plan[0].sum() == 4:
@@ -573,7 +572,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # Check if pos is a tensor of zeros (default case)
         if torch.all(pos == 0):
             # Get the robot's current position
-            robot_pos = torch.tensor(self.mj_model_wrapper.get_body_position_world("base_link"), dtype=torch.float32)
+            robot_pos = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32)
             # Use only the x-dimension of the robot's position
             pos = torch.tensor([robot_pos[0],self.lateral_pos, 0.0], dtype=torch.float32)
 
@@ -604,7 +603,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         # if self.current_gait in ["pace"]:
         #     self.future_feet_positions_w[[0, 3], :, 0] += 0.12 * direction_x
         #     self.future_feet_positions_w[[0, 3], :, 1] += 0.12 * direction_y
-        self.future_feet_positions_init_frame = self.mj_model_wrapper.transform_world_to_init_frame(
+        self.future_feet_positions_init_frame = self.robot.mj_model.transform_world_to_init_frame(
             self.future_feet_positions_w.numpy()
         )
        
@@ -858,7 +857,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             ]
 
             # Get feet positions from the state manager
-            feet_errors = self.mj_model_wrapper.get_feet_positions_world() - self.future_feet_positions_w[:, self.current_goal_idx].numpy()
+            feet_errors = self.robot.mj_model.get_feet_positions_world() - self.future_feet_positions_w[:, self.current_goal_idx].numpy()
             if feet_errors is not None:
                 for i, (name, color) in enumerate(zip(feet_names, colors)):
                     marker = Marker()
@@ -1018,7 +1017,7 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         """
         try:
             # Calculate error norms directly
-            feet_errors = np.linalg.norm(self.mj_model_wrapper.get_feet_positions_world() - self.future_feet_positions_w[:, self.current_goal_idx].numpy(), axis=-1)
+            feet_errors = np.linalg.norm(self.robot.mj_model.get_feet_positions_world() - self.future_feet_positions_w[:, self.current_goal_idx].numpy(), axis=-1)
             
             # Create Float32MultiArray message
             msg = Float32MultiArray()

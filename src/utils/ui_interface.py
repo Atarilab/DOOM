@@ -86,9 +86,6 @@ class ModeManager:
 
         if controller and hasattr(controller, "set_mode"):
             controller.set_mode()
-            
-        if hasattr(controller, "set_start_time"):
-            controller.set_start_time(time.time())
 
         else:
             self.logger.debug(f"Mode set to: {self._current_mode}")

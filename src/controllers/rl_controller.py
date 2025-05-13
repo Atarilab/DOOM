@@ -62,7 +62,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
         transform.transform.rotation.z = 0.0
         self.tf_broadcaster.sendTransform(transform)
 
-        self.active = False
         # Load and prepare policy model
         self._load_policy_model(configs)
 
@@ -155,7 +154,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 with self._lock:
                     current_state = self.latest_state
 
-                if current_state is None or not self.active:
+                if current_state is None:
                     time.sleep(0.01)  # Prevent busy waiting
                     continue
 
@@ -192,9 +191,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
         while True:
             try:
-                if not self.active:
-                    time.sleep(0.01)
-                    continue
 
                 # Calculate time since last iteration
                 current_time = time.time()
@@ -273,7 +269,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                     "kd": self.Kd,
                     "tau": 0.0,
                 }
-                for i in range(12)
+                for i in range(self.robot.num_joints)
             }
 
             # Track command preparation time
@@ -285,8 +281,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
             print(f"Command preparation error: {e}")
             return self.cmd
 
-    def set_mode(self):
-        self.active = True
 
 
 class RLLocomotionVelocityController(BaseRLLocomotionController):

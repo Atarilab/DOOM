@@ -150,16 +150,16 @@ class JoystickManager:
                     elif key_state[self.key_map["start"]] and not self.active_controller.__class__.__name__ == "IdleController":
                         self.mode_manager.set_mode("IDLE")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in ["StayDownController", "StandDownController"]:
+                    elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in ["Go2StayDownController", "Go2StandDownController"]:
                         self.mode_manager.set_mode("STAND", "STAND_UP")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["down"]] and self.active_controller.__class__.__name__ == "StandUpController":
+                    elif key_state[self.key_map["down"]] and self.active_controller.__class__.__name__ == "Go2StandUpController":
                         self.mode_manager.set_mode("STAND", "STAND_DOWN")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "StandDownController":
+                    elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "Go2StandDownController":
                         self.mode_manager.set_mode("STAND", "STAY_DOWN")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "StandUpController":
+                    elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "Go2StandUpController":
                         self.mode_manager.set_mode("LOCOMOTION", "RL-CONTACT")
                         self._last_command_time = current_time
 
