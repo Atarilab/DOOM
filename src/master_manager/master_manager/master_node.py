@@ -7,7 +7,7 @@ import argparse
 # DOOM Imports
 from controllers.stand_controller import IdleController
 from master_manager.low_level_cmd_publisher import LowLevelCmdPublisher
-from robots.go2.go2 import Go2
+from robots import resolve_robot
 from state_manager.state_manager import StateManager
 from utils.ui_interface import ModeManager, RobotControlUI
 from utils.initialization import initialize_channel, initialize_robot_controller
@@ -59,8 +59,8 @@ async def main_async(args=None):
         # Initialize state manager - responsible for handling ROS/DDS raw messages
         state_manager = StateManager(logger=logger)
         
-        # Initialize robot model
-        robot = Go2(task=args.task, logger=logger)
+        # Automatically resolve robot class from task name
+        robot = resolve_robot(args.task, logger)
         
         # Add subscribers desired for the specified task to state manager from robot model
         for name, subscriber in robot.subscribers.items():
