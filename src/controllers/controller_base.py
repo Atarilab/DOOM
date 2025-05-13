@@ -70,7 +70,11 @@ class ControllerBase(ABC):
         self.dof_pos_limit = np.array([lower_limits, upper_limits])
 
         # Effort limits
-        self.effort_limit = self.robot.effort_limit
+        # TODO: Fetch from mj_model
+        try:
+            self.effort_limit = self.robot.effort_limit
+        except NotImplementedError:
+            self.effort_limit = np.inf
 
         # Soft joint position limits
         joint_pos_mean = (lower_limits + upper_limits) / 2

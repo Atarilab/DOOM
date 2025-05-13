@@ -1,3 +1,3 @@
-from .mj_robot import MjQuadRobotWrapper
+from .mj_robot import MjRobotWrapper
 
-__all__ = ["MjQuadRobotWrapper"]
+__all__ = ["MjRobotWrapper"]

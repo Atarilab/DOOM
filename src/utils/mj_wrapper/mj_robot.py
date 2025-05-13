@@ -2,14 +2,13 @@ from typing import Dict, List, Optional, Tuple
 
 import mujoco
 import numpy as np
-from numpy.typing import NDArray
 from utils.math import quat_to_rotmatrix
 
 
-class MjQuadRobotWrapper:
+class MjRobotWrapper:
     """MuJoCo wrapper for quadruped robot simulation and computation."""
 
-    def __init__(self, xml_path: str):
+    def __init__(self, xml_path: str, feet_names: List[str]):
         """
         Initialize MuJoCo model from XML.
 
@@ -29,15 +28,15 @@ class MjQuadRobotWrapper:
         self.joint_names = {}
         for i in range(self.model.njnt):
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, i)
-            if name:
+            if name and name != "floating_base_joint":
                 self.joint_names[name] = i
+
+        self.num_joints = len(self.joint_names)
 
         # Debug print to see what bodies are available
         print(f"Available bodies: {list(self.body_names.keys())}")
 
-        # Cache feet body indices
-        self.feet_bodies = ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
-        self.feet_indices = [self.body_names.get(name, -1) for name in self.feet_bodies]
+        self.feet_indices = [self.body_names.get(name, -1) for name in feet_names]
 
         # Initialize world frame transform
         self._init_world_frame = False
@@ -99,8 +98,8 @@ class MjQuadRobotWrapper:
                 self.data.qpos[0:3] = state["base_pos_w"]
             if "base_quat" in state:
                 self.data.qpos[3:7] = state["base_quat"]
-        self.data.qpos[-12:] = q
-        self.data.qvel[-12:] = v
+        self.data.qpos[-self.num_joints:] = q
+        self.data.qvel[-self.num_joints:] = v
 
         mujoco.mj_forward(self.model, self.data)
 

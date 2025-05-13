@@ -1,7 +1,7 @@
 from typing import Dict, TYPE_CHECKING
 
 from robots.robot_base import RobotBase
-from utils.mj_wrapper import MjQuadRobotWrapper
+from utils.mj_wrapper import MjRobotWrapper
 from controllers.stand_controller import (
     G1StayUpController,
     G1StandUpController,
@@ -23,7 +23,7 @@ class G1(RobotBase):
     """
     def __init__(self, task, logger):
         super().__init__(task=task, logger=logger)
-
+        self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
         self.low_cmd_msg = unitree_hg_msg_dds__LowCmd_
         self.low_cmd_msg_type = G1LowCmd_
         
@@ -33,7 +33,11 @@ class G1(RobotBase):
     @property
     def name(self):
         return "G1"
-
+    
+    @property
+    def feet_names(self):
+        return ["left_ankle_roll_link", "right_ankle_roll_link"]
+    
     # TODO: Fetch from mj_model
     @property
     def joint_names(self):
@@ -79,11 +83,11 @@ class G1(RobotBase):
 
     @property
     def effort_limit(self):
-        return 23.5
+        raise NotImplementedError
 
     @property
     def xml_path(self):
-        return "/home/atari/workspace/DOOM/src/robots/g1/g1.xml"
+        return "/home/atari/workspace/DOOM/src/robots/g1/g1_29dof.xml"
     
     @property
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":

@@ -1,7 +1,7 @@
 from typing import Dict, TYPE_CHECKING
 
 from robots.robot_base import RobotBase
-from utils.mj_wrapper import MjQuadRobotWrapper
+from utils.mj_wrapper import MjRobotWrapper
 from controllers.stand_controller import (
     Go2StayDownController,
     Go2StandUpController,
@@ -26,8 +26,7 @@ class Go2(RobotBase):
     """
     def __init__(self, task, logger):
         super().__init__(task=task, logger=logger)
-        
-        self.mj_model = MjQuadRobotWrapper(self.xml_path)
+        self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
         self.low_cmd_msg = unitree_go_msg_dds__LowCmd_
         self.low_cmd_msg_type = Go2LowCmd_
         
@@ -37,6 +36,10 @@ class Go2(RobotBase):
     @property
     def name(self):
         return "Go2"
+    
+    @property
+    def feet_names(self):
+        return ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
 
     @property
     def joint_names(self):

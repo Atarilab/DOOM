@@ -11,7 +11,7 @@ from utils.helpers import reorder_robot_states
 from utils.math import GRAVITY_DIR, quat_rotate_inverse
 
 if TYPE_CHECKING:
-    from utils.mj_wrapper.mj_robot import MjQuadRobotWrapper
+    from utils.mj_wrapper.mj_robot import MjRobotWrapper
 
 
 def joint_pos(states: Dict[str, Any]) -> torch.Tensor:
@@ -146,7 +146,7 @@ def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> to
     return torch.tensor([contact_time_left()])
 
 
-def base_height(states: Dict[str, Any], mj_model: "MjQuadRobotWrapper") -> torch.Tensor:
+def base_height(states: Dict[str, Any], mj_model: "MjRobotWrapper") -> torch.Tensor:
     """
     The height of the base of the robot.
     """
@@ -155,7 +155,7 @@ def base_height(states: Dict[str, Any], mj_model: "MjQuadRobotWrapper") -> torch
 
 def ee_pos_rel_b(
     states: Dict[str, Any],
-    mj_model: "MjQuadRobotWrapper",
+    mj_model: "MjRobotWrapper",
     future_feet_positions_w: Callable,
     current_goal_idx: Callable,
 ) -> torch.Tensor:
@@ -183,7 +183,7 @@ def ee_pos_rel_b(
 
 def contact_locations(
     states: Dict[str, Any],
-    mj_model: "MjQuadRobotWrapper",
+    mj_model: "MjRobotWrapper",
     future_feet_positions_init_frame: Callable,
     current_goal_idx: Callable,
     obs_horizon: int,
@@ -200,7 +200,7 @@ def contact_locations(
 
 def contact_locations_b(
     states: Dict[str, Any],
-    mj_model: "MjQuadRobotWrapper",
+    mj_model: "MjRobotWrapper",
     future_feet_positions_w: Callable,
     current_goal_idx: Callable,
     obs_horizon: int,
