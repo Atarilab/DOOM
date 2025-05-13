@@ -88,6 +88,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 
 ## TODO
 - [ ] Implement simple stand up, stand down controllers
+- [ ] Test Humanoid Velocity Locomotion Policy
 - [ ] Create table with box env
 - [ ] Test contact bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
