@@ -87,7 +87,12 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
-- [ ] Add support for AlienGo/G1/Allegro
+- [ ] Implement simple stand up, stand down controllers
+- [ ] Create table with box env
+- [ ] Test contact bimanual manipulation policy
+- [ ] Add support for AlienGo/Allegro
+- [x] Add G1 in sim
+- [x] Optional Terminal UI Interface
 - [x] Test RViz on the real robot for contact-conditioned policy (stance, trot in place)
 - [x] Implement joystick control for controller-specific commands
 - [x] Implement joystick control for switching between common modes
