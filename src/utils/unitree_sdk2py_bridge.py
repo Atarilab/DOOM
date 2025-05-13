@@ -57,13 +57,13 @@ class UnitreeSdk2Bridge:
         self.low_state_puber.Init()
         self.lowStateThread = RecurrentThread(interval=self.dt, target=self.PublishLowState, name="sim_lowstate")
         self.lowStateThread.Start()
-        if self.robot == "go2":
-            self.high_state = unitree_go_msg_dds__SportModeState_()
-            self.high_state_puber = ChannelPublisher(TOPIC_HIGHSTATE, SportModeState_)
-            self.high_state_puber.Init()
-            self.HighStateThread = RecurrentThread(interval=self.dt, target=self.PublishHighState, name="sim_highstate")
-            self.HighStateThread.Start()
+        self.high_state = unitree_go_msg_dds__SportModeState_()
+        self.high_state_puber = ChannelPublisher(TOPIC_HIGHSTATE, SportModeState_)
+        self.high_state_puber.Init()
+        self.HighStateThread = RecurrentThread(interval=self.dt, target=self.PublishHighState, name="sim_highstate")
+        self.HighStateThread.Start()
 
+        if self.robot == "go2":
             self.wireless_controller = unitree_go_msg_dds__WirelessController_()
             self.wireless_controller_puber = ChannelPublisher(TOPIC_WIRELESS_CONTROLLER, WirelessController_)
             self.wireless_controller_puber.Init()
