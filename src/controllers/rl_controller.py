@@ -251,7 +251,8 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
             # Clip the joint pos targets for safety
             if hasattr(self, "soft_dof_pos_limit"):
-                joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
+                joint_indices = self.policy_joint_indices if hasattr(self, "policy_joint_indices") else None
+                joint_pos_targets = self._clip_dof_pos(joint_pos_targets, joint_indices=joint_indices)
 
             return joint_pos_targets
         except Exception as e:

@@ -128,13 +128,16 @@ class ControllerBase(ABC):
         """
         return np.clip(effort, -self.effort_limit, self.effort_limit)
 
-    def _clip_dof_pos(self, joint_pos_targets: np.ndarray) -> np.ndarray:
+    def _clip_dof_pos(self, joint_pos_targets: np.ndarray, joint_indices: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Enforce soft joint position limits.
 
         :param joint_pos_targets: Desired joint positions
         :return: Positions constrained within soft limits
         """
+        if joint_indices is not None:
+            return np.clip(joint_pos_targets[joint_indices], self.soft_dof_pos_limit[0][joint_indices], self.soft_dof_pos_limit[1][joint_indices])
+        
         return np.clip(joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
 
     def register_commands(self):
