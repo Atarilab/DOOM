@@ -88,6 +88,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
         # Precompute static configurations
         self.action_scale = torch.tensor(configs["controller_config"]["action_scale"], dtype=torch.float32)
+        self.policy_architecture = configs["controller_config"].get("policy_architecture", "mlp")
 
     def _initialize_controller_parameters(self, configs: Dict[str, Any]):
         """
@@ -137,7 +138,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
-        self.obs_buffer = ObservationHistoryStorage(num_envs=1, num_obs=obs_dim, max_length=1, device="cpu")
+        self.obs_buffer = ObservationHistoryStorage(num_envs=1, policy_architecture=self.policy_architecture, num_obs=obs_dim, max_length=1, device="cpu")
 
         # Start concurrent processing threads
         self._init_processing_threads()
@@ -211,16 +212,17 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
                     # Policy inference
                     with torch.no_grad():
-                        raw_action = self.policy(obs.unsqueeze(0))
+                        raw_action = self.policy(obs)
+                            
 
                     self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
-                    print(f"Policy inference error: {e}")
+                    self.command_manager.logger.error(f"Policy inference error: {e}")
                     time.sleep(0.1)  # Prevent rapid error loops
                     continue
 
             except Exception as e:
-                print(f"Policy inference thread error: {e}")
+                self.command_manager.logger.error(f"Policy inference thread error: {e}")
                 time.sleep(0.1)  # Prevent rapid error loops
                 
     def compute_joint_pos_targets(self):

@@ -7,12 +7,13 @@ import torch
 
 
 class ObservationHistoryStorage:
-    def __init__(self, num_envs: int, num_obs: int, max_length: int, device: torch.device = "cpu"):
+    def __init__(self, num_envs: int, policy_architecture: str, num_obs: int, max_length: int, device: torch.device = "cpu"):
         """
         Initialize a FIFO queue for state history, starting with zeros at initialization.
 
         Args:
             num_envs (int): Number of environments.
+            policy_architecture (str): Policy architecture.
             num_obs (int): Number of observations per environment.
             max_length (int): Maximum length of the state history for each environment.
             device (torch.device): Device to store the buffer (e.g., "cuda" or "cpu").
@@ -20,6 +21,7 @@ class ObservationHistoryStorage:
         self.num_envs = num_envs
         self.num_obs = num_obs
         self.max_length = max_length
+        self.policy_architecture = policy_architecture
         self.device = device
 
         # Initialize the buffer with zeros of shape (num_envs, num_obs * max_length)
@@ -49,9 +51,14 @@ class ObservationHistoryStorage:
         Get the current state history.
 
         Returns:
-            torch.Tensor: A tensor of shape `(num_envs, num_obs * max_length)`.
+            torch.Tensor: Observation tensor with correct shape for policy.
         """
-        return self.buffer.detach().clone()
+        obs = self.buffer.detach().clone()
+        if self.policy_architecture == "recurrent":
+            return obs
+        else:
+            return obs.unsqueeze(0)
+
 
     def reset(self, done: torch.Tensor):
         """Reset the buffer for environments that are done.

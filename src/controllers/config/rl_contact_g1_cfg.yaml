@@ -1,67 +1,105 @@
-# policy_path: "policies/velocity_policy_unidirectional.pt"
-control_dt: 0.001
-decimation: 4
+policy_path: "policies/g1_unitree_locomotion.pt"
+policy_architecture: "recurrent"
+control_dt: 0.002
+decimation: 10
 action_dim: 12
-obs_dim: 48
-action_scale: 0.35
-stiffness: 25.0
-damping: 0.5
-default_joint_pos:
-  - 0.1
-  - 0.8
-  - -1.5
+obs_dim: 47
+action_scale: 0.25 # 0.25
+stiffness: 
+  - 100
+  - 100
+  - 100
+  - 150
+  - 40
+  - 40
+  - 100
+  - 100
+  - 100
+  - 150
+  - 40
+  - 40
+damping: 
+  - 2
+  - 2
+  - 2
+  - 4
+  - 2
+  - 2
+  - 2
+  - 2
+  - 2
+  - 4
+  - 2
+  - 2
+default_joint_pos: # only leg joint positions ( 0 used for arm and waist joints)
   - -0.1
-  - 0.8
-  - -1.5
-  - 0.1
-  - 1.0
-  - -1.5
+  - 0.0
+  - 0.0
+  - 0.3
+  - -0.2
+  - 0.0
   - -0.1
-  - 1.0
-  - -1.5
+  - 0.0
+  - 0.0
+  - 0.3
+  - -0.2
+  - 0.0
 
-ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joint_names object
-  - "FL_hip_joint" # 0
-  - "FR_hip_joint" # 1
-  - "RL_hip_joint" # 2
-  - "RR_hip_joint" # 3
-  - "FL_thigh_joint" # 4
-  - "FR_thigh_joint" # 5
-  - "RL_thigh_joint" # 6
-  - "RR_thigh_joint" # 7
-  - "FL_calf_joint" # 8
-  - "FR_calf_joint" # 9
-  - "RL_calf_joint" # 10
-  - "RR_calf_joint" # 11
+leg_joint2motor_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
-JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING:
-  [3, 0, 9, 6, 4, 1, 10, 7, 5, 2, 11, 8]
-JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
-    1,
-    5,
-    9,
-    0,
-    4,
-    8,
-    3,
-    7,
-    11,
-    2,
-    6,
-    10,
-  ] 
+arm_waist_joint2motor_idx: 
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 26
+  - 27
+  - 28
 
-ISAAC_LAB_DEFAULT_JOINT_POS: [
-    0.1000, # 0
-    -0.1000, # 1
-    0.1000, # 2
-    -0.1000, # 3
-    0.8000, # 4
-    0.8000, # 5
-    1.0000, # 6
-    1.0000, # 7
-    -1.5000, # 8
-    -1.5000, # 9
-    -1.5000, # 10
-    -1.5000, # 11
-  ] # from asset.data.default_joint_pos; corresponds to ISAACLAB_JOINT_ORDER; is used as action offset
+arm_waist_kps: 
+  - 300
+  - 300
+  - 300
+  - 100
+  - 100
+  - 50
+  - 50
+  - 20
+  - 20
+  - 20
+  - 100
+  - 100
+  - 50
+  - 50
+  - 20
+  - 20
+  - 20
+
+arm_waist_kds: 
+  - 3
+  - 3
+  - 3
+  - 2
+  - 2
+  - 2
+  - 2
+  - 1
+  - 1
+  - 1
+  - 2
+  - 2
+  - 2
+  - 2
+  - 1
+  - 1
+  - 1                            
