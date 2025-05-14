@@ -181,9 +181,9 @@ def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
     
     states = {
         "mode_machine": msg["mode_machine"],
-        "joint_pos": [motor_states[i].q for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))],
-        "joint_vel": [motor_states[i].dq for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))],
-        "joint_tau_est": [motor_states[i].tau_est for i in leg_joint2motor_idx + arm_waist_joint2motor_idx],
+        "joint_pos": np.array([motor_states[i].q for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))]),
+        "joint_vel": np.array([motor_states[i].dq for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))]),
+        "joint_tau_est": np.array([motor_states[i].tau_est for i in leg_joint2motor_idx + arm_waist_joint2motor_idx]),
         "gyroscope": imu_state.gyroscope,
         "accelerometer": imu_state.accelerometer,
         "base_quat": imu_state.quaternion,

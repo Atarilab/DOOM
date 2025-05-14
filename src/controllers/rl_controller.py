@@ -96,26 +96,28 @@ class BaseRLLocomotionController(ControllerBase, Node):
         :param configs: Configuration dictionary
         """
         controller_config = configs["controller_config"]
+        
+        # Controller gains and configuration
+        self.Kp = controller_config.get("stiffness", None)
+        self.Kd = controller_config.get("damping", None)
+        self.action_dim = controller_config.get("action_dim", None)
+        self.control_dt = controller_config.get("control_dt", None)
+        self.decimation = controller_config.get("decimation", None)
 
-        self.default_joint_pos = torch.tensor(controller_config["ISAAC_LAB_DEFAULT_JOINT_POS"], dtype=torch.float32)
+        self.default_joint_pos = torch.tensor(
+            controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None), dtype=torch.float32
+        ) if controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None) is not None else torch.tensor(controller_config["default_joint_pos"], dtype=torch.float32)
 
-        self.actions_isaac_to_unitree_mapping = np.array(controller_config["JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING"])
+        self.actions_mapping = np.array(
+            controller_config.get("JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING", np.arange(self.action_dim))
+        )
 
         self.joint_obs_unitree_to_isaac_mapping = torch.tensor(
-            controller_config["JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING"]
-        )
-
-        # Controller gains and configuration
-        self.Kp = controller_config["stiffness"]
-        self.Kd = controller_config["damping"]
-        self.action_dim = controller_config["action_dim"]
-        self.control_dt = controller_config["control_dt"]
-        self.decimation = controller_config["decimation"]
+            controller_config.get("JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING", None)
+        ) if controller_config.get("JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING", None) is not None else None
 
         # Filter coefficient (0 < alpha < 1), lower values = more smoothing
-        self.action_filter_alpha = (
-            controller_config["action_filter_alpha"] if "action_filter_alpha" in controller_config else 1.0
-        )
+        self.action_filter_alpha = controller_config.get("action_filter_alpha", 1.0)
         self.filtered_action = torch.zeros(self.action_dim, dtype=torch.float32)
         self.is_first_action = True
 
@@ -130,8 +132,8 @@ class BaseRLLocomotionController(ControllerBase, Node):
         :param configs: Configuration dictionary
         """
         # Performance optimization: Preallocate tensors
-        action_dim = configs["controller_config"]["action_dim"]
-        obs_dim = configs["controller_config"]["obs_dim"]
+        action_dim = configs["controller_config"].get("action_dim", None)
+        obs_dim = configs["controller_config"].get("obs_dim", None)
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
@@ -220,24 +222,14 @@ class BaseRLLocomotionController(ControllerBase, Node):
             except Exception as e:
                 print(f"Policy inference thread error: {e}")
                 time.sleep(0.1)  # Prevent rapid error loops
-
-    def compute_torques(self, state, desired_goal):
-        """
-        Compute motor commands using the learned policy.
-
-        :param state: Current robot state
-        :param desired_goal: Desired goal state (not used in this implementation)
-        :return: Motor commands dictionary
-        """
-        super().compute_torques(state, desired_goal)
-
-        start_time = time.perf_counter()
-
+                
+    def compute_joint_pos_targets(self):
+        
         try:
             # Ensure we have processed observations and have a valid action
             if self.obs_buffer.get().numel() == 0 or self.obs_buffer.get().sum() == 0:
                 # If no observations yet, use default joint positions
-                joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_isaac_to_unitree_mapping]
+                joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_mapping]
             else:
                 # Apply exponential moving average filter to smooth actions
                 if self.is_first_action:
@@ -254,39 +246,21 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 joint_pos_targets = (
                     (self.filtered_action * self.action_scale + self.default_joint_pos)
                     .cpu()
-                    .numpy()[self.actions_isaac_to_unitree_mapping]
+                    .numpy()[self.actions_mapping]
                 )
 
             # Clip the joint pos targets for safety
             if hasattr(self, "soft_dof_pos_limit"):
                 joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
-            # Prepare motor commands
-            self.cmd = {
-                f"motor_{i}": {
-                    "q": joint_pos_targets[i],
-                    "kp": self.Kp,
-                    "dq": 0.0,
-                    "kd": self.Kd,
-                    "tau": 0.0,
-                }
-                for i in range(self.robot.num_joints)
-            }
-
-            # Track command preparation time
-            self.cmd_preparation_time = time.perf_counter() - start_time
-
-            return self.cmd
-
+            return joint_pos_targets
         except Exception as e:
-            print(f"Command preparation error: {e}")
-            return self.cmd
+            self.command_manager.logger.error(f"Error computing joint pos targets: {e}")
+            # return self.cmd
 
-
-
-class RLLocomotionVelocityController(BaseRLLocomotionController):
+class RLQuadrupedLocomotionVelocityController(BaseRLLocomotionController):
     """
-    Velocity-conditioned RL Locomotion Controller
+    Velocity-conditioned quadruped RL Locomotion Controller
     Uses contact-implicit reinforcement learning policy
     """
 
@@ -295,6 +269,12 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
 
         # Default velocity commands
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0])
+        
+        
+    def set_mode(self):
+        """Runs when the mode is changed in the UI."""
+        super().set_mode()
+        
 
     def change_commands(self, new_commands: Dict[str, Any]):
         """
@@ -403,14 +383,56 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         """
         return {
 
-            # Step Size
+            # X-Velocity
             "up": lambda: self.change_commands({"x_velocity": self.velocity_commands[0] + 0.1, "y_velocity": self.velocity_commands[1]}),
             "down": lambda: self.change_commands({"x_velocity": self.velocity_commands[0] - 0.1, "y_velocity": self.velocity_commands[1]}),
-            # Lateral Position 
+            # Y-Velocity
             "left": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1] + 0.1}),
             "right": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1] - 0.1}),
         }
+    
+    def compute_torques(self, state, desired_goal):
+        """
+        Compute motor commands using the learned policy.
 
-    def set_mode(self):
-        """Runs when the mode is changed in the UI."""
-        super().set_mode()
+        :param state: Current robot state
+        :param desired_goal: Desired goal state (not used in this implementation)
+        :return: Motor commands dictionary
+        """
+        super().compute_torques(state, desired_goal)
+
+        start_time = time.perf_counter()
+
+        try:
+            joint_pos_targets = self.compute_joint_pos_targets()
+
+            # Prepare motor commands
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": joint_pos_targets[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
+
+            # Track command preparation time
+            self.cmd_preparation_time = time.perf_counter() - start_time
+            
+
+        except Exception as e:
+            self.command_manager.logger.error(f"Error computing torques: {e}")
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": self.default_joint_pos[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
+        
+        return self.cmd

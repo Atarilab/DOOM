@@ -15,7 +15,7 @@ from controllers.rl_controller import BaseRLLocomotionController
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
 
-class RLLocomotionContactController(BaseRLLocomotionController):
+class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
     """
     Contact-conditioned RL Locomotion Controller
     Uses contact-explicit reinforcement learning policy
@@ -330,6 +330,8 @@ class RLLocomotionContactController(BaseRLLocomotionController):
         """
         if self.robot.mj_model is not None:
             self.robot.mj_model.update(state)
+            
+        start_time = time.perf_counter()
 
         # Update the latest state for the observation processing thread
         with self._lock:
@@ -360,10 +362,38 @@ class RLLocomotionContactController(BaseRLLocomotionController):
             self.pub_contact_plan()
 
         # self.command_manager.logger.debug(f"Time left: {self.time_left:.2f} seconds")
+        try:
+            joint_pos_targets = self.compute_joint_pos_targets()
+
+            # Prepare motor commands
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": joint_pos_targets[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
+
+            # Track command preparation time
+            self.cmd_preparation_time = time.perf_counter() - start_time
+            
+        except Exception as e:
+            self.command_manager.logger.error(f"Error computing torques: {e}")
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": self.default_joint_pos[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
         
-        # Use the base class implementation to compute torques
-        # This will use the pre-computed raw_action from the policy inference thread
-        return super().compute_torques(state, desired_goal)
+        return self.cmd
     
     def _update_action_scale(self):
         """Update the action scale based on the current gait."""

@@ -29,83 +29,108 @@ def joint_pos(states: Dict[str, Any]) -> torch.Tensor:
     return torch.tensor(joint_pos)
 
 
-def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, mapping: np.ndarray) -> torch.Tensor:
+def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
     """
     Compute relative joint positions.
 
     :param states: State dictionary
     :param default_joint_pos: Default joint positions
+    :param scale: Scale factor
     :param mapping: Mapping from Unitree to Isaac Joint Order
     :return: Relative joint positions
     """
-    return torch.tensor(states["joint_pos"][mapping] - default_joint_pos)
+    if mapping is None:
+        mapping = np.arange(len(states["joint_pos"]))
+    return torch.tensor((states["joint_pos"][mapping] - default_joint_pos)) * scale
 
 
-def joint_vel(states: Dict[str, Any], mapping: np.ndarray) -> torch.Tensor:
+def joint_vel(states: Dict[str, Any], scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
     """
     The joint positions of the asset.
 
     :param states: State dictionary
+    :param scale: Scale factor
     :param mapping: Mapping from Unitree to Isaac Joint Order
     :return: Joint velocities
     """
-    return torch.tensor(states["joint_vel"][mapping])
+    if mapping is None:
+        mapping = np.arange(len(states["joint_vel"]))
+    return torch.tensor((states["joint_vel"][mapping])) * scale
 
 
-def lin_vel_b(states: Dict[str, Any]) -> torch.Tensor:
+def lin_vel_b(states: Dict[str, Any], scale = 1.0) -> torch.Tensor:
     """
     The linear velocity of the asset in base frame.
 
     :param states: State dictionary
+    :param scale: Scale factor
     :return: Linear velocity in the base frame
     """
 
-    return torch.tensor(states["lin_vel_b"])
+    return torch.tensor((states["lin_vel_b"])) * scale
 
 
-def ang_vel_b(states: Dict[str, Any]) -> torch.Tensor:
+def ang_vel_b(states: Dict[str, Any], scale = 1.0) -> torch.Tensor:
     """
     The angular velocity of the asset in base frame.
 
     :param states: State dictionary
+    :param scale: Scale factor
     :return: Angular velocity in the base frame
     """
 
-    return torch.tensor(states["gyroscope"])
+    return torch.tensor((states["gyroscope"])) * scale
 
 
-def projected_gravity_b(states: Dict[str, Any]) -> torch.Tensor:
+def projected_gravity_b(states: Dict[str, Any], scale = 1.0) -> torch.Tensor:
     """
     The projected gravity vector.
 
     :param states: State dictionary
+    :param scale: Scale factor
     :return: Projected Gravity vector in the base frame
     """
 
-    quat = torch.tensor([states["base_quat"]], dtype=torch.float64).squeeze(0)
+    base_quat = states["base_quat"]
+    if isinstance(base_quat, np.ndarray):
+        quat = torch.tensor(base_quat, dtype=torch.float64)
+    elif torch.is_tensor(base_quat):
+        quat = base_quat.clone().detach().to(dtype=torch.float64)
+    else:
+        quat = torch.tensor(np.array(base_quat), dtype=torch.float64)
     gravity_dir = torch.tensor([0, 0, -1.0], dtype=torch.float64)
     
-    return quat_rotate_inverse(quat, gravity_dir)
+    return quat_rotate_inverse(quat, gravity_dir) * scale
 
 
-def last_action(states: Dict[str, Any], last_action: Callable) -> torch.Tensor:
+def last_action(states: Dict[str, Any], last_action: Callable, scale = 1.0) -> torch.Tensor:
     """
     The previous action from the policy. We use a callable (lambda) to fetch the latest value from the controller class.
 
     :param states: State dictionary
+    :param scale: Scale factor
     :return: The previous action from the agent
     """
-    return last_action()
+    return last_action() * scale
 
 
-def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> torch.Tensor:
+def velocity_commands(states: Dict[str, Any], velocity_commands: Callable, scale = 1.0) -> torch.Tensor:
     """
     The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
 
     :param states: State dictionary
+    :param scale: Scale factor
     :return: Velocity commands (Vx, Vy, Wz)
     """
-    return velocity_commands()
+    return velocity_commands() * scale
+
+
+def phase(states: Dict[str, Any], counter: Callable, period: float, control_dt: float):
+    count = counter() * control_dt
+    phase = count % period / period
+    sin_phase = np.sin(phase * np.pi * 2)
+    cos_phase = np.cos(phase * np.pi * 2)
+    return torch.tensor([sin_phase, cos_phase])
 
 
 def starting_time(states: Dict[str, Any]):
@@ -176,7 +201,11 @@ def ee_pos_rel_b(
     # Get future feet positions in init frame
     desired_feet_positions = future_feet_positions_w()[:, current_goal_idx()]
     # Compute the distance between the current feet positions and the desired feet positions
-    ee_pos_rel = torch.tensor(desired_feet_positions - feet_positions_w).norm(dim=1)
+    diff = desired_feet_positions - feet_positions_w
+    if torch.is_tensor(diff):
+        ee_pos_rel = diff.clone().norm(dim=1)
+    else:
+        ee_pos_rel = torch.tensor(diff).norm(dim=1)
 
     return ee_pos_rel
 
