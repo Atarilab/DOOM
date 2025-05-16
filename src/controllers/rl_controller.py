@@ -79,6 +79,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         """
         model_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
+            "policies",
             configs["controller_config"]["policy_path"],
         )
 
@@ -214,7 +215,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
                     with torch.no_grad():
                         raw_action = self.policy(obs)
                             
-
                     self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
                     self.command_manager.logger.error(f"Policy inference error: {e}")
@@ -226,7 +226,9 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 time.sleep(0.1)  # Prevent rapid error loops
                 
     def compute_joint_pos_targets(self):
-        
+        """
+        Compute joint position targets based on the policy output.
+        """
         try:
             # Ensure we have processed observations and have a valid action
             if self.obs_buffer.get().numel() == 0 or self.obs_buffer.get().sum() == 0:

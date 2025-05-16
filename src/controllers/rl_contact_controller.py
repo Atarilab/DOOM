@@ -693,6 +693,12 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             "R1-right": lambda: self._handle_stance_width_change("rear", "increase"),
         }
         
+
+    """
+    Function handlers for changing the contact commands for the rl-contact-locomotion controller
+    - gait, step size, heading, lateral position, command duration, stance width
+    """
+    
     def change_commands(self, new_commands: Dict[str, Any]):
         """Change the robot's contact commands with thread safety.
 
@@ -727,7 +733,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
 
         except Exception as e:
             self.command_manager.logger.error(f"Contact command update failed: {e}")
-        
+
+
     def _handle_step_size_change(self, direction: str):
         """Handle forwardstep size changes."""
         # Increase step size by 0.01 meters when up button is pressed
@@ -845,6 +852,9 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             
             if self.command_manager and self.command_manager.logger:
                 self.command_manager.logger.debug("Reset command duration and stance width values to default")
+
+
+
 
     """
     Helper functions to initialize publishers for visualization.
