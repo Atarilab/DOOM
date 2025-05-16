@@ -1,7 +1,7 @@
-# policy_path: "policies/contact_policy_actuatorRand.pt"
-# policy_path: "policies/contact_policy_feetRandom.pt"
-policy_path: "policies/contact_policy_stanceSeperate.pt"
-# policy_path: "policies/contact_policy_latest.pt"
+# policy_path: "contact_policy_actuatorRand.pt"
+# policy_path: "contact_policy_feetRandom.pt"
+policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
+# policy_path: "contact_policy_latest.pt"
 fixed_feet_positions: false
 obs_dim: 82
 control_dt: 0.001
