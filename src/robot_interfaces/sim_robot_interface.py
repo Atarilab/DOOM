@@ -17,10 +17,14 @@ class SimRobotInterface(RobotInterfaceBase):
 
         self.robot_name = config["ROBOT"]
         self.robot_scene = os.path.join(os.getcwd(), "robots", self.robot_name, config["SCENE"])
+        
 
         # Initialize Mujoco model and data
         self.mj_model = mujoco.MjModel.from_xml_path(self.robot_scene)
         self.mj_data = mujoco.MjData(self.mj_model)
+        
+        # Check for object body in the scene
+        self.object_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "object")
 
         # Set the timestep for the simulation
         self.mj_model.opt.timestep = config["SIMULATION_DT"]
@@ -63,7 +67,7 @@ class SimRobotInterface(RobotInterfaceBase):
 
     def _simulation_thread(self):
         ChannelFactoryInitialize(self.domain_id, self.interface)
-        unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data, robot=self.robot_name)
+        unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data, robot=self.robot_name, object=self.object_id)
 
         if self.print_scene_info:
             unitree.PrintSceneInformation()
@@ -128,7 +132,7 @@ class ElasticBand:
     def __init__(self):
         self.stiffness = 200
         self.damping = 100
-        self.point = np.array([0, 0, 3])
+        self.point = np.array([0, 0, 2.5])
         self.length = 0
         self.enable = True
 

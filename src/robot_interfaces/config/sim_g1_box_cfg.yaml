@@ -1,0 +1,10 @@
+ROBOT: "g1"
+SCENE: "scene_29dof_box.xml"
+ELASTIC_BAND: True
+BASE_LINK: "torso_link"
+
+SIMULATION_DT: 0.005
+VIEWER_DT: 0.02  # 50 fps for viewer
+PRINT_SCENE_INFORMATION: True
+INTERFACE: "lo"
+DOMAIN_ID: 1

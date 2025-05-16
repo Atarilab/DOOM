@@ -14,6 +14,7 @@ TOPIC_LOWCMD = "rt/lowcmd"
 TOPIC_LOWSTATE = "rt/lowstate"
 TOPIC_HIGHSTATE = "rt/sportmodestate"
 TOPIC_WIRELESS_CONTROLLER = "rt/wirelesscontroller"
+TOPIC_BOXSTATE = "rt/boxstate"
 
 MOTOR_SENSOR_NUM = 3
 NUM_MOTOR_IDL_GO = 20
@@ -22,10 +23,11 @@ NUM_MOTOR_IDL_HG = 35
 
 class UnitreeSdk2Bridge:
 
-    def __init__(self, mj_model, mj_data, robot="go2"):
+    def __init__(self, mj_model, mj_data, robot="go2", object=None):
         self.mj_model = mj_model
         self.mj_data = mj_data
         self.robot = robot
+        self.object_id = object
 
         if self.robot == "go2":
             from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowState_ as LowState_default
@@ -57,11 +59,19 @@ class UnitreeSdk2Bridge:
         self.low_state_puber.Init()
         self.lowStateThread = RecurrentThread(interval=self.dt, target=self.PublishLowState, name="sim_lowstate")
         self.lowStateThread.Start()
+        
         self.high_state = unitree_go_msg_dds__SportModeState_()
         self.high_state_puber = ChannelPublisher(TOPIC_HIGHSTATE, SportModeState_)
         self.high_state_puber.Init()
         self.HighStateThread = RecurrentThread(interval=self.dt, target=self.PublishHighState, name="sim_highstate")
         self.HighStateThread.Start()
+        
+        if self.object_id != -1:
+            self.box_state = unitree_go_msg_dds__SportModeState_()
+            self.box_state_puber = ChannelPublisher(TOPIC_BOXSTATE, SportModeState_)
+            self.box_state_puber.Init()
+            self.BoxStateThread = RecurrentThread(interval=self.dt, target=self.PublishBoxState, name="sim_boxstate")
+            self.BoxStateThread.Start()
 
         if self.robot == "go2":
             self.wireless_controller = unitree_go_msg_dds__WirelessController_()
@@ -194,6 +204,20 @@ class UnitreeSdk2Bridge:
             self.high_state.velocity[2] = self.mj_data.sensordata[self.dim_motor_sensor + 15]
 
         self.high_state_puber.Write(self.high_state)
+        
+    def PublishBoxState(self):
+       
+            # Get position and orientation (quaternion)
+            pos = self.mj_data.xpos[self.object_id].copy()
+            quat = self.mj_data.xquat[self.object_id].copy()
+            # Get linear and angular velocity
+            linvel = self.mj_data.cvel[self.object_id][:3].copy()
+            angvel = self.mj_data.cvel[self.object_id][3:].copy()
+            self.box_state.position[:] = pos
+            self.box_state.velocity[:] = linvel
+            self.box_state.imu_state.quaternion[:] = quat
+            self.box_state.imu_state.gyroscope[:] = angvel
+            self.box_state_puber.Write(self.box_state)
 
     def PublishWirelessController(self):
         if self.joystick is not None:
