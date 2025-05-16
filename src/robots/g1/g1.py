@@ -6,12 +6,14 @@ from controllers.stand_controller import (
     G1StayUpController,
     G1StandUpController,
 )
+from controllers.rl_controller import RLHumanoidLocomotionVelocityController
+from controllers.rl_contact_bimanual_controller import RLHumanoidBimanualContactController
 
 from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowState_ as G1LowState_
 from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as G1LowCmd_
 
-from state_manager.msg_handlers import g1_low_state_handler, sport_mode_state_handler
+from state_manager.msg_handlers import g1_low_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 
 if TYPE_CHECKING:
@@ -153,6 +155,10 @@ class G1(RobotBase):
                     "STAND_UP": G1StandUpController,
                     "STAY_UP": G1StayUpController,
                 },
+                "LOCOMOTION": {
+                    # "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
+                    "RL-CONTACT": RLHumanoidBimanualContactController,
+                },
             }
 
         else:
@@ -187,6 +193,7 @@ class G1(RobotBase):
         
         if "sim" in self.task:
             from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_
+            from state_manager.msg_handlers import sport_mode_state_handler, object_state_handler
             dds_sportsmode_state_sub = DDSStateSubscriber(
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
@@ -194,6 +201,15 @@ class G1(RobotBase):
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
+            
+            if "contact" in self.task:
+                dds_object_state_sub = DDSStateSubscriber(
+                    topic="rt/objectstate",
+                    msg_type=SportModeState_,
+                    handler_func=object_state_handler,
+                    logger=self.logger,
+                )
+                _subscribers["object_state"] = dds_object_state_sub
 
         else:
             from vicon_receiver.msg import Position

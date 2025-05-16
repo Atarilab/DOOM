@@ -1,4 +1,4 @@
-policy_path: "g1_unitree_locomotion.pt"
+policy_path: "bimanual_g1/policy.pt"
 policy_architecture: "recurrent"
 control_dt: 0.002
 decimation: 10
