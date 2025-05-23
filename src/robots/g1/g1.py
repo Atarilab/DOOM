@@ -5,6 +5,7 @@ from utils.mj_wrapper import MjRobotWrapper
 from controllers.stand_controller import (
     G1StayUpController,
     G1StandUpController,
+    G1LowLevelController
 )
 from controllers.rl_controller import RLHumanoidLocomotionVelocityController
 from controllers.rl_contact_bimanual_controller import RLHumanoidBimanualContactController
@@ -36,8 +37,10 @@ class G1(RobotBase):
         self.low_cmd_msg = unitree_hg_msg_dds__LowCmd_
         self.low_cmd_msg_type = G1LowCmd_
         
-        # self.stand_down_joint_pos = [ 0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375, 0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375, ]
-        # self.stand_up_joint_pos = [ 0.1, 0.8, -1.5, -0.1, 0.8, -1.5, 0.1, 1.0, -1.5, -0.1, 1.0, -1.5, ]
+        # Log available controllers
+        self.logger.info(f"Available controllers for {self.name}: {self.available_controllers}")
+        self.logger.info(f"Available subscribers for {self.name}: {self.subscribers}")
+        
 
     @property
     def name(self):
@@ -148,21 +151,36 @@ class G1(RobotBase):
         Returns:
             Dict[str, Dict[str, Type[ControllerBase]]]: A dictionary of available controllers for the G1 robot based on the desired task.
         """
+        self.logger.info(f"Available task for {self.name}: {self.task}")
         controllers = {}
         if "contact" in self.task:
             controllers = {
                 "STAND": {
                     "STAND_UP": G1StandUpController,
                     "STAY_UP": G1StayUpController,
+                    "LOW_LEVEL": G1LowLevelController,
                 },
                 "LOCOMOTION": {
                     # "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
                     "RL-CONTACT": RLHumanoidBimanualContactController,
                 },
             }
+        elif "velocity" in self.task:
+            controllers = {
+                "STAND": {
+                    "STAND_UP": G1StandUpController,
+                    "STAY_UP": G1StayUpController,
+                    "LOW_LEVEL": G1LowLevelController,
+                },
+                "LOCOMOTION": {
+                    "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
+                },
+            }
 
         else:
             controllers = {}
+            
+        self.logger.info(f"Available controllers for {self.name}: {controllers}")
         return controllers
     
     @property
