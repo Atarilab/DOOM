@@ -94,7 +94,7 @@ async def main_async(args=None):
 
             # Create robot control UI if not disabled
             if args.enable_ui:
-                app_task = asyncio.create_task(RobotControlUI(mode_manager).run_async())
+                app_task = asyncio.create_task(RobotControlUI(mode_manager, task_name=args.task).run_async())
             else:
                 app_task = None
 

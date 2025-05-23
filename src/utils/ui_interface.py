@@ -261,8 +261,15 @@ class RobotControlUI(App):
             text-align: center;
             text-style: bold;
             color: rgb(100, 150, 255);  /* Bright accent color */
-            margin-bottom: 2;
+            margin-bottom: 1;
             padding: 1;
+        }
+        
+        #subtitle {
+            text-align: center;
+            color: #6cb4ee;
+            margin-top: 1;
+            margin-bottom: 1;
         }
 
         #status {
@@ -416,12 +423,13 @@ class RobotControlUI(App):
         mode_manager: ModeManager,
         command_manager: Optional[CommandManager] = None,
         logger: Optional[logging.Logger] = None,
-    ):
+        task_name: str = None):
         super().__init__()
         self.mode_manager = mode_manager
         self.command_manager = command_manager
         self.logger = logger or logging.getLogger(__name__)
         self.mode_structure = self._build_mode_structure()
+        self.task_name = task_name
 
     def _build_mode_structure(self):
         """
@@ -444,6 +452,12 @@ class RobotControlUI(App):
             with Container(id="menu-container"):
                 with Container(id="control-container"):
                     yield Static("ATARI DOOM Robot Control Interface", id="title")
+                    try:
+                        controller_type, task, interface, robot = self.task_name.split("-")
+                    except ValueError:
+                        controller_type = task = interface = robot = "Unknown"
+                    subtitle = f"[b]Controller:[/b] {controller_type.upper()}    [b]Task:[/b] {task.capitalize()}    [b]Interface:[/b] {interface.capitalize()}    [b]Robot:[/b] {robot.capitalize()}"
+                    yield Static(subtitle, id="subtitle")
                     yield Static("Current Status: IDLE", id="status")
 
                     # Main menu with mode buttons
