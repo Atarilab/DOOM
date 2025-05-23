@@ -220,12 +220,12 @@ def contact_plan(states: Dict[str, Any], contact_plan: Callable) -> torch.Tensor
     return contact_plan().view(-1)
 
 
-def contact_status(states: Dict[str, Any]) -> torch.Tensor:
+def contact_status(states: Dict[str, Any], asset_name: str = "robot") -> torch.Tensor:
     """
     The contact status. We use a callable (lambda) to fetch the latest value from the controller class.
     """
     contact_status = np.zeros(4)
-    contact_forces = np.array(states["foot_forces"])
+    contact_forces = np.array(states[f"{asset_name}/foot_forces"])
     contact_forces_norm = np.linalg.norm(contact_forces)
     contact_status[contact_forces_norm > 1.0] = 1
     return torch.tensor(contact_status)
@@ -239,6 +239,25 @@ def contact_time_left(states: Dict[str, Any], contact_time_left: Callable) -> to
     :return: Contact timing
     """
     return torch.tensor([contact_time_left()])
+
+
+def object_size(states: Dict[str, Any], size: tuple[float, float, float], asset_name: str = "object") -> torch.Tensor:
+    """
+    The size of the object.
+
+    :param states: State dictionary
+    :param size: Size of the object
+    :param asset_name: Name of the asset
+    :return: Size of the object
+    """
+    return torch.tensor(size)
+
+
+def dummy_contact_status(states: Dict[str, Any]) -> torch.Tensor:
+    """
+    Dummy contact status.
+    """
+    return torch.zeros(4)
 
 
 def base_height(states: Dict[str, Any], mj_model: "MjRobotWrapper") -> torch.Tensor:
