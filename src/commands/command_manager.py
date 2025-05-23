@@ -14,10 +14,10 @@ class CommandTerm:
 
     name: str
     description: str
-    min_value: float
-    max_value: float
     default_value: float
     type: type
+    min_value: float = None
+    max_value: float = None
     current_value: Any = None
     validator: Optional[Callable[[Any], bool]] = None
 
@@ -37,7 +37,9 @@ class CommandTerm:
                 return False
 
             # Check value range
-            if converted_value < self.min_value or converted_value > self.max_value:
+            if self.min_value is not None and converted_value < self.min_value:
+                return False
+            if self.max_value is not None and converted_value > self.max_value:
                 return False
 
             # Run custom validator if provided
