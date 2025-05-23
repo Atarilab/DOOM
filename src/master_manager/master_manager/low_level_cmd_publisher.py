@@ -47,11 +47,12 @@ class LowLevelCmdPublisher(Node):
         self.dds_cmd = self.robot.low_cmd_msg()
         self.crc = CRC()
         
-        if self.robot.name == "g1":
+        if self.robot.name == "UnitreeG1":
             self.motor_mode = MotorMode.PR
             self.mode_machine_ = 0
             self._init_cmd_g1(self.mode_machine_, self.motor_mode)
-        elif self.robot.name == "go2":
+            
+        elif self.robot.name == "UnitreeGo2":
             self._init_cmd_go2()
         
         # self.sc = SportClient()  
@@ -150,6 +151,13 @@ class LowLevelCmdPublisher(Node):
                     motor = motor_commands[f"motor_{i}"]
                     for attr in ["q", "kp", "dq", "kd", "tau"]:
                         setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
+                    if motor_commands.get("mode", None) is not None:
+                        self.dds_cmd.motor_cmd[i].mode = motor["mode"]
+                if motor_commands.get("mode_pr", None) is not None:
+                    self.dds_cmd.mode_pr = motor_commands["mode_pr"]
+                if motor_commands.get("mode_machine", None) is not None:
+                    self.dds_cmd.mode_machine = motor_commands["mode_machine"]
+                    
             except Exception as e:
                 self.logger.error(f"Error updating motor commands: {e}")
                 return
