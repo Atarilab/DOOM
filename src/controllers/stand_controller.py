@@ -291,7 +291,7 @@ class G1StandUpController(ControllerBase):
         obs = self.obs_manager.compute(state)
         # record the current pos
         for i in range(self.dof_size):
-            self.init_dof_pos[i] = state["joint_pos"][self.dof_idx[i]]
+            self.init_dof_pos[i] = state["robot/joint_pos"][self.dof_idx[i]]
             
         alpha = self.step_counter / self.num_steps
 

@@ -47,7 +47,7 @@ class G1(RobotBase):
         Returns:
             str: The name of the robot.
         """
-        return "G1"
+        return "UnitreeG1"
     
     @property
     def feet_names(self):

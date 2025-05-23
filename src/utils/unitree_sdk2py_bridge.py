@@ -25,7 +25,7 @@ NUM_MOTOR_IDL_HG = 35
 
 class UnitreeSdk2Bridge:
 
-    def __init__(self, mj_model, mj_data, robot="go2", object=None):
+    def __init__(self, mj_model, mj_data, robot, object=None):
         self.mj_model = mj_model
         self.mj_data = mj_data
         self.robot = robot
@@ -208,6 +208,8 @@ class UnitreeSdk2Bridge:
         self.high_state_puber.Write(self.high_state)
         
     def PublishObjectState(self):
+        """ Publish the object states in the world frame."""
+        
         # Get position and orientation (quaternion)
         pos = self.mj_data.xpos[self.object_id].copy()
         quat = self.mj_data.xquat[self.object_id].copy()
@@ -219,6 +221,7 @@ class UnitreeSdk2Bridge:
         # Convert to world frame
         lin_vel_w = rot.apply(lin_vel_b)
         ang_vel_w = rot.apply(ang_vel_b)
+        
         self.object_state.position[:] = pos
         self.object_state.velocity[:] = lin_vel_w
         self.object_state.imu_state.quaternion[:] = quat

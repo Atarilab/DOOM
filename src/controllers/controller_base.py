@@ -36,6 +36,7 @@ class ControllerBase(ABC):
         self.robot: "RobotBase" = robot
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
+        self.logger = None
         self.mode_manager = None  # Will be set by the mode manager when registering
         self.configs = configs
         self.control_dt = configs["controller_config"]["control_dt"]

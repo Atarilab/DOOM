@@ -35,6 +35,7 @@ class MjRobotWrapper:
 
         # Debug print to see what bodies are available
         print(f"Available bodies: {list(self.body_names.keys())}")
+        print(f"Available joints: {list(self.joint_names.keys())}")
 
         self.feet_indices = [self.body_names.get(name, -1) for name in feet_names]
 
@@ -59,9 +60,9 @@ class MjRobotWrapper:
 
         try:
             # Use the base position and orientation from the state
-            base_pos = np.array(state["base_pos_w"])
+            base_pos = np.array(state["robot/base_pos_w"])
             # Convert quaternion (w,x,y,z) to rotation matrix using the utility function
-            base_rot = quat_to_rotmatrix(np.array(state["base_quat"]), order="wxyz")
+            base_rot = quat_to_rotmatrix(np.array(state["robot/base_quat"]), order="wxyz")
 
         except Exception as e:
             print(f"Error setting init frame: {e}")
@@ -90,14 +91,14 @@ class MjRobotWrapper:
         """
         if state is not None:
             # Extract joint positions and velocities from state
-            q = state["joint_pos"]
-            v = state["joint_vel"]
+            q = state["robot/joint_pos"]
+            v = state["robot/joint_vel"]
 
             # Set base pose in world frame
-            if "base_pos_w" in state:
-                self.data.qpos[0:3] = state["base_pos_w"]
-            if "base_quat" in state:
-                self.data.qpos[3:7] = state["base_quat"]
+            if "robot/base_pos_w" in state:
+                self.data.qpos[0:3] = state["robot/base_pos_w"]
+            if "robot/base_quat" in state:
+                self.data.qpos[3:7] = state["robot/base_quat"]
         self.data.qpos[-self.num_joints:] = q
         self.data.qvel[-self.num_joints:] = v
 

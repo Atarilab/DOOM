@@ -14,39 +14,58 @@ if TYPE_CHECKING:
     from utils.mj_wrapper.mj_robot import MjRobotWrapper
 
 
-def joint_pos(states: Dict[str, Any]) -> torch.Tensor:
+def joint_pos(states: Dict[str, Any], asset_name: str = "robot") -> torch.Tensor:
     """
     The joint positions of the asset.
 
     :param states: State dictionary
+    :param asset_name: Name of the asset
     :return: Joint positions
     """
     joint_pos = reorder_robot_states(
-        states["joint_pos"],
+        states[f"{asset_name}/joint_pos"],
         origin_order=["FL", "FR", "RL", "RR"],
         target_order=["FR", "FL", "RR", "RL"],
     )
     return torch.tensor(joint_pos)
 
 
-def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
+def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, asset_name: str = "robot", scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
     """
     Compute relative joint positions.
 
     :param states: State dictionary
     :param default_joint_pos: Default joint positions
-    :param scale: Scale factor
+        :param scale: Scale factor
     :param mapping: Mapping from Unitree to Isaac Joint Order
     :return: Relative joint positions
     """
     if mapping is None:
-        mapping = np.arange(len(states["joint_pos"]))
-    return torch.tensor((states["joint_pos"][mapping] - default_joint_pos)) * scale
+        mapping = np.arange(len(states[f"{asset_name}/joint_pos"]))
+    return torch.tensor((states[f"{asset_name}/joint_pos"][mapping] - default_joint_pos)) * scale
 
 
-def joint_vel(states: Dict[str, Any], scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
+def joint_pos_limit_normalized(states: Dict[str, Any], soft_dof_limits: np.ndarray, asset_name: str = "robot") -> torch.Tensor:
+    """The joint positions of the asset normalized with the asset's soft joint limits.
+
+    :param states: State dictionary
+    :param soft_dof_limits: Soft joint limits
+    :param asset_name: Name of the asset
+    :return: Normalized joint positions
     """
-    The joint positions of the asset.
+    
+    joint_pos = states[f"{asset_name}/joint_pos"]
+    lower_limit = soft_dof_limits[:, 0]
+    upper_limit = soft_dof_limits[:, 1]
+    
+    offset = (lower_limit + upper_limit) * 0.5
+
+    return 2 * (joint_pos - offset) / (upper_limit - lower_limit)
+
+
+def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
+    """
+    The joint velocities of the asset.
 
     :param states: State dictionary
     :param scale: Scale factor
@@ -54,44 +73,95 @@ def joint_vel(states: Dict[str, Any], scale = 1.0, mapping: np.ndarray = None) -
     :return: Joint velocities
     """
     if mapping is None:
-        mapping = np.arange(len(states["joint_vel"]))
-    return torch.tensor((states["joint_vel"][mapping])) * scale
+        mapping = np.arange(len(states[f"{asset_name}/joint_vel"]))
+    return torch.tensor((states[f"{asset_name}/joint_vel"][mapping])) * scale
 
-
-def lin_vel_b(states: Dict[str, Any], scale = 1.0) -> torch.Tensor:
+def lin_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
     """
-    The linear velocity of the asset in base frame.
+    The linear velocity of the asset in world frame.
 
     :param states: State dictionary
+    :param asset_name: Name of the asset
     :param scale: Scale factor
     :return: Linear velocity in the base frame
     """
 
-    return torch.tensor((states["lin_vel_b"])) * scale
+    return torch.tensor((states[f"{asset_name}/lin_vel_w"])) * scale
 
 
-def ang_vel_b(states: Dict[str, Any], scale = 1.0) -> torch.Tensor:
+def ang_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
     """
-    The angular velocity of the asset in base frame.
+    The angular velocity of the asset in world frame.
 
     :param states: State dictionary
+    :param asset_name: Name of the asset
     :param scale: Scale factor
     :return: Angular velocity in the base frame
     """
 
-    return torch.tensor((states["gyroscope"])) * scale
+    return torch.tensor((states[f"{asset_name}/ang_vel_w"])) * scale
 
 
-def projected_gravity_b(states: Dict[str, Any], scale = 1.0) -> torch.Tensor:
+def lin_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+    """
+    The linear velocity of the asset in base frame.
+
+    :param states: State dictionary
+    :param asset_name: Name of the asset
+    :param scale: Scale factor
+    :return: Linear velocity in the base frame
+    """
+
+    return torch.tensor((states[f"{asset_name}/lin_vel_b"])) * scale
+
+
+def ang_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+    """
+    The angular velocity of the asset in base frame.
+
+    :param states: State dictionary
+    :param asset_name: Name of the asset
+    :param scale: Scale factor
+    :return: Angular velocity in the base frame
+    """
+
+    return torch.tensor((states[f"{asset_name}/gyroscope"])) * scale
+
+def root_pos_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+    """
+    The position of the root of the asset in world frame.
+
+    :param states: State dictionary
+    :param asset_name: Name of the asset
+    :param scale: Scale factor
+    :return: Position of the root in the world frame
+    """
+    return torch.tensor((states[f"{asset_name}/base_pos_w"])) * scale
+
+
+def root_quat_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+    """
+    The orientation of the root of the asset in world frame.
+
+    :param states: State dictionary
+    :param asset_name: Name of the asset
+    :param scale: Scale factor
+    :return: Orientation of the root in the world frame
+    """
+    return torch.tensor((states[f"{asset_name}/base_quat"])) * scale
+
+
+def projected_gravity_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
     """
     The projected gravity vector.
 
     :param states: State dictionary
+    :param asset_name: Name of the asset
     :param scale: Scale factor
     :return: Projected Gravity vector in the base frame
     """
 
-    base_quat = states["base_quat"]
+    base_quat = states[f"{asset_name}/base_quat"]
     if isinstance(base_quat, np.ndarray):
         quat = torch.tensor(base_quat, dtype=torch.float64)
     elif torch.is_tensor(base_quat):

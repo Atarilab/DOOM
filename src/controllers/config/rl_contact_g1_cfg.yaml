@@ -2,8 +2,8 @@ policy_path: "bimanual_g1/policy.pt"
 policy_architecture: "recurrent"
 control_dt: 0.002
 decimation: 10
-action_dim: 12
-obs_dim: 47
+action_dim: 17
+obs_dim: 126
 action_scale: 0.25 # 0.25
 stiffness: 
   - 100

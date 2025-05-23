@@ -138,6 +138,7 @@ class CommandWidget(Vertical):
         controller: The active robot controller
         command_specs: List of command specifications
             Each spec is a tuple of (command_name, label, min_value, max_value)
+        logger: The logger
     """
 
     def __init__(

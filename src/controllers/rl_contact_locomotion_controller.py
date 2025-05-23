@@ -22,7 +22,6 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
     """
 
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        self.init_completed = False
         super().__init__(robot=robot, configs=configs)
 
         # Initialize publshers for visualization
@@ -202,8 +201,6 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
         self.current_goal_idx = 0
         self.goal_completion_counter = 0
 
-        self.init_completed = True
-        
     def register_observations(self):
         """
         Register observations for contact-conditioned locomotion.
@@ -356,12 +353,12 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             self.pub_current_contact_locations()
 
         if self.visualize["foot_forces"]:
-            self.pub_foot_forces(state["foot_forces"])
-            self.pub_contact_status(state["foot_forces"])
+            self.pub_foot_forces(state["robot/foot_forces"])
+            self.pub_contact_status(state["robot/foot_forces"])
         if self.visualize["contact_plan"]:
             self.pub_contact_plan()
 
-        # self.command_manager.logger.debug(f"Time left: {self.time_left:.2f} seconds")
+        # self.logger.debug(f"Time left: {self.time_left:.2f} seconds")
         try:
             joint_pos_targets = self.compute_joint_pos_targets()
 
@@ -381,7 +378,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             self.cmd_preparation_time = time.perf_counter() - start_time
             
         except Exception as e:
-            self.command_manager.logger.error(f"Error computing torques: {e}")
+            self.logger.error(f"Error computing torques: {e}")
             self.cmd = {
                 f"motor_{i}": {
                     "q": self.default_joint_pos[i],
@@ -410,8 +407,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                 if hasattr(self, 'step_size_change_pending') and self.step_size_change_pending:
                     self.feet_step_size = self.pending_step_size
                     self.step_size_change_pending = False
-                    if self.command_manager and self.command_manager.logger:
-                        self.command_manager.logger.debug(f"Applied step size change: {self.feet_step_size:.2f} meters")
+                    if self.logger is not None:
+                        self.logger.debug(f"Applied step size change: {self.feet_step_size:.2f} meters")
                     # Regenerate future feet positions with new step size
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
                     self.generate_future_feet_positions(pos=avg_base_xy)
@@ -421,8 +418,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                 if self.heading_change_pending:
                     self.heading_command = self.pending_heading
                     self.heading_change_pending = False
-                    if self.command_manager and self.command_manager.logger:
-                        self.command_manager.logger.debug(f"Applied heading change: {self.heading_command:.2f} radians")
+                    if self.logger is not None:
+                        self.logger.debug(f"Applied heading change: {self.heading_command:.2f} radians")
                     # Regenerate future feet positions with new heading
                     self.generate_future_feet_positions()
 
@@ -430,8 +427,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                 if self.lateral_pos_change_pending:
                     self.lateral_pos = self.pending_lateral_pos
                     self.lateral_pos_change_pending = False
-                    if self.command_manager and self.command_manager.logger:
-                        self.command_manager.logger.debug(f"Applied lateral pos change: {self.lateral_pos:.2f} meters")
+                    if self.logger is not None:
+                        self.logger.debug(f"Applied lateral pos change: {self.lateral_pos:.2f} meters")
                     # Regenerate future feet positions with new heading
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
                     avg_base_xy[1] = self.lateral_pos
@@ -441,8 +438,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                 if self.command_duration_change_pending:
                     self.command_duration = self.pending_command_duration
                     self.command_duration_change_pending = False
-                    if self.command_manager and self.command_manager.logger:
-                        self.command_manager.logger.debug(f"Applied command duration change: {self.command_duration:.2f} seconds")
+                    if self.logger is not None:
+                        self.logger.debug(f"Applied command duration change: {self.command_duration:.2f} seconds")
                 
                 # Apply pending offset change if any
                 if self.stance_width_change_pending:
@@ -452,8 +449,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                     self.current_offset[3, 1] = -self.pending_stance_width_rear
 
                     self.stance_width_change_pending = False
-                    if self.command_manager and self.command_manager.logger:
-                        self.command_manager.logger.debug(f"Applied stance width change: {self.current_offset}")
+                    if self.logger is not None:
+                        self.logger.debug(f"Applied stance width change: {self.current_offset}")
                     # Regenerate future feet positions with new stance width
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
 
@@ -491,7 +488,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                             # Signal that the gait change is complete
                             self._gait_change_event.set()
 
-                            self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
+                            self.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
 
                             # Signal that the gait change is complete
                     else:
@@ -518,7 +515,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                             # Signal that the gait change is complete
                             self._gait_change_event.set()
 
-                            self.command_manager.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
+                            self.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
 
 
                 # Normal gait progression (only if not in transition phase)
@@ -569,7 +566,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                         
         except Exception as e:
             if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
-                self.command_manager.logger.error(f"Error resampling commands: {e}")
+                self.logger.error(f"Error resampling commands: {e}")
             else:
                 print(f"Error resampling commands: {e}")
 
@@ -732,7 +729,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
                                 self.transition_end_gait = new_gait
 
         except Exception as e:
-            self.command_manager.logger.error(f"Contact command update failed: {e}")
+            self.logger.error(f"Contact command update failed: {e}")
 
 
     def _handle_step_size_change(self, direction: str):
@@ -806,8 +803,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             # Set the pending flag
             self.command_duration_change_pending = True
             
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.debug(f"Pending command duration change: {self.pending_command_duration:.2f} seconds")
+            if self.logger is not None:
+                self.logger.debug(f"Pending command duration change: {self.pending_command_duration:.2f} seconds")
 
     def _handle_stance_width_change(self, side: str, direction: str):
         """Handle offset changes."""
@@ -835,8 +832,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             # Set the pending flag
             self.stance_width_change_pending = True
             
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.debug(f"Pending stance width change: {self.pending_stance_width_front:.3f} meters (front) and {self.pending_stance_width_rear:.3f} meters (rear)")
+            if self.logger is not None:
+                self.logger.debug(f"Pending stance width change: {self.pending_stance_width_front:.3f} meters (front) and {self.pending_stance_width_rear:.3f} meters (rear)")
 
     def _handle_reset(self):
         """Reset command duration and offset values to default."""
@@ -850,8 +847,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             self.pending_stance_width_rear = self.default_offset[0, 1]
             self.stance_width_change_pending = True
             
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.debug("Reset command duration and stance width values to default")
+            if self.logger is not None:
+                self.logger.debug("Reset command duration and stance width values to default")
 
 
 
@@ -932,7 +929,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             # Publish the marker array
             self.feet_error_pub.publish(feet_errors_msg)
         except Exception as e:
-            self.command_manager.logger.error(f"Failed to publish feet error: {e}")
+            self.logger.error(f"Failed to publish feet error: {e}")
 
     def pub_future_feet_positions(self):
         """
@@ -988,12 +985,12 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
 
             # Publish the marker array
             self.feet_trajectory_pub.publish(marker_array)
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.debug("Published future feet positions marker array")
+            if self.logger is not None:
+                self.logger.debug("Published future feet positions marker array")
 
         except Exception as e:
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.error(f"Failed to publish future feet positions: {e}")
+            if self.logger is not None:
+                self.logger.error(f"Failed to publish future feet positions: {e}")
 
     def pub_current_contact_locations(self):
         """
@@ -1048,8 +1045,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             self.contact_locations_pub.publish(marker_array)
 
         except Exception as e:
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.error(f"Failed to publish current contact locations: {e}")
+            if self.logger is not None:
+                self.logger.error(f"Failed to publish current contact locations: {e}")
 
     def pub_feet_error_norm(self):
         """
@@ -1070,7 +1067,7 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             # Publish the message
             self.feet_error_norm_pub.publish(msg)
         except Exception as e:
-            self.command_manager.logger.error(f"Failed to publish feet error norm: {e}")
+            self.logger.error(f"Failed to publish feet error norm: {e}")
 
     def pub_contact_plan(self):
         """
@@ -1093,8 +1090,8 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             self.contact_plan_pub.publish(msg)
             
         except Exception as e:
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.error(f"Failed to publish contact plan: {e}")
+            if self.logger is not None:
+                self.logger.error(f"Failed to publish contact plan: {e}")
         
     def pub_contact_status(self, foot_forces):
         """
@@ -1109,12 +1106,12 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             msg.layout.dim[0].stride = 4
             mapped_foot_forces = [foot_forces[1], foot_forces[0], foot_forces[3], foot_forces[2]]
             msg.data = [float(x > 30) for x in mapped_foot_forces]
-            # self.command_manager.logger.debug(f"Publishing foot forces: {foot_forces}")
+            # self.logger.debug(f"Publishing foot forces: {foot_forces}")
 
             # Publish the message
             self.contact_status_pub.publish(msg)
         except Exception as e:
-            self.command_manager.logger.error(f"Failed to publish contact status: {e}")
+            self.logger.error(f"Failed to publish contact status: {e}")
             
     def pub_foot_forces(self, foot_forces):
         """
@@ -1129,9 +1126,9 @@ class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
             msg.layout.dim[0].stride = 4
             mapped_foot_forces = [foot_forces[1], foot_forces[0], foot_forces[3], foot_forces[2]]
             msg.data = [float(x) for x in mapped_foot_forces]
-            # self.command_manager.logger.debug(f"Publishing foot forces: {foot_forces}")
+            # self.logger.debug(f"Publishing foot forces: {foot_forces}")
 
             # Publish the message
             self.foot_forces_pub.publish(msg)
         except Exception as e:
-            self.command_manager.logger.error(f"Failed to publish foot forces: {e}")
+            self.logger.error(f"Failed to publish foot forces: {e}")
