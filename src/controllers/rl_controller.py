@@ -217,12 +217,12 @@ class BaseRLLocomotionController(ControllerBase, Node):
                             
                     self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
-                    self.command_manager.logger.error(f"Policy inference error: {e}")
+                    self.logger.error(f"Policy inference error: {e}")
                     time.sleep(0.1)  # Prevent rapid error loops
                     continue
 
             except Exception as e:
-                self.command_manager.logger.error(f"Policy inference thread error: {e}")
+                self.logger.error(f"Policy inference thread error: {e}")
                 time.sleep(0.1)  # Prevent rapid error loops
                 
     def compute_joint_pos_targets(self):
@@ -260,7 +260,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
             return joint_pos_targets
         except Exception as e:
-            self.command_manager.logger.error(f"Error computing joint pos targets: {e}")
+            self.logger.error(f"Error computing joint pos targets: {e}")
             # return self.cmd
 
 class RLQuadrupedLocomotionVelocityController(BaseRLLocomotionController):
@@ -301,12 +301,12 @@ class RLQuadrupedLocomotionVelocityController(BaseRLLocomotionController):
                 
             self.velocity_commands = new_velocity_commands
             
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.debug(f"Command Updated: {new_commands}")
+            if self.logger is not None:
+                self.logger.debug(f"Command Updated: {new_commands}")
         except ValueError as e:
             # Log error or handle validation failure
-            if self.command_manager and self.command_manager.logger:
-                self.command_manager.logger.error(f"Command update failed: {e}")
+            if self.logger is not None:
+                self.logger.error(f"Command update failed: {e}")
 
     def register_commands(self):
         self.command_manager.register(
@@ -428,7 +428,7 @@ class RLQuadrupedLocomotionVelocityController(BaseRLLocomotionController):
             
 
         except Exception as e:
-            self.command_manager.logger.error(f"Error computing torques: {e}")
+            self.logger.error(f"Error computing torques: {e}")
             self.cmd = {
                 f"motor_{i}": {
                     "q": self.default_joint_pos[i],

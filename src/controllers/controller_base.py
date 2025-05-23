@@ -105,6 +105,7 @@ class ControllerBase(ABC):
         :param obs_manager: Command manager instance
         """
         self.command_manager = cmd_manager
+        self.logger = cmd_manager.logger
 
         # Automatically register commands if method exists
         if hasattr(self, "register_commands"):
