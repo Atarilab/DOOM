@@ -39,7 +39,6 @@ If the connection is not established, you might need to manually set the IP for 
 
 ## VS Code Workspace Setup
 Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container. Additionally, debuggers for certain tasks are already defined in `.vscode/launch.json`.
-"""
 
 ## How to use DOOM to control your robot
 The various tasks are defined in `tasks/task_configs.json`. Currently, the following tasks are defined and tested:
@@ -59,13 +58,88 @@ python3 simulate.py --task custom-task-name --log log_name
 ```
 Example Workflow: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > `RL-Velocity` > `RL-Velocity`
 
+## Go2 Blind Locomotion using UI Velocity Commands Example (SIM)
+Before you start, make sure there are no other main processes running on your computer. This could cause jittery movements due to imperfect tracking of the PD controllers introduced by the latency from heavy process in the background. Keep an eye out for your CPU utilisation using `htop` to validate this. A simple restart can ensure that you start fresh. 
+
+#### Terminal 1
+```bash
+./doom -a # attach a terminal to the existing DOOM container
+cd src/
+python3 simulate.py --task=rl-velocity-sim-go2
+```
+#### Terminal 2
+```bash
+./doom -e # enter the container
+source setup_local.sh
+ros2 run master_manager master_node --task rl-velocity-sim-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
+```
+IDLE mode is a damping mode to gracefully stop commands to the robot.
+STAND modes are used to initialise the robot to its default positions using simple PD controllers. Click on `STAND`, and then `STAY_DOWN`. This makes the robot stay in a crouched position close to the ground. After it stabilises, click on `STAND_UP`, which is a phase-based PD controller that makes the robot stand up to the default joint configuration. `STAND_DOWN` is also a phase-based PD controller that moves from the standing up joint configuration to the crouched joint position, as in `STAY_DOWN`.
+
+> Note: Since these `STAND` modes are phase-based PD controllers, allow them to stabilise before switching to other modes.
+
+> Note: The UI terminal window may need to be resized to see the different modes. If using [Terminator](https://gnome-terminator.org/), you can use `Ctrl+Shift+X` for full screen and `Ctrl + MouseScroll` to adjust the window dimensions to fit your screen
+
+Now that the robot is in the `STAND_UP` configuration, go back to the Main Menu from the UI, choose `LOCOMOTION`, and then `RL-VELOCITY`. This will start the velocity command based blind RL locomotion policy at zero velocity. From the UI, you can now enter the X, Y velocities and the yaw rates for fixed command velocities.
+
+## Go2 Blind Locomotion using UI Velocity Commands Example (REAL)
+The only change for running on the real robot is launching the Vicon client to get the base states instead of launching the simulator, and using the correct task name for the real experiments. The rest is taken care of by DOOM to maintain the same interface to run experiments in sim (MuJoCo) and on the real robot.
+
+#### Terminal 1
+Launch Vicon client that publishes the base states
+```bash
+./doom -e # enter the container
+ros2 launch vicon_receiver client.launch.py
+```
+
+#### Terminal 2
+```bash
+./doom -a # attach a terminal to the existing DOOM container
+source setup.sh
+ros2 topic list # view available topics, confirm if you can view topics published by the robot and by the vicon
+ros2 run master_manager master_node --task rl-velocity-real-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
+```
+
+#### Terminal 3 (optional)
+Use plotjuggler to view topics in real time plots
+```bash
+./doom -a # attach a terminal to the existing DOOM container
+source setup.sh
+ros2 run plotjuggler plotjuggler
+```
+
+#### Terminal 4 (optional)
+Robot Visualization in RViz
+```bash
+./doom -a # attach a terminal to the existing DOOM container
+source setup.sh
+ros2 launch go2_description go2_visualization.launch.py
+```
+
+## Joystick 
+Alternatively, to send commands to the robot, users can also use the joystick. Make sure that the Docker container is launched with the joystick already connected.
+There are some common joystick configurations to handle the mode-switches:
+
+Start: `IDLE` -> `STAY_DOWN`
+
+Start: AnyElse -> `IDLE`
+
+Up: `STAY_DOWN`/`STAND_DOWN` -> `STAND_UP`
+
+Down: `STAND_UP` -> `STAND_DOWN`
+
+Down: `STAND_DOWN` -> `STAY_DOWN`
+
+L1+R1: `STAND_UP` -> `RL-CONTACT` 
+
+You can further define controller-specific joystick mappings by defining `get_joystick_mappings` (See RL-Contact Controller for reference).
+
 
 ## Vicon State Estimation
 The Vicon receiver client is already installed in the docker container. You can launch it in a new terminal inside existing container (`./doom -a`) using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
-> Note: One of the markers around the midsection is the origin of the vicon frame. The [translations](https://github.com/Atarilab/DOOM/blob/ffeb612f67ab69da194d9a04be915162b138044b/src/state_manager/state_manager/msg_handlers.py#L71) towards the base were taken as a rough estimate. There are no rotations considered for this frame.
 
 ## Live Plotting using PlotJuggler
 ```bash
@@ -108,6 +182,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 
 ## Known Issues
 - When using torque control for low-level control, there is a delay (latency), which causes the robot to behave unexpectedly. This could be resolved by training with delayed actuation of joints. However, position control generally seems to be a more stable and recommended approach to sending low-level commands to the robot.
+- 
 
 ## Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
