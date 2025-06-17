@@ -1,9 +1,10 @@
-policy_path: "locomotion_go2/velocity_policy_unidirectional.pt"
-control_dt: 0.001
-decimation: 4
+policy_path: "locomotion_go2/2025-05-30_18-17-23_fromVision_motions_DepthCam_extended_SEED_1.pt"
+control_dt: 0.02 # this is the dt with which control output is determined
+decimation: 1 # possibly leave at one
 action_dim: 12
+observation_history_length: 5
 obs_dim: 48
-action_scale: 0.35
+action_scale: 0.25
 stiffness: 25.0
 damping: 0.5
 default_joint_pos:

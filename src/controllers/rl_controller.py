@@ -1,14 +1,16 @@
 import os
 import threading
 import time
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 import numpy as np
 import torch
-from commands.command_manager import CommandTerm
-from controllers.controller_base import ControllerBase
 from geometry_msgs.msg import Point, TransformStamped
 from rclpy.node import Node
+from tf2_ros import StaticTransformBroadcaster
+
+from commands.command_manager import CommandTerm
+from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import (
     ang_vel_b,
@@ -19,7 +21,6 @@ from state_manager.observations import (
     projected_gravity_b,
     velocity_commands,
 )
-from tf2_ros import StaticTransformBroadcaster
 from utils.helpers import ObservationHistoryStorage
 
 if TYPE_CHECKING:
@@ -98,7 +99,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         :param configs: Configuration dictionary
         """
         controller_config = configs["controller_config"]
-        
+
         # Controller gains and configuration
         self.Kp = controller_config.get("stiffness", None)
         self.Kd = controller_config.get("damping", None)
@@ -139,7 +140,15 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
-        self.obs_buffer = ObservationHistoryStorage(num_envs=1, policy_architecture=self.policy_architecture, num_obs=obs_dim, max_length=1, device="cpu")
+        self.obs_buffer = ObservationHistoryStorage(
+            num_envs=1,
+            policy_architecture=self.policy_architecture,
+            num_obs=obs_dim,
+            max_length=configs["controller_config"].get(
+                "observation_history_length", 1
+            ),
+            device="cpu",
+        )
 
         # Start concurrent processing threads
         self._init_processing_threads()
@@ -214,7 +223,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                     # Policy inference
                     with torch.no_grad():
                         raw_action = self.policy(obs)
-                            
+
                     self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
                     self.command_manager.logger.error(f"Policy inference error: {e}")
@@ -224,7 +233,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
             except Exception as e:
                 self.command_manager.logger.error(f"Policy inference thread error: {e}")
                 time.sleep(0.1)  # Prevent rapid error loops
-                
+
     def compute_joint_pos_targets(self):
         """
         Compute joint position targets based on the policy output.
@@ -352,7 +361,6 @@ class RLQuadrupedLocomotionVelocityController(BaseRLLocomotionController):
         """
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
-        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
         self.obs_manager.register(
             "velocity_commands",
             ObsTerm(
@@ -360,6 +368,7 @@ class RLQuadrupedLocomotionVelocityController(BaseRLLocomotionController):
                 params={"velocity_commands": lambda: self.velocity_commands},
             ),
         )
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
         self.obs_manager.register(
             "joint_pos",
             ObsTerm(
