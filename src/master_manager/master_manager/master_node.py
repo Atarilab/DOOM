@@ -13,6 +13,18 @@ from utils.ui_interface import ModeManager, RobotControlUI
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.logger import get_logger
 
+import debugpy
+import sys
+
+# Check if we're in debug mode (you can use any flag you prefer)
+if '--debug' in sys.argv:
+    debugpy.listen(5678)
+    print("Waiting for debugger to attach...")
+    debugpy.wait_for_client()
+    print("Debugger attached!")
+    # Remove the --debug flag so it doesn't interfere with your app
+    sys.argv.remove('--debug')
+
 node = None
 state_manager = None
 
