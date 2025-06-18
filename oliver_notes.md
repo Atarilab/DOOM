@@ -21,3 +21,5 @@ Add this to `.vscode/launch.json` for debug ROS node:
 and start like this:
 
 `ros2 run master_manager master_node --task rl-velocity-sim-go2 --log test --enable-ui --debug`
+
+Run `pip install debugpy` in container

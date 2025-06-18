@@ -1,6 +1,7 @@
-policy_path: "locomotion_go2/2025-05-30_18-17-23_fromVision_motions_DepthCam_extended_SEED_1.pt"
-control_dt: 0.02 # this is the dt with which control output is determined
-decimation: 1 # possibly leave at one
+policy_path: "locomotion_go2/home/admin_07/project_repos/isaac_lab/IsaacLab/logs/rsl_rl/unitree_go2_flat/_complexReward_test_noDR_SEED_1/exported/policy.pt"
+control_dt: 0.002 # this is the dt with which control output is determined
+decimation: 2 # possibly leave at one
+SIMULATION_DT: 0.001
 action_dim: 12
 observation_history_length: 5
 obs_dim: 48
@@ -37,20 +38,8 @@ ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joi
 
 JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING:
   [3, 0, 9, 6, 4, 1, 10, 7, 5, 2, 11, 8]
-JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
-    1,
-    5,
-    9,
-    0,
-    4,
-    8,
-    3,
-    7,
-    11,
-    2,
-    6,
-    10,
-  ] 
+JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING:
+  [1, 5, 9, 0, 4, 8, 3, 7, 11, 2, 6, 10]
 
 ISAAC_LAB_DEFAULT_JOINT_POS: [
     0.1000, # 0
@@ -66,3 +55,21 @@ ISAAC_LAB_DEFAULT_JOINT_POS: [
     -1.5000, # 10
     -1.5000, # 11
   ] # from asset.data.default_joint_pos; corresponds to ISAACLAB_JOINT_ORDER; is used as action offset
+
+# For IsaacLab we have:
+# asset.data.default_joint_friction = 0
+# asset.data.default_joint_armature = 0
+# asset.data.default_joint_damping = 0.5
+# asset.data.default_joint_limits =
+# tensor([[-1.0472,  1.0472],
+#         [-1.0472,  1.0472],
+#         [-1.0472,  1.0472],
+#         [-1.0472,  1.0472],
+#         [-1.5708,  3.4907],
+#         [-1.5708,  3.4907],
+#         [-0.5236,  4.5379],
+#         [-0.5236,  4.5379],
+#         [-2.7227, -0.8378],
+#         [-2.7227, -0.8378],
+#         [-2.7227, -0.8378],
+#         [-2.7227, -0.8378]], device='cuda:0')
