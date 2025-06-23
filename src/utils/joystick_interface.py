@@ -1,9 +1,12 @@
-import pygame
 import logging
 import threading
 import time
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
+import pygame
+
 from utils.ui_interface import ModeManager
+
 
 class JoystickManager:
     """Manages joystick input and mapping to robot commands."""
@@ -160,7 +163,7 @@ class JoystickManager:
                         self.mode_manager.set_mode("STAND", "STAY_DOWN")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "Go2StandUpController":
-                        self.mode_manager.set_mode("LOCOMOTION", "RL-CONTACT")
+                        self.mode_manager.set_mode("LOCOMOTION", "RL-VELOCITY")
                         self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available

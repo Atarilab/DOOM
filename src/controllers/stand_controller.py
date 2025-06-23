@@ -1,10 +1,11 @@
-from typing import Any, Dict, TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING, Any, Dict
 
 import numpy as np
+
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import starting_time
-import time
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
@@ -28,9 +29,9 @@ class IdleController(ControllerBase):
 
     def compute_torques(self, state, desired_goal):
 
-        # When Init Controller is called, set the init frame
-        if self.robot.mj_model is not None:
-            self.robot.mj_model.set_initial_world_frame(state, caller=self.__class__.__name__)
+        # # When Init Controller is called, set the init frame
+        # if self.robot.mj_model is not None:
+        #     self.robot.mj_model.set_initial_world_frame(state, caller=self.__class__.__name__)
 
         super().compute_torques(state, desired_goal=desired_goal)
 

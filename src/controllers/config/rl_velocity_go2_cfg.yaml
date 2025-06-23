@@ -1,4 +1,4 @@
-policy_path: "locomotion_go2/home/admin_07/project_repos/isaac_lab/IsaacLab/logs/rsl_rl/unitree_go2_flat/_complexReward_test_noDR_SEED_1/exported/policy.pt"
+policy_path: "locomotion_go2/home/admin_07/project_repos/isaac_lab/IsaacLab/logs/rsl_rl/unitree_go2_AMPflat/2025-06-06_15-35-34_fromVision_motions_DepthCam_extendedWithoutReverse_SEED_1/exported/policy.pt"
 control_dt: 0.002 # this is the dt with which control output is determined
 decimation: 2 # possibly leave at one
 SIMULATION_DT: 0.001
