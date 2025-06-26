@@ -1,7 +1,7 @@
-policy_path: "locomotion_go2/home/admin_07/project_repos/isaac_lab/IsaacLab/logs/rsl_rl/unitree_go2_flat/_complexReward_test_noDR_SEED_1/exported/policy.pt"
-control_dt: 0.002 # this is the dt with which control output is determined
-decimation: 2 # possibly leave at one
-SIMULATION_DT: 0.001
+policy_path: "locomotion_go2/home/admin_07/project_repos/isaac_lab/IsaacLab/logs/rsl_rl/unitree_go2_flat/2025-06-25_17-02-26_complexReward_test_DR3_SEED_1/exported/policy.pt"
+control_dt: 0.02 # this is the dt with which control output is determined
+decimation: 1 # possibly leave at one
+SIMULATION_DT: 0.005
 action_dim: 12
 observation_history_length: 5
 obs_dim: 48
