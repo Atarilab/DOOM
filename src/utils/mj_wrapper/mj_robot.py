@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Tuple
 
 import mujoco
 import numpy as np
+
 from utils.math import quat_to_rotmatrix
 
 
@@ -62,7 +63,6 @@ class MjRobotWrapper:
             base_pos = np.array(state["base_pos_w"])
             # Convert quaternion (w,x,y,z) to rotation matrix using the utility function
             base_rot = quat_to_rotmatrix(np.array(state["base_quat"]), order="wxyz")
-
         except Exception as e:
             print(f"Error setting init frame: {e}")
             return

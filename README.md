@@ -50,7 +50,7 @@ The various tasks are defined in `tasks/task_configs.json`. Currently, the follo
   
 Once you've chosen the task you want to run, you can launch the user interface to control the robot using:
 ```bash
-ros2 run master_manager master_node --task custom-task-name --log log_name
+ros2 run master_manager master_node --task rl-velocity-real-go2--log log_name
 ```
 This repository also has a simulation mode which allows you to run the same scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. Note that MuJoCo is not used as a visualizer for your real robot interface but rather as a sanity test of the same script that you might run on the real robot.
 To launch the simulator, run:
