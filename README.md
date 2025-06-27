@@ -46,6 +46,7 @@ The various tasks are defined in `tasks/task_configs.json`. Currently, the follo
 - `rl-velocity-real-go2` (Status: ✅ )
 - `rl-contact-sim-go2` (Status: ✅ )
 - `rl-contact-real-go2` (Status: ✅ )
+- `rl-velocity-sim-g1` (Status: ⚠️ ) [WIP]: Stand Controllers work, not the policy
   
 Once you've chosen the task you want to run, you can launch the user interface to control the robot using:
 ```bash
@@ -161,11 +162,11 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
-- [ ] Implement simple stand up, stand down controllers
-- [ ] Test Humanoid Velocity Locomotion Policy
-- [ ] Create table with box env
-- [ ] Test contact bimanual manipulation policy
+- [ ] Test g1 velocity locomotion Policy
+- [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
+- [x] Create table with box env for G1
+- [x] Implement simple stand up, stand down controllers for G1
 - [x] Add G1 in sim
 - [x] Optional Terminal UI Interface
 - [x] Test RViz on the real robot for contact-conditioned policy (stance, trot in place)
