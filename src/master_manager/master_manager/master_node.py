@@ -1,20 +1,23 @@
+import argparse
+import asyncio
 import os
 import time
+
 import rclpy
-import asyncio
-import argparse
+
 
 # DOOM Imports
 from controllers.stand_controller import IdleController
 from master_manager.low_level_cmd_publisher import LowLevelCmdPublisher
 from robots import resolve_robot
 from state_manager.state_manager import StateManager
-from utils.ui_interface import ModeManager, RobotControlUI
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.logger import get_logger
+from utils.ui_interface import ModeManager, RobotControlUI
 
 node = None
 state_manager = None
+import traceback
 
 async def main_async(args=None):
     """
@@ -37,7 +40,9 @@ async def main_async(args=None):
     # Parse arguments
     parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
     parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run")
-    parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
+    parser.add_argument(
+        "--log", type=str, default="test", help="Experiment name to log information"
+    )
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
     parser.add_argument("--enable-ui", action="store_true", help="Enable the Robot Control UI")
 
@@ -48,7 +53,7 @@ async def main_async(args=None):
     logger = get_logger(f"{args.task}_robot_controller", log_file, debug=args.debug)
 
     try:
-        logger.info(f"Starting robot controller for task: {args.task}")
+        logger.info('Starting robot controller for task: {}', args.task)
 
         # Load configurations
         configs = await initialize_robot_controller(args.task, logger)
@@ -58,10 +63,10 @@ async def main_async(args=None):
 
         # Initialize state manager - responsible for handling ROS/DDS raw messages
         state_manager = StateManager(logger=logger)
-        
+
         # Automatically resolve robot class from task name
         robot = resolve_robot(args.task, logger)
-        
+
         # Add subscribers desired for the specified task to state manager from robot model
         for name, subscriber in robot.subscribers.items():
             state_manager.add_subscriber(name, subscriber)
@@ -69,12 +74,13 @@ async def main_async(args=None):
         # Create mode manager and register idle (damping) controller
         mode_manager = ModeManager(logger=logger)
         mode_manager.register_mode("IDLE", {"default": IdleController(robot, configs)})
-        
+
         # Register controllers available for the robot
         for controller_type, controllers in robot.available_controllers.items():
-            controller_dict = {}
-            for controller_name, controller_class in controllers.items():
-                controller_dict[controller_name] = controller_class(robot, configs)
+            controller_dict = {
+                controller_name: controller_class(robot, configs)
+                for (controller_name, controller_class) in controllers.items()
+            }
             mode_manager.register_mode(controller_type, controller_dict)
 
         # Set idle mode by default
@@ -93,14 +99,15 @@ async def main_async(args=None):
             logger.info("Starting concurrent tasks")
 
             # Create robot control UI if not disabled
-            if args.enable_ui:
-                app_task = asyncio.create_task(RobotControlUI(mode_manager, task_name=args.task).run_async())
-            else:
-                app_task = None
+            app_task = (
+                asyncio.create_task(RobotControlUI(mode_manager, task_name=args.task).run_async())
+                if args.enable_ui
+                else None
+            )
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
-                spin_dt = 0.00025
+                spin_dt = 0.00025  # you could increase this value to reduce the frequency of the callbacks (less CPU utilization)
                 last_spin_time = time.time()
 
                 while rclpy.ok():
@@ -134,7 +141,7 @@ async def main_async(args=None):
         logger.info("Set controller to IDLE mode before shutdown")
 
     except Exception as e:
-        logger.exception(f"An error occurred: {e}")
+        logger.exception('An error occurred: {}', e)
         raise
     finally:
         if node:

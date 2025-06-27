@@ -1,6 +1,5 @@
 import logging
-import time
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
@@ -10,16 +9,8 @@ from tf2_ros import TransformBroadcaster
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
-from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
-from unitree_sdk2py.go2.sport.sport_client import SportClient
-
-
 from utils.joystick_interface import JoystickManager
 
-if TYPE_CHECKING:
-    from robots.robot_base import RobotBase
-    from state_manager.state_manager import StateManager
-    from utils.ui_interface import ModeManager
 
 class LowLevelCmdPublisher(Node):
     """Manages low-level robot command publishing."""
@@ -42,34 +33,18 @@ class LowLevelCmdPublisher(Node):
         # Control parameters
         self.dt = dt
         self.running_time = 0.0
-        
+
         # Initialize command message
         self.dds_cmd = self.robot.low_cmd_msg()
         self.crc = CRC()
-        
+
         if self.robot.name == "UnitreeG1":
-            self.motor_mode = MotorMode.PR
+            self.motor_mode = MotorMode.pr
             self.mode_machine_ = 0
             self._init_cmd_g1(self.mode_machine_, self.motor_mode)
-            
+
         elif self.robot.name == "UnitreeGo2":
             self._init_cmd_go2()
-        
-        # self.sc = SportClient()  
-        # self.sc.SetTimeout(5.0)
-        # self.sc.Init()
-
-        # self.msc = MotionSwitcherClient()
-        # self.msc.SetTimeout(5.0)
-        # self.msc.Init()
-
-        # status, result = self.msc.CheckMode()
-        # while result['name']:
-        #     self.sc.StandDown()
-        #     self.msc.ReleaseMode()
-        #     status, result = self.msc.CheckMode()
-        #     time.sleep(1)
-
         # DDS Publisher setup
         self.dds_pub = ChannelPublisher("rt/lowcmd", self.robot.low_cmd_msg_type)
         self.dds_pub.Init()
@@ -95,17 +70,21 @@ class LowLevelCmdPublisher(Node):
 
         for i in range(len(self.dds_cmd.motor_cmd)):
             self.dds_cmd.motor_cmd[i].mode = 0x01  # PMSM mode
-            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
+            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[
+                i
+            ].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
 
     def _init_cmd_g1(self, mode_machine, mode_pr):
         """Initialize command message with default values for g1."""
-        
+
         self.dds_cmd.mode_machine = mode_machine
         self.dds_cmd.mode_pr = mode_pr
-        
+
         for i in range(len(self.dds_cmd.motor_cmd)):
             self.dds_cmd.motor_cmd[i].mode = 1
-            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
+            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[
+                i
+            ].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
@@ -113,16 +92,15 @@ class LowLevelCmdPublisher(Node):
 
         # Get active controller and compute torques
         active_controller = self.mode_manager.get_active_controller()
-        active_obs_manager = self.mode_manager.get_active_obs_manager()
+        self.mode_manager.get_active_obs_manager()
 
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
 
             # Calculate actual time since last callback
-            time_since_last_callback = current_time - self.last_callback_time
 
             # Update joystick state and handle mode switching
-            _ = self.joystick_manager.update()
+            self.joystick_manager.update()
 
             # Retrieve states from state manager
             try:
@@ -157,7 +135,7 @@ class LowLevelCmdPublisher(Node):
                     self.dds_cmd.mode_pr = motor_commands["mode_pr"]
                 if motor_commands.get("mode_machine", None) is not None:
                     self.dds_cmd.mode_machine = motor_commands["mode_machine"]
-                    
+
             except Exception as e:
                 self.logger.error(f"Error updating motor commands: {e}")
                 return
@@ -219,8 +197,8 @@ class LowLevelCmdPublisher(Node):
         """Clean up resources."""
         if hasattr(self, 'joystick_manager'):
             self.joystick_manager.cleanup()
-            
-            
+
+
 class MotorMode:
-    PR = 0  # Series Control for Pitch/Roll Joints
-    AB = 1  # Parallel Control for A/B Joints
+    pr = 0  # Series Control for Pitch/Roll Joints
+    ab = 1  # Parallel Control for A/B Joints

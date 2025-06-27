@@ -1,9 +1,11 @@
-import pygame
 import logging
 import threading
 import time
-from typing import Optional, Dict, Any
+from typing import Optional
+
+import pygame
 from utils.ui_interface import ModeManager
+
 
 class JoystickManager:
     """Manages joystick input and mapping to robot commands."""
@@ -17,18 +19,18 @@ class JoystickManager:
         self.mode_manager = mode_manager
         self.active_controller = None
         self._setup_joystick()
-        
+
         # Thread management
         self._running = False
         self._thread = None
         self._lock = threading.Lock()
         self._last_key_value = 0
         self._update_rate = 0.02  # 50Hz update rate
-        
+
         # Command cooldown
         self._last_command_time = 0.0
         self._command_cooldown = 0.2  # 0.2 second cooldown between commands
-        
+
         # Start the joystick thread
         self.start_thread()
 
@@ -37,14 +39,13 @@ class JoystickManager:
         pygame.init()
         pygame.joystick.init()
         joystick_count = pygame.joystick.get_count()
-        
-        if joystick_count > 0:
-            self.joystick = pygame.joystick.Joystick(device_id)
-            self.joystick.init()
-            self.logger.info("Joystick initialized successfully")
-        else:
+
+        if joystick_count <= 0:
             self.logger.warning("No gamepad detected")
             return
+        self.joystick = pygame.joystick.Joystick(device_id)
+        self.joystick.init()
+        self.logger.info("Joystick initialized successfully")
 
         if js_type == "xbox":
             self.axis_id = {
@@ -68,7 +69,7 @@ class JoystickManager:
                 "SELECT": 6,
                 "START": 7,
             }
-            
+
             self.key_map = {
                 "R1": 0,
                 "L1": 1,
@@ -94,17 +95,17 @@ class JoystickManager:
         """Set the currently active controller for joystick mapping."""
         with self._lock:
             self.active_controller = controller
-       
+
     def update(self) -> int:
         """
         Get the current joystick state without processing it.
-        
+
         Returns:
             int: Bitmap of pressed buttons/axes
         """
         with self._lock:
             return self._last_key_value
-            
+
     def _joystick_thread_func(self):
         """Thread function that continuously updates joystick state."""
         while self._running:
@@ -112,15 +113,17 @@ class JoystickManager:
                 if not self.joystick:
                     time.sleep(0.1)
                     continue
-                    
+
                 pygame.event.get()
                 key_state = [0] * 16
-                
+
                 # Update button states
                 key_state[self.key_map["R1"]] = self.joystick.get_button(self.button_id["RB"])
                 key_state[self.key_map["L1"]] = self.joystick.get_button(self.button_id["LB"])
                 key_state[self.key_map["start"]] = self.joystick.get_button(self.button_id["START"])
-                key_state[self.key_map["select"]] = self.joystick.get_button(self.button_id["SELECT"])
+                key_state[self.key_map["select"]] = self.joystick.get_button(
+                    self.button_id["SELECT"]
+                )
                 key_state[self.key_map["R2"]] = self.joystick.get_axis(self.axis_id["RT"]) > 0
                 key_state[self.key_map["L2"]] = self.joystick.get_axis(self.axis_id["LT"]) > 0
                 key_state[self.key_map["A"]] = self.joystick.get_button(self.button_id["A"])
@@ -144,61 +147,97 @@ class JoystickManager:
                 # Only process commands if cooldown period has passed
                 if time_since_last_command >= self._command_cooldown:
                     # Handle mode switching based on button combinations
-                    if key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ == "IdleController":
+                    if (
+                        key_state[self.key_map["start"]]
+                        and self.active_controller.__class__.__name__ == "IdleController"
+                    ):
                         self.mode_manager.set_mode("STAND", "STAY_DOWN")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["start"]] and not self.active_controller.__class__.__name__ == "IdleController":
+                    elif (
+                        key_state[self.key_map["start"]]
+                        and self.active_controller.__class__.__name__ != "IdleController"
+                    ):
                         self.mode_manager.set_mode("IDLE")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in ["Go2StayDownController", "Go2StandDownController"]:
+                    elif key_state[
+                        self.key_map["up"]
+                    ] and self.active_controller.__class__.__name__ in {
+                        "Go2StayDownController",
+                        "Go2StandDownController",
+                    }:
                         self.mode_manager.set_mode("STAND", "STAND_UP")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["down"]] and self.active_controller.__class__.__name__ == "Go2StandUpController":
+                    elif (
+                        key_state[self.key_map["down"]]
+                        and self.active_controller.__class__.__name__ == "Go2StandUpController"
+                    ):
                         self.mode_manager.set_mode("STAND", "STAND_DOWN")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["down"]] and key_state[self.key_map["L1"]] and self.active_controller.__class__.__name__ == "Go2StandDownController":
+                    elif (
+                        key_state[self.key_map["down"]]
+                        and key_state[self.key_map["L1"]]
+                        and self.active_controller.__class__.__name__ == "Go2StandDownController"
+                    ):
                         self.mode_manager.set_mode("STAND", "STAY_DOWN")
                         self._last_command_time = current_time
-                    elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "Go2StandUpController":
-                        self.mode_manager.set_mode("LOCOMOTION", "RL-CONTACT")
+                    elif (
+                        key_state[self.key_map["L1"]]
+                        and key_state[self.key_map["R1"]]
+                        and self.active_controller.__class__.__name__ == "Go2StandUpController"
+                    ):
+                        self.mode_manager.set_mode("LOCOMOTION", "RL-VELOCITY")
                         self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available
-                    if self.active_controller and hasattr(self.active_controller, 'get_joystick_mappings'):
+                    if self.active_controller and hasattr(
+                        self.active_controller, 'get_joystick_mappings'
+                    ):
                         mappings = self.active_controller.get_joystick_mappings()
                         for button, callback in mappings.items():
                             # Handle key combinations (e.g. "L1-right")
                             if "-" in button:
                                 keys = button.split("-")
                                 # Check if all keys in combination are pressed
-                                if all(key in self.key_map and key_state[self.key_map[key]] for key in keys):
+                                if all(
+                                    key in self.key_map and key_state[self.key_map[key]]
+                                    for key in keys
+                                ):
                                     try:
                                         callback()
                                         self._last_command_time = current_time
                                         break
                                     except Exception as e:
-                                        self.logger.error(f"Error executing joystick mapping for {button}: {e}")
+                                        self.logger.error(
+                                            f"Error executing joystick mapping for {button}: {e}"
+                                        )
                             # Handle single keys
-                            elif button in self.key_map and key_state[self.key_map[button]] and not any(
-                                key_state[self.key_map[key]] for key in self.key_map if key != button
-                            ):
+                            elif (
+                                button in self.key_map
+                                and key_state[self.key_map[button]]
+                                and not any(
+                                    key_state[self.key_map[key]]
+                                    for key in self.key_map
+                                    if key != button
+                            )):
                                 try:
                                     callback()
                                     self._last_command_time = current_time
                                     break
                                 except Exception as e:
-                                    self.logger.error(f"Error executing joystick mapping for {button}: {e}")
+                                    self.logger.error(
+                                        f"Error executing joystick mapping for {button}: {e}"
+                                    )
 
                 if key_value != 0:
                     self.logger.debug(f"Joystick state: {key_value}")
-                    
+
                 with self._lock:
                     self._last_key_value = key_value
                     self.active_controller = self.mode_manager.get_active_controller()
-                
+
                 # Sleep to maintain update rate
                 time.sleep(self._update_rate)
-                
+
             except Exception as e:
                 self.logger.error(f"Error in joystick thread: {e}")
                 time.sleep(0.1)  # Prevent rapid error loops
