@@ -35,6 +35,8 @@ ping $ROBOT_IP
 ```
 If the connection is not established, you might need to manually set the IP for the wired connection. You can do so by following the "Configure Network Environment" section [here](https://support.unitree.com/home/en/developer/Quick_start).
 
+If it still doesn't ping the robot after manually configuring the IP, you can check if the right network interface is chosen. Using the USB-Ethernet Adapter, the network interface should have the ID `enx3c4937046061` by default. You can confirm it using `ifconfig` and checking the network interface ID for the corresponding `$ROBOT_IP`. If not, you should manually change it in `.env.base`, `.env.docker`, then delete the existing container using `./doom.sh -d`, rebuild the container using `./doom.sh -b`, enter inside the container using `./doom.sh -e`, and update the ROS/DDS network interface inside `setup.sh` using the one you found with `ifconfig`. Don't forget to run `source setup.sh` to update them.
+
 ---
 
 ## VS Code Workspace Setup
@@ -64,13 +66,13 @@ Before you start, make sure there are no other main processes running on your co
 
 #### Terminal 1
 ```bash
-./doom -a # attach a terminal to the existing DOOM container
+./doom -e # enter the container
 cd src/
 python3 simulate.py --task=rl-velocity-sim-go2
 ```
 #### Terminal 2
 ```bash
-./doom -e # enter the container
+./doom -a # attach a terminal to the existing DOOM container
 source setup_local.sh
 ros2 run master_manager master_node --task rl-velocity-sim-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
 ```
