@@ -35,6 +35,8 @@ ping $ROBOT_IP
 ```
 If the connection is not established, you might need to manually set the IP for the wired connection. You can do so by following the "Configure Network Environment" section [here](https://support.unitree.com/home/en/developer/Quick_start).
 
+If it still doesn't ping the robot after manually configuring the IP, you can check if the right network interface is chosen. Using the USB-Ethernet Adapter, the network interface should have the ID `enx3c4937046061` by default. You can confirm it using `ifconfig` and checking the network interface ID for the corresponding `$ROBOT_IP`. If not, you should manually change it in `.env.base`, `.env.docker`, then delete the existing container using `./doom.sh -d`, rebuild the container using `./doom.sh -b`, enter inside the container using `./doom.sh -e`, and update the ROS/DDS network interface inside `setup.sh` using the one you found with `ifconfig`. Don't forget to run `source setup.sh` to update them.
+
 ---
 
 ## VS Code Workspace Setup
@@ -46,6 +48,7 @@ The various tasks are defined in `tasks/task_configs.json`. Currently, the follo
 - `rl-velocity-real-go2` (Status: ✅ )
 - `rl-contact-sim-go2` (Status: ✅ )
 - `rl-contact-real-go2` (Status: ✅ )
+- `rl-velocity-sim-g1` (Status: ⚠️ ) [WIP]: Stand Controllers work, not the policy
   
 Once you've chosen the task you want to run, you can launch the user interface to control the robot using:
 ```bash
@@ -63,13 +66,13 @@ Before you start, make sure there are no other main processes running on your co
 
 #### Terminal 1
 ```bash
-./doom -a # attach a terminal to the existing DOOM container
+./doom -e # enter the container
 cd src/
 python3 simulate.py --task=rl-velocity-sim-go2
 ```
 #### Terminal 2
 ```bash
-./doom -e # enter the container
+./doom -a # attach a terminal to the existing DOOM container
 source setup_local.sh
 ros2 run master_manager master_node --task rl-velocity-sim-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
 ```
@@ -161,11 +164,11 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
 ## TODO
-- [ ] Implement simple stand up, stand down controllers
-- [ ] Test Humanoid Velocity Locomotion Policy
-- [ ] Create table with box env
-- [ ] Test contact bimanual manipulation policy
+- [ ] Test g1 velocity locomotion Policy
+- [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
+- [x] Create table with box env for G1
+- [x] Implement simple stand up, stand down controllers for G1
 - [x] Add G1 in sim
 - [x] Optional Terminal UI Interface
 - [x] Test RViz on the real robot for contact-conditioned policy (stance, trot in place)
