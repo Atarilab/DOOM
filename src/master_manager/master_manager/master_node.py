@@ -94,6 +94,7 @@ async def main_async(args=None):
             mode_manager=mode_manager,
             state_manager=state_manager,
             logger=logger,
+            debug=args.debug,
         )
 
         async def run():

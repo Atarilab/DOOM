@@ -10,7 +10,7 @@ from utils.mode_manager import ModeManager
 class JoystickManager:
     """Manages joystick input and mapping to robot commands."""
 
-    def __init__(self, mode_manager: ModeManager, logger: Optional[logging.Logger] = None):
+    def __init__(self, mode_manager: ModeManager, logger: Optional[logging.Logger] = None, debug: bool = False):
         self.logger = logger or logging.getLogger(__name__)
         self.joystick = None
         self.axis_id = {}
@@ -18,6 +18,7 @@ class JoystickManager:
         self.key_map = {}
         self.mode_manager = mode_manager
         self.active_controller = None
+        self.debug = debug
         self._setup_joystick()
 
         # Thread management
@@ -30,6 +31,9 @@ class JoystickManager:
         # Command cooldown
         self._last_command_time = 0.0
         self._command_cooldown = 0.2  # 0.2 second cooldown between commands
+
+        # Submodes indices
+        self._submode_indices = {}  # Track current submode index for each mode
 
         # Start the joystick thread
         self.start_thread()
@@ -108,6 +112,7 @@ class JoystickManager:
 
     def _joystick_thread_func(self):
         """Thread function that continuously updates joystick state."""
+        self.logger.debug("Joystick thread started")
         while self._running:
             try:
                 if not self.joystick:
@@ -185,7 +190,19 @@ class JoystickManager:
                         and key_state[self.key_map["R1"]]
                         and self.active_controller.__class__.__name__ == "Go2StandUpController"
                     ):
-                        self.mode_manager.set_mode("LOCOMOTION", "RL-VELOCITY")
+                        # Cycle through available submodes of the for the main mode
+                        main_mode = list(self.mode_manager._modes.keys())[2]
+                        available_submodes = self.mode_manager.get_mode_info(main_mode)["submode"]
+                        
+                        if main_mode not in self._submode_indices:
+                            self._submode_indices[main_mode] = 0
+                        
+                        current_index = self._submode_indices[main_mode]
+                        self.mode_manager.set_mode(main_mode, available_submodes[current_index])
+                        
+                        self.logger.info(f"Mode set to {main_mode} - {available_submodes[current_index]}")
+                        
+                        self._submode_indices[main_mode] = (current_index + 1) % len(available_submodes)
                         self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available
@@ -246,9 +263,10 @@ class JoystickManager:
         """Start the joystick processing thread."""
         if not self._running:
             self._running = True
-            self._thread = threading.Thread(target=self._joystick_thread_func, daemon=True)
+
+            self._thread = threading.Thread(target=self._joystick_thread_func, daemon=not self.debug)
             self._thread.start()
-            self.logger.info("Joystick thread started")
+            self.logger.info(f"Joystick thread started (daemon={not self.debug})")
 
     def stop_thread(self):
         """Stop the joystick processing thread."""

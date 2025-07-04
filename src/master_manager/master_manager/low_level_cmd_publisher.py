@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
@@ -27,6 +27,7 @@ class LowLevelCmdPublisher(Node):
         mode_manager: "ModeManager",
         state_manager: "StateManager",
         logger: Optional[logging.Logger] = None,
+        debug: bool = False,
     ):
         super().__init__("low_level_cmd")
 
@@ -58,8 +59,12 @@ class LowLevelCmdPublisher(Node):
         self.joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # Initialize joystick manager
-        self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, logger=self.logger)
+        # Initialize joystick manager with debug mode support
+        self.joystick_manager = JoystickManager(
+            mode_manager=self.mode_manager, 
+            logger=self.logger,
+            debug=debug
+        )
 
         # Create timer for periodic command publishing
         self.timer = self.create_timer(self.dt, self.low_level_cmd_callback, clock=self.get_clock())
