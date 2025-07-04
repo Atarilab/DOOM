@@ -8,7 +8,7 @@ from controllers.stand_controller import (
     Go2StandDownController,
 )
 from controllers.rl_contact_locomotion_controller import RLQuadrupedLocomotionContactController
-from controllers.rl_controller import RLQuadrupedLocomotionVelocityController
+from controllers.rl_velocity_locomotion_controller import RLQuadrupedLocomotionVelocityController
 
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as Go2LowState_

@@ -10,12 +10,12 @@ from state_manager.obs_manager import ObsTerm
 from std_msgs.msg import ColorRGBA, Float32MultiArray, MultiArrayDimension
 from visualization_msgs.msg import Marker, MarkerArray
 
-from controllers.rl_controller import BaseRLLocomotionController
+from controllers.rl_controller_base import RLControllerBase
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
 
-class RLQuadrupedLocomotionContactController(BaseRLLocomotionController):
+class RLQuadrupedLocomotionContactController(RLControllerBase):
     """
     Contact-conditioned RL Locomotion Controller
     Uses contact-explicit reinforcement learning policy

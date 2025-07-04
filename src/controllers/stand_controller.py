@@ -3,7 +3,6 @@ from typing import Any, Dict, TYPE_CHECKING
 import numpy as np
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
-from state_manager.observations import starting_time
 import time
 
 if TYPE_CHECKING:
@@ -51,7 +50,7 @@ class Go2StandUpController(ControllerBase):
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-
+    
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         super().__init__(robot=robot, configs=configs)
 
@@ -67,12 +66,12 @@ class Go2StandUpController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
 
@@ -115,12 +114,12 @@ class Go2StandDownController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
 
@@ -161,12 +160,12 @@ class Go2StayDownController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
 
@@ -203,12 +202,12 @@ class Go2StanceController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
     
@@ -277,12 +276,12 @@ class G1StandUpController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
 
@@ -356,12 +355,12 @@ class G1StayUpController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
 
@@ -441,12 +440,12 @@ class G1LowLevelController(ControllerBase):
         """
         Register observations for this controller.
         """
-
+        from state_manager.observations import current_time
         # Register observations using the mode-specific obs_manager
         self.obs_manager.register(
             "time",
             ObsTerm(
-                starting_time,
+                current_time,
             ),
         )
 

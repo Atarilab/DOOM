@@ -1,4 +1,4 @@
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING, Type
 
 from robots.robot_base import RobotBase
 from utils.mj_wrapper import MjRobotWrapper
@@ -7,7 +7,7 @@ from controllers.stand_controller import (
     G1StandUpController,
     G1LowLevelController
 )
-from controllers.rl_controller import RLHumanoidLocomotionVelocityController
+from controllers.rl_velocity_locomotion_controller import RLHumanoidLocomotionVelocityController
 from controllers.rl_contact_bimanual_controller import RLHumanoidBimanualContactController
 
 from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_

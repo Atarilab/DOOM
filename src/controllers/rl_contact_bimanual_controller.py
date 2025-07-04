@@ -8,12 +8,12 @@ from commands.command_manager import CommandTerm
 
 from state_manager.obs_manager import ObsTerm
 
-from controllers.rl_controller import BaseRLLocomotionController
+from controllers.rl_controller_base import RLControllerBase
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
 
-class RLHumanoidBimanualContactController(BaseRLLocomotionController):
+class RLHumanoidBimanualContactController(RLControllerBase):
     """
     Contact-conditioned RL Bimanual Controller
     Uses contact-explicit reinforcement learning policy
