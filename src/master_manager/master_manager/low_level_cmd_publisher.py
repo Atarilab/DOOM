@@ -11,6 +11,11 @@ from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
 from utils.joystick_interface import JoystickManager
 
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
+    from utils.mode_manager import ModeManager
+    from state_manager.state_manager import StateManager
+
 
 class LowLevelCmdPublisher(Node):
     """Manages low-level robot command publishing."""

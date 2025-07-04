@@ -13,7 +13,8 @@ from robots import resolve_robot
 from state_manager.state_manager import StateManager
 from utils.initialization import initialize_channel, initialize_robot_controller
 from utils.logger import get_logger
-from utils.ui_interface import ModeManager, RobotControlUI
+from utils.mode_manager import ModeManager
+from utils.ui_interface import RobotControlUI
 
 node = None
 state_manager = None

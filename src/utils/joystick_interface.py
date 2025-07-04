@@ -4,7 +4,7 @@ import time
 from typing import Optional
 
 import pygame
-from utils.ui_interface import ModeManager
+from utils.mode_manager import ModeManager
 
 
 class JoystickManager:

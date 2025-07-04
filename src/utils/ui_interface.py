@@ -1,9 +1,7 @@
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from commands.command_manager import CommandManager
 from controllers.stand_controller import ControllerBase
-from state_manager.obs_manager import ObservationManager
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.containers import Container, Horizontal, Vertical
@@ -11,204 +9,11 @@ from textual.reactive import reactive
 from textual.validation import Number
 from textual.widgets import Button, Header, Input, Label, Static
 from utils.logger import logging
+from utils.mode_manager import ModeManager
 
 # Define color constants
 BUTTON_DEFAULT_COLOR = Color(50, 50, 80)
 BUTTON_ACTIVE_COLOR = Color(70, 70, 110)
-
-
-class ModeManager:
-    """
-    A flexible mode management system that allows dynamic registration of modes and controllers.
-    """
-
-    def __init__(self, logger=None):
-        self._modes: Dict[str, Dict[str, ControllerBase]] = {}
-        self._current_mode: Optional[str] = None
-        self._current_submode: Optional[str] = None
-        self._mode_obs_managers: Dict[str, ObservationManager] = {}
-        self._submode_cmd_managers: Dict[str, CommandManager] = {}
-        self.logger = logger
-
-    def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase]):
-        """
-        Register a new mode with individual obs managers for each submode.
-
-        :param mode_name: Name of the mode
-        :param controllers: Dictionary of controllers for this mode
-        """
-        # Create an observation manager for each submode
-        obs_managers = {submode_name: ObservationManager(logger=self.logger) for submode_name in controllers.keys()}
-
-        self._modes[mode_name] = controllers
-        self._mode_obs_managers[mode_name] = obs_managers
-
-        # Pass corresponding obs manager to each controller
-        for submode_name, controller in controllers.items():
-            if hasattr(controller, "set_obs_manager"):
-                controller.set_obs_manager(obs_managers[submode_name])
-
-            if hasattr(controller, "register_commands"):
-                self._submode_cmd_managers[submode_name] = CommandManager(logger=self.logger)
-                controller.set_cmd_manager(self._submode_cmd_managers[submode_name])
-
-    def set_mode(self, mode_name: str, submode: Optional[str] = None):
-        """
-        Set the current mode and optional submode.
-
-        :param mode_name: Name of the mode to set
-        :param submode: Optional submode within the mode
-        :raises ValueError: If mode or submode is not registered
-        """
-        if mode_name not in self._modes:
-            raise ValueError(f"Mode {mode_name} not registered")
-
-        if submode is not None and submode not in self._modes[mode_name]:
-            raise ValueError(f"Submode {submode} not registered for mode {mode_name}")
-
-        # Deactivate existing controller
-        if self._current_submode and self._current_mode:
-            controller = self._modes[self._current_mode][self._current_submode]
-            if hasattr(controller, "active"):
-                controller.active = False
-
-        self._current_mode = mode_name
-        self._current_submode = submode
-
-        if submode is not None:
-            self.logger.debug(f"Mode set to: {self._current_mode} - {self._current_submode}")
-
-        # Run set_mode function if it exists in the controller
-        if self._current_submode:
-            controller = self._modes[self._current_mode][self._current_submode]
-        else:
-            controller = self._modes[self._current_mode].get("default", None)
-
-        if controller and hasattr(controller, "set_mode"):
-            controller.set_mode()
-
-        else:
-            self.logger.debug(f"Mode set to: {self._current_mode}")
-
-    def get_active_controller(self) -> ControllerBase:
-        """
-        Get the active controller based on current mode and submode.
-
-        :return: Active controller
-        :raises ValueError: If no mode is set
-        """
-        if self._current_mode is None:
-            raise ValueError("No mode is currently set")
-
-        if self._current_submode:
-            return self._modes[self._current_mode][self._current_submode]
-
-        return self._modes[self._current_mode].get("default", None)
-
-    def get_active_obs_manager(self) -> ObservationManager:
-        """
-        Get the observation manager for the current submode.
-
-        :return: Active observation manager
-        :raises ValueError: If no mode is set
-        """
-        if self._current_mode is None:
-            raise ValueError("No mode is currently set")
-
-        # If no submode, use 'default' for the mode
-        if self._current_submode is None:
-            return self._mode_obs_managers[self._current_mode]["default"]
-
-        return self._mode_obs_managers[self._current_mode][self._current_submode]
-
-    def get_current_mode_info(self) -> Dict[str, Optional[str]]:
-        """
-        Get current mode and submode information.
-
-        :return: Dictionary with current mode and submode
-        """
-        return {"mode": self._current_mode, "submode": self._current_submode}
-
-
-class CommandWidget(Vertical):
-    """
-    A widget for configuring robot controller commands with dynamic input fields.
-
-    Args:
-        controller: The active robot controller
-        command_specs: List of command specifications
-            Each spec is a tuple of (command_name, label, min_value, max_value)
-        logger: The logger
-    """
-
-    def __init__(
-        self,
-        controller: Any,
-        command_specs: List[Tuple[str, str, float, float]],
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.controller = controller
-        self.command_specs = command_specs
-        self.logger = logging.getLogger(__name__)
-
-    def compose(self):
-        """Dynamically create input fields based on command specifications."""
-        # Title for command configuration
-        yield Label("Configure Robot Commands", classes="section-header")
-
-        # Create a container for input fields to group them
-        with Vertical(classes="command-inputs-container"):
-            yield Button(
-                "Change Commands",
-                variant="success",
-                classes="update-button",
-                id="update-commands-btn",
-            )
-
-            # Check if this is a contact controller
-            if hasattr(self.controller, "gait_patterns"):
-                # Create gait selection buttons
-                yield Label("Select Gait Pattern", classes="command-label")
-                with Horizontal(classes="gait-buttons-container"):
-                    for gait in self.controller.gait_patterns.keys():
-                        yield Button(
-                            gait.capitalize(),
-                            classes="gait-button",
-                            id=f"gait-{gait}",
-                        )
-            elif hasattr(self.controller, "velocity_commands"):
-                # Create numeric input fields for other controllers
-                for command_name, label, min_val, max_val in self.command_specs:
-                    with Horizontal(classes="command-input-row"):
-                        yield Label(label, classes="command-label")
-                        input_field = Input(
-                            placeholder=f"Enter {label}",
-                            validators=[Number(minimum=min_val, maximum=max_val)],
-                            classes="command-input",
-                            id=f"input-{command_name}",
-                        )
-                        yield input_field
-
-    def on_button_pressed(self, event: Button.Pressed):
-        """Handle button presses for gait selection."""
-        button_id = event.button.id
-
-        if button_id.startswith("gait-"):
-            # Update the gait selection
-            gait = button_id.replace("gait-", "")
-            updates = {"gait": gait}
-
-            # Update the controller
-            if hasattr(self.controller, "change_commands"):
-                self.controller.change_commands(updates)
-
-                # Visual feedback using predefined colors
-                for btn in self.query(".gait-button"):
-                    btn.styles.background = BUTTON_DEFAULT_COLOR
-                event.button.styles.background = BUTTON_ACTIVE_COLOR
-
 
 class RobotControlUI(App):
     """
@@ -700,3 +505,83 @@ class RobotControlUI(App):
     def on_unmount(self) -> None:
         """Set robot to IDLE mode when UI is closed."""
         self.mode_manager.set_mode("IDLE")
+        
+
+class CommandWidget(Vertical):
+    """
+    A widget for configuring robot controller commands with dynamic input fields.
+
+    Args:
+        controller: The active robot controller
+        command_specs: List of command specifications
+            Each spec is a tuple of (command_name, label, min_value, max_value)
+        logger: The logger
+    """
+
+    def __init__(
+        self,
+        controller: Any,
+        command_specs: List[Tuple[str, str, float, float]],
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.controller = controller
+        self.command_specs = command_specs
+        self.logger = logging.getLogger(__name__)
+
+    def compose(self):
+        """Dynamically create input fields based on command specifications."""
+        # Title for command configuration
+        yield Label("Configure Robot Commands", classes="section-header")
+
+        # Create a container for input fields to group them
+        with Vertical(classes="command-inputs-container"):
+            yield Button(
+                "Change Commands",
+                variant="success",
+                classes="update-button",
+                id="update-commands-btn",
+            )
+
+            # Check if this is a contact controller
+            if hasattr(self.controller, "gait_patterns"):
+                # Create gait selection buttons
+                yield Label("Select Gait Pattern", classes="command-label")
+                with Horizontal(classes="gait-buttons-container"):
+                    for gait in self.controller.gait_patterns.keys():
+                        yield Button(
+                            gait.capitalize(),
+                            classes="gait-button",
+                            id=f"gait-{gait}",
+                        )
+            elif hasattr(self.controller, "velocity_commands"):
+                # Create numeric input fields for other controllers
+                for command_name, label, min_val, max_val in self.command_specs:
+                    with Horizontal(classes="command-input-row"):
+                        yield Label(label, classes="command-label")
+                        input_field = Input(
+                            placeholder=f"Enter {label}",
+                            validators=[Number(minimum=min_val, maximum=max_val)],
+                            classes="command-input",
+                            id=f"input-{command_name}",
+                        )
+                        yield input_field
+
+    def on_button_pressed(self, event: Button.Pressed):
+        """Handle button presses for gait selection."""
+        button_id = event.button.id
+
+        if button_id.startswith("gait-"):
+            # Update the gait selection
+            gait = button_id.replace("gait-", "")
+            updates = {"gait": gait}
+
+            # Update the controller
+            if hasattr(self.controller, "change_commands"):
+                self.controller.change_commands(updates)
+
+                # Visual feedback using predefined colors
+                for btn in self.query(".gait-button"):
+                    btn.styles.background = BUTTON_DEFAULT_COLOR
+                event.button.styles.background = BUTTON_ACTIVE_COLOR
