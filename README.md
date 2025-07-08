@@ -153,7 +153,7 @@ ros2 launch go2_description go2_visualization.launch.py
 ```
 
 ## 🎮 Joystick 
-Alternatively, to send commands to the robot, users can also use the joystick. Make sure that the Docker container is launched with the joystick already connected.
+Alternatively, to send commands to the robot, users can also use the joystick. Make sure that the Docker container is launched with the joystick already connected. Otherwise, you will need to rebuild the container and enter again.
 There are some common joystick configurations to handle the mode-switches:
 
 Start: `IDLE` -> `STAY_DOWN`
