@@ -16,34 +16,59 @@
 *A framework for controlling Unitree robots (Go2, G1) in the real world and in Mujoco simulation using a unified interface.*
 </div>
 
-## Table of Contents
+## 📋 Table of Contents
 
-- ⚙️ [Requirements](#️-requirements)
-- 📦 [Installation Instructions](#-installation-instructions)
-- 🐳 [Building and Running the Container](#-building-and-running-the-container)
-- 🤖 [Testing Robot Connection](#-testing-robot-connection)
-- 💻 [VS Code Workspace Setup](#-vs-code-workspace-setup)
-- 🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot)
-  - 🧭 [Go2 Blind Locomotion using UI Velocity Commands (SIM)](#-go2-blind-locomotion-using-ui-velocity-commands-example-sim)
-  - 🦿 [Go2 Blind Locomotion using UI Velocity Commands (REAL)](#-go2-blind-locomotion-using-ui-velocity-commands-example-real)
-- 🎮 [Joystick](#-joystick)
-- 📡 [Vicon State Estimation](#-vicon-state-estimation)
-- 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler)
-- 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz)
-- 🧹 [Code Formatting](#-code-formatting)
-- 📦 [Installed ROS2 Packages](#-installed-ros2-packages)
-- 🧩 [DOOM Elements](#-doom-elements)
-  - 🧠 [Master Manager](#-master-manager)
-  - 📈 [State Manager](#-state-manager)
-  - 🔁 [Mode Manager](#-mode-manager)
-  - 👀 [Observation Manager](#-observation-manager)
-  - 🦾 [RobotBase](#-robotbase)
-  - 🎯 [ControllerBase](#-controllerbase)
-  - 🎮 [Joystick Interface](#-joystick-interface)
-  - 🖥️ [RobotControlUI](#️-robotcontrolui)
-- 📝 [TODO](#-todo)
-- 🐞 [Known Issues](#-known-issues)
-- 📚 [Resources](#-resources)
+---
+
+### 🚀 **First Steps**
+| Section | Description |
+|---------|-------------|
+| ⚙️ [Requirements](#️-requirements) | System requirements and dependencies |
+| 📦 [Installation Instructions](#-installation-instructions) | Complete setup guide |
+| 🤖 [Testing Robot Connection](#-testing-robot-connection-if-running-on-the-robot) | Verify robot connectivity |
+
+---
+
+### 🎮 **Usage & Control**
+| Section | Description |
+|---------|-------------|
+| 🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot) | Main usage guide |
+| 🎮 [Joystick Control](#-joystick) | Joystick Control interface |
+
+---
+
+### 📊 **Visualization & Monitoring**
+| Section | Description |
+|---------|-------------|
+| 📡 [Vicon State Estimation](#-vicon-state-estimation) | Motion capture integration |
+| 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler) | Real-time data visualization |
+| 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz) | 3D robot visualization |
+
+---
+
+### 🛠 **Development**
+| Section | Description |
+|---------|-------------|
+| 🧹 [Code Formatting](#-code-formatting) | Code style and formatting tools |
+| 📦 [Installed ROS2 Packages](#-installed-ros2-packages) | Available packages and dependencies |
+
+---
+
+### 🧩 **Architecture**
+| Section | Description |
+|---------|-------------|
+| 🧩 [DOOM Elements](#-doom-elements) | Core system components |
+
+---
+
+### 📝 **Project Status**
+| Section | Description |
+|---------|-------------|
+| 📝 [TODO](#-todo) | Upcoming features and improvements |
+| 🐞 [Known Issues](#-known-issues) | Current limitations and bugs |
+| 📚 [Resources](#-resources) | External documentation and links |
+
+---
 
 ## ⚙️ Requirements 
 - docker (ros2 container with unitree_sdk)
@@ -51,13 +76,15 @@
 - nvidia Graphics card and [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   
 ## 📦 Installation Instructions
+
+### 🛠 Install DOOM
 For installation of the DOOM project, run:
 ```bash
 ./doom.sh -i
 ```
 The above script, updates all submodules, builds the docker container, and manually sets up a network interface in the same subnetwork as the robot.
 
-## 🐳 Building and running the container
+### 🐳 Building and running the container
 ```bash
 ./doom.sh -b # build
 ./doom.sh -e # enter
@@ -68,10 +95,16 @@ For more helpful functions from `./doom.sh`, run:
 ./doom.sh -h
 ```
 
+### 💻 VS Code Workspace Setup
+Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container. Additionally, debuggers for certain tasks are already defined in `.vscode/launch.json`.
+
+---
+
+## 🤖 Testing Robot Connection (if running on the robot)
+
 > **Warning:** Before you run anything on the robot, make sure to turn off the sports mode using the Go2 app. Log in to the app using the ATARI Gmail credentials and toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot.
 > **Check:** Unitree ros topics should appear by default with 'ros2 topic list'. If not, try restarting your computer.
-
-## 🤖 Testing Robot Connection
+> 
 Once inside the docker container, you can access the Robot's IP address via `$ROBOT_IP`. You can test the connection using:
 ```bash
 ping $ROBOT_IP
@@ -82,11 +115,8 @@ If it still doesn't ping the robot after manually configuring the IP, you can ch
 
 ---
 
-## 💻 VS Code Workspace Setup
-Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container. Additionally, debuggers for certain tasks are already defined in `.vscode/launch.json`.
-
 ## 🚀 How to use DOOM to control your robot
-The various tasks are defined in `tasks/task_configs.json`. Currently, the following tasks are defined and tested:
+The various tasks are defined in [`tasks/task_configs.json`](src/tasks/task_configs.json). Currently, the following tasks are defined and tested:
 - `rl-velocity-sim-go2` (Status: ✅ )
 - `rl-velocity-real-go2` (Status: ✅ )
 - `rl-contact-sim-go2` (Status: ✅ )
