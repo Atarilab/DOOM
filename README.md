@@ -1,49 +1,63 @@
+
+<div align="center">
+
 ![ATARI DOOM Banner](assets/banner.jpg)
-# DOOM
-Repository for running the experiments on the real robots and simulate them on Mujoco using a common interface.
+
+# 🤖 DOOM - Robot Control Framework
+
+**Unified Interface for Real Robot Control and MuJoCo Simulation**
+
+[![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/)
+[![ROS2](https://img.shields.io/badge/ROS2-Humble-green.svg)](https://docs.ros.org/en/humble/)
+[![Docker](https://img.shields.io/badge/Docker-Required-orange.svg)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)](https://github.com/Atarilab/DOOM)
+
+*A framework for controlling Unitree robots (Go2, G1) in the real world and in Mujoco simulation using a unified interface.*
+</div>
 
 ## Table of Contents
 
-- [Requirements](#requirements)
-- [Installation Instructions](#installation-instructions)
-- [Building and Running the Container](#building-and-running-the-container)
-- [Testing Robot Connection](#testing-robot-connection)
-- [VS Code Workspace Setup](#vs-code-workspace-setup)
-- [How to Use DOOM to Control Your Robot](#how-to-use-doom-to-control-your-robot)
-  - [Go2 Blind Locomotion using UI Velocity Commands (SIM)](#go2-blind-locomotion-using-ui-velocity-commands-example-sim)
-  - [Go2 Blind Locomotion using UI Velocity Commands (REAL)](#go2-blind-locomotion-using-ui-velocity-commands-example-real)
-- [Joystick](#joystick)
-- [Vicon State Estimation](#vicon-state-estimation)
-- [Live Plotting using PlotJuggler](#live-plotting-using-plotjuggler)
-- [Robot Visualization in RViz](#robot-visualization-in-rviz)
-- [Code Formatting](#code-formatting)
-- [Installed ROS2 Packages](#installed-ros2-packages)
-- [DOOM Elements](#doom-elements)
-  - [Master Manager](#master-manager)
-  - [State Manager](#state-manager)
-  - [Mode Manager](#mode-manager)
-  - [Observation Manager](#observation-manager)
-  - [RobotBase](#robotbase)
-  - [ControllerBase](#controllerbase)
-  - [Joystick Interface](#joystick-interface)
-  - [RobotControlUI](#robotcontrolui)
-- [TODO](#todo)
-- [Known Issues](#known-issues)
-- [Resources](#resources)
+- ⚙️ [Requirements](#️-requirements)
+- 📦 [Installation Instructions](#-installation-instructions)
+- 🐳 [Building and Running the Container](#-building-and-running-the-container)
+- 🤖 [Testing Robot Connection](#-testing-robot-connection)
+- 💻 [VS Code Workspace Setup](#-vs-code-workspace-setup)
+- 🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot)
+  - 🧭 [Go2 Blind Locomotion using UI Velocity Commands (SIM)](#-go2-blind-locomotion-using-ui-velocity-commands-example-sim)
+  - 🦿 [Go2 Blind Locomotion using UI Velocity Commands (REAL)](#-go2-blind-locomotion-using-ui-velocity-commands-example-real)
+- 🎮 [Joystick](#-joystick)
+- 📡 [Vicon State Estimation](#-vicon-state-estimation)
+- 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler)
+- 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz)
+- 🧹 [Code Formatting](#-code-formatting)
+- 📦 [Installed ROS2 Packages](#-installed-ros2-packages)
+- 🧩 [DOOM Elements](#-doom-elements)
+  - 🧠 [Master Manager](#-master-manager)
+  - 📈 [State Manager](#-state-manager)
+  - 🔁 [Mode Manager](#-mode-manager)
+  - 👀 [Observation Manager](#-observation-manager)
+  - 🦾 [RobotBase](#-robotbase)
+  - 🎯 [ControllerBase](#-controllerbase)
+  - 🎮 [Joystick Interface](#-joystick-interface)
+  - 🖥️ [RobotControlUI](#️-robotcontrolui)
+- 📝 [TODO](#-todo)
+- 🐞 [Known Issues](#-known-issues)
+- 📚 [Resources](#-resources)
 
-## Requirements 
+## ⚙️ Requirements 
 - docker (ros2 container with unitree_sdk)
 - unitree Go2
 - nvidia Graphics card and [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   
-## Installation Instructions
+## 📦 Installation Instructions
 For installation of the DOOM project, run:
 ```bash
 ./doom.sh -i
 ```
 The above script, updates all submodules, builds the docker container, and manually sets up a network interface in the same subnetwork as the robot.
 
-## Building and running the container
+## 🐳 Building and running the container
 ```bash
 ./doom.sh -b # build
 ./doom.sh -e # enter
@@ -57,7 +71,7 @@ For more helpful functions from `./doom.sh`, run:
 > **Warning:** Before you run anything on the robot, make sure to turn off the sports mode using the Go2 app. Log in to the app using the ATARI Gmail credentials and toggle off **Device > Service Status > sport_mode** as this will interfere with the additional torque commands passed to the robot.
 > **Check:** Unitree ros topics should appear by default with 'ros2 topic list'. If not, try restarting your computer.
 
-## Testing Robot Connection
+## 🤖 Testing Robot Connection
 Once inside the docker container, you can access the Robot's IP address via `$ROBOT_IP`. You can test the connection using:
 ```bash
 ping $ROBOT_IP
@@ -68,10 +82,10 @@ If it still doesn't ping the robot after manually configuring the IP, you can ch
 
 ---
 
-## VS Code Workspace Setup
+## 💻 VS Code Workspace Setup
 Open VS Code with `unitree_mujoco_container` as the project directory and build the docker container. Additionally, debuggers for certain tasks are already defined in `.vscode/launch.json`.
 
-## How to use DOOM to control your robot
+## 🚀 How to use DOOM to control your robot
 The various tasks are defined in `tasks/task_configs.json`. Currently, the following tasks are defined and tested:
 - `rl-velocity-sim-go2` (Status: ✅ )
 - `rl-velocity-real-go2` (Status: ✅ )
@@ -90,7 +104,7 @@ python3 simulate.py --task custom-task-name --log log_name
 ```
 Example Workflow: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > `RL-Velocity` > `RL-Velocity`
 
-## Go2 Blind Locomotion using UI Velocity Commands Example (SIM)
+## 🧭 Go2 Blind Locomotion using UI Velocity Commands Example (SIM)
 Before you start, make sure there are no other main processes running on your computer. This could cause jittery movements due to imperfect tracking of the PD controllers introduced by the latency from heavy process in the background. Keep an eye out for your CPU utilisation using `htop` to validate this. A simple restart can ensure that you start fresh. 
 
 #### Terminal 1
@@ -114,7 +128,7 @@ STAND modes are used to initialise the robot to its default positions using simp
 
 Now that the robot is in the `STAND_UP` configuration, go back to the Main Menu from the UI, choose `LOCOMOTION`, and then `RL-VELOCITY`. This will start the velocity command based blind RL locomotion policy at zero velocity. From the UI, you can now enter the X, Y velocities and the yaw rates for fixed command velocities.
 
-## Go2 Blind Locomotion using UI Velocity Commands Example (REAL)
+## 🦿 Go2 Blind Locomotion using UI Velocity Commands Example (REAL)
 The only change for running on the real robot is launching the Vicon client to get the base states instead of launching the simulator, and using the correct task name for the real experiments. The rest is taken care of by DOOM to maintain the same interface to run experiments in sim (MuJoCo) and on the real robot.
 
 #### Terminal 1
@@ -148,7 +162,7 @@ source setup.sh
 ros2 launch go2_description go2_visualization.launch.py
 ```
 
-## Joystick 
+## 🎮 Joystick 
 Alternatively, to send commands to the robot, users can also use the joystick. Make sure that the Docker container is launched with the joystick already connected.
 There are some common joystick configurations to handle the mode-switches:
 
@@ -167,62 +181,62 @@ L1+R1: `STAND_UP` -> `RL-CONTACT`
 You can further define controller-specific joystick mappings by defining `get_joystick_mappings` (See RL-Contact Controller for reference).
 
 
-## Vicon State Estimation
+## 📡 Vicon State Estimation
 The Vicon receiver client is already installed in the docker container. You can launch it in a new terminal inside existing container (`./doom -a`) using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
 
-## Live Plotting using PlotJuggler
+## 📊 Live Plotting using PlotJuggler
 ```bash
 ros2 run plotjuggler plotjuggler
 ```
 
-## Robot Visualization in RViz
+## 👁️ Robot Visualization in RViz
 Visualizing in RViz is useful, especially for debugging, to see what the world looks like to the robot. Once the master node is launched in a terminal, you can launch RViz in another terminal using:
 ```bash
 ros2 launch go2_description go2_visualization.launch.py
 ```
 
-## Code Formatting
+## 🧹 Code Formatting
 This project uses [black](https://github.com/psf/black) as the code formatter and [flake7](https://github.com/PyCQA/flake8) as additional linter to ensure consistent code style across the codebase. You can run the formatter inside the container in VS Code (or other forks like Cursor, Windsurf etc.) using the keyboard shortcut `Ctrl + Shift + B` and running the task `Format and Lint`.
 
-## Installed ROS2 Packages
+## 📦 Installed ROS2 Packages
 - [unitree_sdk](https://github.com/unitreerobotics/unitree_sdk2)
 - [unitree_sdk_python](https://github.com/unitreerobotics/unitree_sdk2_python)
 - [ros2-vicon-receiver](https://github.com/Atarilab/ros2-vicon-receiver.git)
 
-## DOOM Elements
-### [Master Manager](src/master_manager/master_manager/master_node.py)
+## 🧩 DOOM Elements
+### 🧠 [Master Manager](src/master_manager/master_manager/master_node.py)
 The master manager is the entry point of DOOM. It loads up the necessary configurations based on the arguments you provide to it, the main one being the `task`, used to resolve the task, robot and interface (sim/real). For example, `rl-velocity-sim-go2` is used to resolve the robot: Go2, the interface: simulation, the controller type: rl, and the method: contact. It follows the convention: `<controller-type>-<method>-<interface>-<robot>`
 . The available configs are defined in [`task_configs.py`](src/tasks/task_configs.py) and can be appended with new ones for new tasks. 
 
 `LowLevelCmdPublisher` is the ROS2 node inside the `master_manager` that runs the main program loop inside the callback. Essentially, it updates the states and passes them to the controller that is active, which returns low-level commands which could be in the form of PD targets or torques. The low-level commands are then published through the unitree communication channel (which uses DDS), to either the simulation interface or real robot interface (which are automatically resolved from the task name). Optionally, the UI Interface can be run concurrently with the `LowLevelCmdPublisher` inside `master_manager` using the `enable-ui` argument.
 
-### [State Manager](src/state_manager/state_manager/state_manager.py)
+### 📈 [State Manager](src/state_manager/state_manager/state_manager.py)
 The state manager is responsible for listening to different ROS2/DDS topics. Each subscriber also has callbacks/handlers which are defined in [`state_manager/msg_handlers.py`](src/state_manager/state_manager/msg_handlers.py). The state manager then makes these states available to your controllers in the form of a dictionary.
 
-### [Mode Manager](src/utils/mode_manager.py)
+### 🔁 [Mode Manager](src/utils/mode_manager.py)
 The mode manager is used to switch between different modes or controllers which are available to the robot based on the `task`. By default, there are the `ZERO` and `DAMPING` modes available across DOOM for all tasks, which are used to send zero torques and damping torques, respectively. When starting the robot, it is useful to have these modes to initialise the robot to some default safe poses, and then switch to the mode/controller that you developed. For example, for the task `rl-velocity-sim-go2`, apart from the default zero and damping modes, also has standing controllers. These are phase-based PD controllers that can stabilise and bring the robot to default positions. Once ready, you can then switch to the `RL-VELOCITY` mode/controller.
 
-### [Observation Manager](src/state_manager/state_manager/obs_manager.py)
+### 👀 [Observation Manager](src/state_manager/state_manager/obs_manager.py)
 Each controller also has an optional observation manager. This is different from the state manager. The states are what you directly subscribe to through ROS2/DDS topics. However, you may sometimes need to create additional observations based on the states you have. For example, in RL routines, it is common to have a projected gravity vector as an observation instead of using quaternions for the base orientation. These can be defined as a function that computes the projected gravity vector from the states. You need to register the required observations in your controller to use this. Additionally, you can also pass  additional params to the observation functions. The observation manager is especially useful for RL since you can register the observations in your RL Controller class, and it can directly compute a vector of observations (respecting the order in your registration) that can be directly given to your policy to compute the action. If you are familiar with the `ObservationManager` in IsaacLab, this is exactly what that does. Additionally, the RL routines have separate threads for policy inference and observation processing and gets the latest policy action inside the `compute_lowlevelcmd()`. 
 
-### [RobotBase](src/robots/robot_base.py)
+### 🦾 [RobotBase](src/robots/robot_base.py)
 The robot class defines robot-specific data. This is also where you define the available controllers and the subscribers for your task and robot, based on the task name. You also have access to a MuJoCo wrapper with `robot.mj_model`. The robots supported now are Unitree Go2 and G1. You can check out `robots/<robot-name>/<robot-name>.py` for more robot-specific information.
 
-### [ControllerBase](src/controllers/controller_base.py)
+### 🎯 [ControllerBase](src/controllers/controller_base.py)
 This is a base controller class that needs to be inherited if you need to define your own controller. In the barest form for creating a new controller, all you need is to inherit the `ControllerBase` and complete the `compute_lowlevelcmd` function, that has access to the states that you subscribe to, and you can compute the desired motor commands in the form of PD targets or torques and pass return it. An example of this can be seen in the `ZeroController` or the `DampingController`. Then you need to make the controller available in your robot class in its corresponding `available_controllers`.
 
 Note: By default, it is not a ROS2 node. However, you can convert it into one by also inheriting from `Node` in `rclpy.node`. Usually, this is only required if you want to visualise something from inside your controller. If you need more info on doing this, check out the `RLControllerBase`.
 
-### [Joystick Interface](src/utils/joystick_interface.py)
+### 🎮 [Joystick Interface](src/utils/joystick_interface.py)
 The joystick interface is used to switch between different modes/controllers and also to send commands to the controller. There are already some common joystick transitions defined to switch across the different modes. Additionally, you can add your own joystick mappings inside your controller by adding them in `get_joystick_mappings()`. Pay attention to not overriding existing joystick mappings for damping and zero modes for safety reasons.
 
-### [RobotControlUI](src/utils/ui_interface.py)
+### 🖥️ [RobotControlUI](src/utils/ui_interface.py)
 This is an optional UI Interface that allows you to choose different modes and send commands to the robot from Terminal UI. In DOOM, we recommend using the joystick instead, since the UI contributes to additional CPU overhead.
 
-## TODO
+## 📝 TODO
 - [ ] Test g1 velocity locomotion Policy
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
@@ -242,9 +256,9 @@ This is an optional UI Interface that allows you to choose different modes and s
 - [x] Add mechanism for real-time state logger and plotter (debug logger in console and file, plotjuggler for ros topics)
 - [x] Test Velocity-conditioned policy
 
-## Known Issues
+## 🐞 Known Issues
 - When using torque control for low-level control, there is a delay (latency), which causes the robot to behave unexpectedly. This could be resolved by training with delayed actuation of joints. However, position control generally seems to be a more stable and recommended approach to sending low-level commands to the robot.
-- 
 
-## Resources
+
+## 📚 Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
