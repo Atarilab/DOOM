@@ -18,57 +18,17 @@
 
 ## 📋 Table of Contents
 
----
+⚙️ [Requirements](#️-requirements) • 📦 [Installation Instructions](#-installation-instructions) • 🤖 [Testing Robot Connection](#-testing-robot-connection-if-running-on-the-robot)
 
-### 🚀 **First Steps**
-| Section | Description |
-|---------|-------------|
-| ⚙️ [Requirements](#️-requirements) | System requirements and dependencies |
-| 📦 [Installation Instructions](#-installation-instructions) | Complete setup guide |
-| 🤖 [Testing Robot Connection](#-testing-robot-connection-if-running-on-the-robot) | Verify robot connectivity |
+🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot) • 🎮 [Joystick Control](#-joystick) 
 
----
+📡 [Vicon State Estimation](#-vicon-state-estimation) • 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler) • 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz) •
 
-### 🎮 **Usage & Control**
-| Section | Description |
-|---------|-------------|
-| 🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot) | Main usage guide |
-| 🎮 [Joystick Control](#-joystick) | Joystick Control interface |
+🧹 [Code Formatting](#-code-formatting) • 📦 [Installed ROS2 Packages](#-installed-ros2-packages)
 
----
+🧩 [DOOM Elements](#-doom-elements)
 
-### 📊 **Visualization & Monitoring**
-| Section | Description |
-|---------|-------------|
-| 📡 [Vicon State Estimation](#-vicon-state-estimation) | Motion capture integration |
-| 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler) | Real-time data visualization |
-| 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz) | 3D robot visualization |
-
----
-
-### 🛠 **Development**
-| Section | Description |
-|---------|-------------|
-| 🧹 [Code Formatting](#-code-formatting) | Code style and formatting tools |
-| 📦 [Installed ROS2 Packages](#-installed-ros2-packages) | Available packages and dependencies |
-
----
-
-### 🧩 **Architecture**
-| Section | Description |
-|---------|-------------|
-| 🧩 [DOOM Elements](#-doom-elements) | Core system components |
-
----
-
-### 📝 **Project Status**
-| Section | Description |
-|---------|-------------|
-| 📝 [TODO](#-todo) | Upcoming features and improvements |
-| 🐞 [Known Issues](#-known-issues) | Current limitations and bugs |
-| 📚 [Resources](#-resources) | External documentation and links |
-
----
+📝 [TODO](#-todo) • 🐞 [Known Issues](#-known-issues) • 📚 [Resources](#-resources) 
 
 ## ⚙️ Requirements 
 - docker (ros2 container with unitree_sdk)
