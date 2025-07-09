@@ -15,7 +15,7 @@ jobs:
         with:
           submodules: recursive
           # Use the default GITHUB_TOKEN unless you have a specific need for a PAT
-          # token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker Image
         run: docker build unitree_mujoco_container/.devcontainer/. --tag mujuni-image:$(date +%s)
