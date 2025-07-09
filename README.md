@@ -103,13 +103,13 @@ Before you start, make sure there are no other main processes running on your co
 
 #### Terminal 1
 ```bash
-./doom -e # enter the container
+./doom.sh -e # enter the container
 cd src/
 python3 simulate.py --task=rl-velocity-sim-go2
 ```
 #### Terminal 2
 ```bash
-./doom -a # attach a terminal to the existing DOOM container
+./doom.sh -a # attach a terminal to the existing DOOM container
 source setup_local.sh
 ros2 run master_manager master_node --task rl-velocity-sim-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
 ```
@@ -128,13 +128,13 @@ The only change for running on the real robot is launching the Vicon client to g
 #### Terminal 1
 Launch Vicon client that publishes the base states
 ```bash
-./doom -e # enter the container
+./doom.sh -e # enter the container
 ros2 launch vicon_receiver client.launch.py
 ```
 
 #### Terminal 2
 ```bash
-./doom -a # attach a terminal to the existing DOOM container
+./doom.sh -a # attach a terminal to the existing DOOM container
 source setup.sh
 ros2 topic list # view available topics, confirm if you can view topics published by the robot and by the vicon
 ros2 run master_manager master_node --task rl-velocity-real-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
@@ -143,7 +143,7 @@ ros2 run master_manager master_node --task rl-velocity-real-go2 --enable-ui # us
 #### Terminal 3 (optional)
 Use plotjuggler to view topics in real time plots
 ```bash
-./doom -a # attach a terminal to the existing DOOM container
+./doom.sh -a # attach a terminal to the existing DOOM container
 source setup.sh
 ros2 run plotjuggler plotjuggler
 ```
@@ -151,7 +151,7 @@ ros2 run plotjuggler plotjuggler
 #### Terminal 4 (optional)
 Robot Visualization in RViz
 ```bash
-./doom -a # attach a terminal to the existing DOOM container
+./doom.sh -a # attach a terminal to the existing DOOM container
 source setup.sh
 ros2 launch go2_description go2_visualization.launch.py
 ```
@@ -178,7 +178,7 @@ You can further define controller-specific joystick mappings by defining `get_jo
 
 
 ## 📡 Vicon State Estimation
-The Vicon receiver client is already installed in the Docker container. You can launch it in a new terminal inside the existing container (`./doom -a`) using:
+The Vicon receiver client is already installed in the Docker container. You can launch it in a new terminal inside the existing container (`./doom.sh -a`) using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
