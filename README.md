@@ -5,7 +5,7 @@
 
 # 🤖 DOOM - Robot Control Framework
 
-**Unified Interface for Real Robot Control and MuJoCo Simulation**
+**Unified Interface for Real Robot Control and MuJoCo Real-time Control**
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/)
 [![ROS2](https://img.shields.io/badge/ROS2-Humble-green.svg)](https://docs.ros.org/en/humble/)
@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)](https://github.com/Atarilab/DOOM)
 
-*A framework for controlling Unitree robots (Go2, G1) in the real world and in Mujoco simulation using a unified interface.*
+*A framework for controlling Unitree robots (Go2, G1) in the real world and in Mujoco real-time using a unified interface.*
 </div>
 
 ## 📋 Table of Contents
@@ -25,11 +25,11 @@
 
 📡 [Vicon State Estimation](#-vicon-state-estimation) • 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler) • 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz) •
 
-🧹 [Code Formatting](#-code-formatting) • 📦 [Installed ROS2 Packages](#-installed-ros2-packages)
+🐞 [Debugging](#-debugging) • 🧹 [Code Formatting](#-code-formatting) • 📦 [Installed ROS2 Packages](#-installed-ros2-packages)
 
 🧩 [DOOM Elements](#-doom-elements)
 
-📝 [TODO](#-todo) • 🐞 [Known Issues](#-known-issues) • 📚 [Resources](#-resources) 
+📝 [TODO](#-todo) • 📚 [Resources](#-resources) 
 
 ## ⚙️ Requirements 
 - docker (ros2 container with unitree_sdk)
