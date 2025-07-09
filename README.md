@@ -9,6 +9,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/)
 [![ROS2](https://img.shields.io/badge/ROS2-Humble-green.svg)](https://docs.ros.org/en/humble/)
+![MuJoCo](https://img.shields.io/badge/MuJoCo-3.3.3-blue)
 [![Docker](https://img.shields.io/badge/Docker-Required-orange.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)](https://github.com/Atarilab/DOOM)
@@ -83,16 +84,19 @@ The various tasks are defined in [`tasks/task_configs.json`](src/tasks/task_conf
 - `rl-contact-real-go2` (Status: ✅ )
 - `rl-velocity-sim-g1` (Status: ⚠️ ) [WIP]: Stand Controllers work, not the policy
   
-Once you've chosen the task you want to run, you can launch the user interface to control the robot using:
+Once you've chosen the task you want to run, you can run the master node to control the robot using:
 ```bash
-ros2 run master_manager master_node --task custom-task-name --log log_name
+ros2 run master_manager master_node --task <insert-task-name>
 ```
-This repository also has a simulation mode which allows you to run the same scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. Note that MuJoCo is not used as a visualizer for your real robot interface but rather as a sanity test of the same script that you might run on the real robot.
+Use the `--enable-ui` argument if you want to use the terminal UI interface. Else, you can also use the joystick to control the robot.
+
+This repository also has a simulation mode, which allows you to run the same scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. Note that MuJoCo is not used as a visualizer for your real robot interface but rather as a sanity test of the same script that you might run on the real robot. It uses a modified version of MuJoCo to behave real-time. 
+
 To launch the simulator, run:
 ```bash
-python3 simulate.py --task custom-task-name --log log_name
+python3 simulate.py --task <insert-task-name>
 ```
-Example Workflow: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > `RL-Velocity` > `RL-Velocity`
+Example Workflow for `rl-velocity-sim-go2` task: `Standing` > `Stay_down` > `Stand_up` > `Back to Main Menu` > `Locomotion` > `RL-Velocity`
 
 ## 🧭 Go2 Blind Locomotion using UI Velocity Commands Example (SIM)
 Before you start, make sure there are no other main processes running on your computer. This could cause jittery movements due to imperfect tracking of the PD controllers introduced by the latency from heavy process in the background. Keep an eye out for your CPU utilisation using `htop` to validate this. A simple restart can ensure that you start fresh. 
@@ -109,7 +113,7 @@ python3 simulate.py --task=rl-velocity-sim-go2
 source setup_local.sh
 ros2 run master_manager master_node --task rl-velocity-sim-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
 ```
-IDLE mode is a damping mode to gracefully stop commands to the robot.
+ZERO mode is used to send zero torques to the robot. DAMPING mode is a damping mode to gracefully stop commands to the robot.
 STAND modes are used to initialise the robot to its default positions using simple PD controllers. Click on `STAND`, and then `STAY_DOWN`. This makes the robot stay in a crouched position close to the ground. After it stabilises, click on `STAND_UP`, which is a phase-based PD controller that makes the robot stand up to the default joint configuration. `STAND_DOWN` is also a phase-based PD controller that moves from the standing up joint configuration to the crouched joint position, as in `STAY_DOWN`.
 
 > Note: Since these `STAND` modes are phase-based PD controllers, allow them to stabilise before switching to other modes.
@@ -156,7 +160,9 @@ ros2 launch go2_description go2_visualization.launch.py
 Alternatively, to send commands to the robot, users can also use the joystick. Make sure that the Docker container is launched with the joystick already connected. Otherwise, you will need to rebuild the container and enter again.
 There are some common joystick configurations to handle the mode-switches:
 
-Start: `IDLE` -> `STAY_DOWN`
+Select: Any -> `ZERO`
+
+Start: `ZERO`/`DAMPING` -> `STAY_DOWN`
 
 Start: AnyElse -> `IDLE`
 
@@ -166,13 +172,13 @@ Down: `STAND_UP` -> `STAND_DOWN`
 
 Down: `STAND_DOWN` -> `STAY_DOWN`
 
-L1+R1: `STAND_UP` -> `RL-CONTACT` 
+L1+R1: `STAND_UP` -> `RL-VELOCITY` 
 
 You can further define controller-specific joystick mappings by defining `get_joystick_mappings` (See RL-Contact Controller for reference).
 
 
 ## 📡 Vicon State Estimation
-The Vicon receiver client is already installed in the docker container. You can launch it in a new terminal inside existing container (`./doom -a`) using:
+The Vicon receiver client is already installed in the Docker container. You can launch it in a new terminal inside the existing container (`./doom -a`) using:
 ```bash
 ros2 launch vicon_receiver client.launch.py
 ```
@@ -191,6 +197,14 @@ ros2 launch go2_description go2_visualization.launch.py
 ## 🧹 Code Formatting
 This project uses [black](https://github.com/psf/black) as the code formatter and [flake7](https://github.com/PyCQA/flake8) as additional linter to ensure consistent code style across the codebase. You can run the formatter inside the container in VS Code (or other forks like Cursor, Windsurf etc.) using the keyboard shortcut `Ctrl + Shift + B` and running the task `Format and Lint`.
 
+## 🐞 Debugging
+A logger is available throughout almost every part of the project. You can print debug logs using `logger.debug()` or info logs using `logger.info()`. Unless in debug mode, the debug logs won't appear on the terminal. It will only be saved to `src/logs`. The debug mode can be turned on using `--debug` argument in launching the master node, such as 
+
+```
+ros2 run master_manager master_node --task rl-velocity-real-go2 --log velocity_real --debug
+```
+When running in debug mode, it is also possible to add breakpoints inside threaded functions (we set `daemon=False`). We highly recommend using a debugger such as the one existing in VSCode (`debugpy`) to add breakpoints and debug the code.
+
 ## 📦 Installed ROS2 Packages
 - [unitree_sdk](https://github.com/unitreerobotics/unitree_sdk2)
 - [unitree_sdk_python](https://github.com/unitreerobotics/unitree_sdk2_python)
@@ -201,7 +215,7 @@ This project uses [black](https://github.com/psf/black) as the code formatter an
 The master manager is the entry point of DOOM. It loads up the necessary configurations based on the arguments you provide to it, the main one being the `task`, used to resolve the task, robot and interface (sim/real). For example, `rl-velocity-sim-go2` is used to resolve the robot: Go2, the interface: simulation, the controller type: rl, and the method: contact. It follows the convention: `<controller-type>-<method>-<interface>-<robot>`
 . The available configs are defined in [`task_configs.py`](src/tasks/task_configs.py) and can be appended with new ones for new tasks. 
 
-`LowLevelCmdPublisher` is the ROS2 node inside the `master_manager` that runs the main program loop inside the callback. Essentially, it updates the states and passes them to the controller that is active, which returns low-level commands which could be in the form of PD targets or torques. The low-level commands are then published through the unitree communication channel (which uses DDS), to either the simulation interface or real robot interface (which are automatically resolved from the task name). Optionally, the UI Interface can be run concurrently with the `LowLevelCmdPublisher` inside `master_manager` using the `enable-ui` argument.
+[`LowLevelCmdPublisher`](https://github.com/Atarilab/DOOM/blob/main/src/master_manager/master_manager/low_level_cmd_publisher.py) is the ROS2 node inside the `master_manager` that runs the main program loop inside the callback. Essentially, it updates the states and passes them to the controller that is active, which returns low-level commands which could be in the form of PD targets or torques. The low-level commands are then published through the unitree communication channel (which uses DDS), to either the simulation interface or real robot interface (which are automatically resolved from the task name). Optionally, the UI Interface can be run concurrently with the `LowLevelCmdPublisher` inside `master_manager` using the `enable-ui` argument.
 
 ### 📈 [State Manager](src/state_manager/state_manager/state_manager.py)
 The state manager is responsible for listening to different ROS2/DDS topics. Each subscriber also has callbacks/handlers which are defined in [`state_manager/msg_handlers.py`](src/state_manager/state_manager/msg_handlers.py). The state manager then makes these states available to your controllers in the form of a dictionary.
