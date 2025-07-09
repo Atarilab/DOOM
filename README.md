@@ -21,7 +21,7 @@
 
 ⚙️ [Requirements](#️-requirements) • 📦 [Installation Instructions](#-installation-instructions) • 🤖 [Testing Robot Connection](#-testing-robot-connection-if-running-on-the-robot)
 
-🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot) • 🎮 [Joystick Control](#-joystick) 
+🚀 [How to Use DOOM to Control Your Robot](#-how-to-use-doom-to-control-your-robot) • 🎮 [Joystick Control](#-joystick) • 🗂️ [Task Library](#-task-library)
 
 📡 [Vicon State Estimation](#-vicon-state-estimation) • 📊 [Live Plotting using PlotJuggler](#-live-plotting-using-plotjuggler) • 👁️ [Robot Visualization in RViz](#️-robot-visualization-in-rviz) •
 
@@ -175,6 +175,15 @@ Down: `STAND_DOWN` -> `STAY_DOWN`
 L1+R1: `STAND_UP` -> `RL-VELOCITY` 
 
 You can further define controller-specific joystick mappings by defining `get_joystick_mappings` (See RL-Contact Controller for reference).
+
+## 🗂️ Task Library
+<div align="center">
+
+| <div align="center"> rl-contact-real-go2 </div> | <div align="center"> rl-contact-sim-go2 </div> |
+| --- | --- |
+| [<img src="./assets/rl-contact-real-go2.gif" width="240px">](rl-contact-real-go2) | [<img src="./assets/rl-contact-sim-go2.gif" width="240px">](rl-contact-sim-go2) |
+
+</div>
 
 
 ## 📡 Vicon State Estimation
