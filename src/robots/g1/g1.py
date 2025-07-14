@@ -1,29 +1,30 @@
-from typing import Dict, TYPE_CHECKING, Type
-
-from robots.robot_base import RobotBase
-from utils.mj_wrapper import MjRobotWrapper
-from controllers.stand_controller import (
-    G1StayUpController,
-    G1StandUpController,
-    G1LowLevelController
-)
-from controllers.rl_velocity_locomotion_controller import RLHumanoidLocomotionVelocityController
-from controllers.rl_contact_bimanual_controller import RLHumanoidBimanualContactController
+from typing import TYPE_CHECKING, Dict, Type
 
 from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowState_ as G1LowState_
 from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as G1LowCmd_
+from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowState_ as G1LowState_
 
+from controllers.rl_contact_bimanual_controller import RLHumanoidBimanualContactController
+from controllers.rl_velocity_locomotion_controller import (
+    RLHumanoidLocomotionVelocityController,
+    RLHumanoidUnitreeLocomotionVelocityController,
+)
+from controllers.stand_controller import G1LowLevelController, G1StandUpController, G1StayUpController
+from robots.robot_base import RobotBase
 from state_manager.msg_handlers import g1_low_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
+from utils.helpers import create_joint_mapping
+from utils.mj_wrapper import MjRobotWrapper
 
 if TYPE_CHECKING:
     from controllers.controller_base import ControllerBase
+
 
 class G1(RobotBase):
     """
     This class provides robot-specific data and available controllers for the G1 robot based on the desired task.
     """
+
     def __init__(self, task, logger):
         """
         Initialize the G1 robot.
@@ -34,13 +35,16 @@ class G1(RobotBase):
         """
         super().__init__(task=task, logger=logger)
         self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
+
         self.low_cmd_msg = unitree_hg_msg_dds__LowCmd_
         self.low_cmd_msg_type = G1LowCmd_
-        
+
+        self.joints_unitree2isaac = create_joint_mapping(self.isaaclab_joint_names(), self.joint_names)
+        self.joints_isaac2unitree = create_joint_mapping(self.joint_names, self.isaaclab_joint_names())
+
         # Log available controllers
         self.logger.info(f"Available controllers for {self.name}: {self.available_controllers}")
         self.logger.info(f"Available subscribers for {self.name}: {self.subscribers}")
-        
 
     @property
     def name(self):
@@ -51,7 +55,7 @@ class G1(RobotBase):
             str: The name of the robot.
         """
         return "UnitreeG1"
-    
+
     @property
     def feet_names(self):
         """
@@ -61,7 +65,7 @@ class G1(RobotBase):
             List[str]: The names of the feet of the robot.
         """
         return ["left_ankle_roll_link", "right_ankle_roll_link"]
-    
+
     # TODO: Fetch from mj_model
     @property
     def joint_names(self):
@@ -103,6 +107,73 @@ class G1(RobotBase):
             "right_wrist_yaw_joint",
         ]
 
+    def isaaclab_joint_names(self):
+        """
+        Returns the names of the joints as in IsaacLab order.
+        """
+        return [
+            
+            "left_hip_pitch_joint",
+            "left_hip_roll_joint",
+            "left_hip_yaw_joint",
+            "left_knee_joint",
+            "left_ankle_pitch_joint",
+            "left_ankle_roll_joint",
+            "right_hip_pitch_joint",
+            "right_hip_roll_joint",
+            "right_hip_yaw_joint",
+            "right_knee_joint",
+            "right_ankle_pitch_joint",
+            "right_ankle_roll_joint",
+            "waist_yaw_joint",
+            "waist_roll_joint",
+            "waist_pitch_joint",
+            "left_shoulder_pitch_joint",
+            "left_shoulder_roll_joint",
+            "left_shoulder_yaw_joint",
+            "left_elbow_joint",
+            "left_wrist_roll_joint",
+            "left_wrist_pitch_joint",
+            "left_wrist_yaw_joint",
+            "right_shoulder_pitch_joint",
+            "right_shoulder_roll_joint",
+            "right_shoulder_yaw_joint",
+            "right_elbow_joint",
+            "right_wrist_roll_joint",
+            "right_wrist_pitch_joint",
+            "right_wrist_yaw_joint",
+
+            # 'left_hip_pitch_joint',
+            # 'right_hip_pitch_joint',
+            # 'waist_yaw_joint',
+            # 'left_hip_roll_joint',
+            # 'right_hip_roll_joint',
+            # 'waist_roll_joint',
+            # 'left_hip_yaw_joint',
+            # 'right_hip_yaw_joint',
+            # 'waist_pitch_joint',
+            # 'left_knee_joint',
+            # 'right_knee_joint',
+            # 'left_shoulder_pitch_joint',
+            # 'right_shoulder_pitch_joint',
+            # 'left_ankle_pitch_joint',
+            # 'right_ankle_pitch_joint',
+            # 'left_shoulder_roll_joint',
+            # 'right_shoulder_roll_joint',
+            # 'left_ankle_roll_joint',
+            # 'right_ankle_roll_joint',
+            # 'left_shoulder_yaw_joint',
+            # 'right_shoulder_yaw_joint',
+            # 'left_elbow_joint',
+            # 'right_elbow_joint',
+            # 'left_wrist_roll_joint',
+            # 'right_wrist_roll_joint',
+            # 'left_wrist_pitch_joint',
+            # 'right_wrist_pitch_joint',
+            # 'left_wrist_yaw_joint',
+            # 'right_wrist_yaw_joint'
+        ]
+
     @property
     def num_joints(self):
         """
@@ -142,7 +213,7 @@ class G1(RobotBase):
             str: The path to the XML file of the robot.
         """
         return "/home/atari/workspace/DOOM/src/robots/g1/g1_29dof.xml"
-    
+
     @property
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":
         """
@@ -176,18 +247,29 @@ class G1(RobotBase):
                     "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
                 },
             }
+        elif "unitree" in self.task:
+            controllers = {
+                "STAND": {
+                    "STAND_UP": G1StandUpController,
+                    "STAY_UP": G1StayUpController,
+                    "LOW_LEVEL": G1LowLevelController,
+                },
+                "LOCOMOTION": {
+                    "RL-UNITREE": RLHumanoidUnitreeLocomotionVelocityController,
+                },
+            }
 
         else:
             controllers = {}
-            
+
         self.logger.info(f"Available controllers for {self.name}: {controllers}")
         return controllers
-    
+
     @property
     def subscribers(self) -> Dict[str, ROS2StateSubscriber | DDSStateSubscriber]:
         """
         Returns a dictionary of subscribers for the G1 robot.
-        
+
         The dictionary contains the following keys:
 
         - "low_state": a DDSStateSubscriber for the low-level state of the robot.
@@ -208,10 +290,12 @@ class G1(RobotBase):
             logger=self.logger,
         )
         _subscribers["low_state"] = dds_low_state_sub
-        
+
         if "sim" in self.task:
             from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_
-            from state_manager.msg_handlers import sport_mode_state_handler, object_state_handler
+
+            from state_manager.msg_handlers import object_state_handler, sport_mode_state_handler
+
             dds_sportsmode_state_sub = DDSStateSubscriber(
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
@@ -219,7 +303,7 @@ class G1(RobotBase):
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
-            
+
             if "contact" in self.task:
                 dds_object_state_sub = DDSStateSubscriber(
                     topic="rt/objectstate",
@@ -231,6 +315,7 @@ class G1(RobotBase):
 
         else:
             from vicon_receiver.msg import Position
+
             ros2_vicon_sub = ROS2StateSubscriber(
                 topic="/vicon/G1/G1",
                 node_name="vicon_state",

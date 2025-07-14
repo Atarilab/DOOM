@@ -7,11 +7,14 @@ from typing import TYPE_CHECKING, Any, Callable, Dict
 
 import numpy as np
 import torch
+
 from utils.helpers import reorder_robot_states
-from utils.math import GRAVITY_DIR, quat_rotate_inverse
+from utils.math import quat_rotate_inverse
+
+import logging
 
 if TYPE_CHECKING:
-    from utils.mj_wrapper.mj_robot import MjRobotWrapper
+    pass
 
 
 def joint_pos(states: Dict[str, Any], asset_name: str = "robot") -> torch.Tensor:
@@ -30,7 +33,13 @@ def joint_pos(states: Dict[str, Any], asset_name: str = "robot") -> torch.Tensor
     return torch.tensor(joint_pos)
 
 
-def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, asset_name: str = "robot", scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
+def joint_pos_rel(
+    states: Dict[str, Any],
+    default_joint_pos: np.ndarray,
+    asset_name: str = "robot",
+    scale=1.0,
+    mapping: np.ndarray = None,
+) -> torch.Tensor:
     """
     Compute relative joint positions.
 
@@ -42,10 +51,12 @@ def joint_pos_rel(states: Dict[str, Any], default_joint_pos: np.ndarray, asset_n
     """
     if mapping is None:
         mapping = np.arange(len(states[f"{asset_name}/joint_pos"]))
-    return torch.tensor((states[f"{asset_name}/joint_pos"][mapping] - default_joint_pos)) * scale
+    return torch.tensor((states[f"{asset_name}/joint_pos"][mapping] - default_joint_pos), dtype=torch.float32) * scale
 
 
-def joint_pos_limit_normalized(states: Dict[str, Any], soft_dof_limits: np.ndarray, asset_name: str = "robot") -> torch.Tensor:
+def joint_pos_limit_normalized(
+    states: Dict[str, Any], soft_dof_limits: np.ndarray, asset_name: str = "robot"
+) -> torch.Tensor:
     """The joint positions of the asset normalized with the asset's soft joint limits.
 
     :param states: State dictionary
@@ -53,17 +64,17 @@ def joint_pos_limit_normalized(states: Dict[str, Any], soft_dof_limits: np.ndarr
     :param asset_name: Name of the asset
     :return: Normalized joint positions
     """
-    
+
     joint_pos = states[f"{asset_name}/joint_pos"]
     lower_limit = soft_dof_limits[:, 0]
     upper_limit = soft_dof_limits[:, 1]
-    
+
     offset = (lower_limit + upper_limit) * 0.5
 
     return 2 * (joint_pos - offset) / (upper_limit - lower_limit)
 
 
-def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0, mapping: np.ndarray = None) -> torch.Tensor:
+def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, mapping: np.ndarray = None) -> torch.Tensor:
     """
     The joint velocities of the asset.
 
@@ -74,9 +85,10 @@ def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0, ma
     """
     if mapping is None:
         mapping = np.arange(len(states[f"{asset_name}/joint_vel"]))
-    return torch.tensor((states[f"{asset_name}/joint_vel"][mapping])) * scale
+    return torch.tensor((states[f"{asset_name}/joint_vel"][mapping]), dtype=torch.float32) * scale
 
-def lin_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+
+def lin_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The linear velocity of the asset in world frame.
 
@@ -89,7 +101,7 @@ def lin_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) ->
     return torch.tensor((states[f"{asset_name}/lin_vel_w"])) * scale
 
 
-def ang_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+def ang_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The angular velocity of the asset in world frame.
 
@@ -102,7 +114,7 @@ def ang_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) ->
     return torch.tensor((states[f"{asset_name}/ang_vel_w"])) * scale
 
 
-def lin_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+def lin_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The linear velocity of the asset in base frame.
 
@@ -115,7 +127,7 @@ def lin_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) ->
     return torch.tensor((states[f"{asset_name}/lin_vel_b"])) * scale
 
 
-def ang_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+def ang_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The angular velocity of the asset in base frame.
 
@@ -127,7 +139,8 @@ def ang_vel_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) ->
 
     return torch.tensor((states[f"{asset_name}/gyroscope"])) * scale
 
-def root_pos_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+
+def root_pos_w(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The position of the root of the asset in world frame.
 
@@ -139,7 +152,7 @@ def root_pos_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -
     return torch.tensor((states[f"{asset_name}/base_pos_w"])) * scale
 
 
-def root_quat_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+def root_quat_w(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The orientation of the root of the asset in world frame.
 
@@ -151,7 +164,31 @@ def root_quat_w(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) 
     return torch.tensor((states[f"{asset_name}/base_quat"])) * scale
 
 
-def projected_gravity_b(states: Dict[str, Any], asset_name: str = "robot", scale = 1.0) -> torch.Tensor:
+def unitree_gravity_orientation(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
+    """
+    The orientation of the gravity vector in the unitree frame.
+    """
+    base_quat = states[f"{asset_name}/base_quat"]
+    if isinstance(base_quat, np.ndarray):
+        quat = torch.tensor(base_quat, dtype=torch.float32)
+    elif torch.is_tensor(base_quat):
+        quat = base_quat.clone().detach().to(dtype=torch.float32)
+    else:
+        quat = torch.tensor(np.array(base_quat), dtype=torch.float32)
+    qw = quat[0]
+    qx = quat[1]
+    qy = quat[2]
+    qz = quat[3]
+
+    gravity_orientation = np.zeros(3)
+
+    gravity_orientation[0] = 2 * (-qz * qx + qw * qy)
+    gravity_orientation[1] = -2 * (qz * qy + qw * qx)
+    gravity_orientation[2] = 1 - 2 * (qw * qw + qz * qz)
+    return torch.tensor(gravity_orientation, dtype=torch.float32) * scale
+
+
+def projected_gravity_b(states: Dict[str, Any], asset_name: str = "robot", scale=1.0) -> torch.Tensor:
     """
     The projected gravity vector.
 
@@ -163,17 +200,17 @@ def projected_gravity_b(states: Dict[str, Any], asset_name: str = "robot", scale
 
     base_quat = states[f"{asset_name}/base_quat"]
     if isinstance(base_quat, np.ndarray):
-        quat = torch.tensor(base_quat, dtype=torch.float64)
+        quat = torch.tensor(base_quat, dtype=torch.float32)
     elif torch.is_tensor(base_quat):
-        quat = base_quat.clone().detach().to(dtype=torch.float64)
+        quat = base_quat.clone().detach().to(dtype=torch.float32)
     else:
-        quat = torch.tensor(np.array(base_quat), dtype=torch.float64)
-    gravity_dir = torch.tensor([0, 0, -1.0], dtype=torch.float64)
-    
+        quat = torch.tensor(np.array(base_quat), dtype=torch.float32)
+    gravity_dir = torch.tensor([0, 0, -1.0], dtype=torch.float32)
+
     return quat_rotate_inverse(quat, gravity_dir) * scale
 
 
-def last_action(states: Dict[str, Any], last_action: Callable, scale = 1.0) -> torch.Tensor:
+def last_action(states: Dict[str, Any], last_action: Callable, scale=1.0) -> torch.Tensor:
     """
     The previous action from the policy. We use a callable (lambda) to fetch the latest value from the controller class.
 
@@ -184,7 +221,7 @@ def last_action(states: Dict[str, Any], last_action: Callable, scale = 1.0) -> t
     return last_action() * scale
 
 
-def velocity_commands(states: Dict[str, Any], velocity_commands: Callable, scale = 1.0) -> torch.Tensor:
+def velocity_commands(states: Dict[str, Any], velocity_commands: Callable, scale=1.0) -> torch.Tensor:
     """
     The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
 
@@ -203,7 +240,41 @@ def phase(states: Dict[str, Any], counter: Callable, period: float, control_dt: 
     return torch.tensor([sin_phase, cos_phase])
 
 
-def starting_time(states: Dict[str, Any]):
+def phase_with_timing(states: Dict[str, Any], logger: Callable, period: float, control_dt: float, decimation: int):
+    """
+    Phase observation that increments an internal counter only when elapsed time exceeds control_dt * decimation.
+    The counter is stored as a function attribute and persists across calls.
+    
+    :param states: State dictionary
+    :param period: Period of the phase signal
+    :param control_dt: Control timestep
+    :param decimation: Decimation factor for counter increment
+    :return: Phase observation as [sin_phase, cos_phase]
+    """
+    if not hasattr(phase_with_timing, "counter"):
+        phase_with_timing.counter = 0
+        phase_with_timing.start_time = time.time()
+    
+    # Calculate actual elapsed time
+    current_time = time.time()
+    elapsed_time = current_time - phase_with_timing.start_time
+    
+    # Increment counter every control_dt * decimation seconds
+    if elapsed_time >= control_dt:
+        phase_with_timing.counter += 1
+        phase_with_timing.start_time = time.time()
+        
+    
+    logger().debug(f"Phase counter incremented to {phase_with_timing.counter}")
+    # Use counter for phase calculation
+    count = phase_with_timing.counter * control_dt
+    phase = count % period / period
+    sin_phase = np.sin(phase * np.pi * 2)
+    cos_phase = np.cos(phase * np.pi * 2)
+    return torch.tensor([sin_phase, cos_phase], dtype=torch.float32)
+
+
+def current_time(states: Dict[str, Any]):
     return time.time()
 
 
@@ -292,11 +363,8 @@ def ee_pos_rel_b(
     # Compute the distance between the current feet positions and the desired feet positions
     diff = desired_feet_positions - feet_positions_w
     if torch.is_tensor(diff):
-        ee_pos_rel = diff.clone().norm(dim=1)
-    else:
-        ee_pos_rel = torch.tensor(diff).norm(dim=1)
-
-    return ee_pos_rel
+        return diff.clone().norm(dim=1)
+    return torch.tensor(diff).norm(dim=1)
 
 
 def contact_locations(
@@ -311,7 +379,7 @@ def contact_locations(
     """
     return torch.tensor(
         mj_model.transform_init_to_base(
-            future_feet_positions_init_frame()[:, current_goal_idx() : current_goal_idx() + obs_horizon]
+            future_feet_positions_init_frame()[:, current_goal_idx(): current_goal_idx() + obs_horizon]
         ).flatten()
     )
 
@@ -326,9 +394,8 @@ def contact_locations_b(
     """
     The future desired feet positions in the base frame.
     """
-    current_base_index = current_goal_idx() // 2
     return torch.tensor(
         mj_model.transform_world_to_base(
-            future_feet_positions_w()[:, current_goal_idx() : current_goal_idx() + obs_horizon].numpy()
+            future_feet_positions_w()[:, current_goal_idx(): current_goal_idx() + obs_horizon].numpy()
         ).flatten()
     )

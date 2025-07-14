@@ -81,12 +81,12 @@ class ObsTerm:
 
 class ObservationManager:
     """
-    Manages a collection of state observations with dependency tracking.
+    Manages a collection of observations with dependency tracking.
     This is responsible for computing the observations for each mode/controller from the states computed
     by the StateManager.
 
     Note that the order of the observations upon registrations matters as it will be maintained for computing the observations
-    and can be directly passed to your controller.
+    and can be directly passed to your controller/policy.
     """
 
     def __init__(self, logger: logging.Logger = None):

@@ -1,19 +1,21 @@
 from typing import Any, List, Optional, Tuple
 
-from commands.command_manager import CommandManager
-from controllers.stand_controller import ControllerBase
 from textual.app import App, ComposeResult
 from textual.color import Color
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.validation import Number
 from textual.widgets import Button, Header, Input, Label, Static
+
+from commands.command_manager import CommandManager
+from controllers.stand_controller import ControllerBase
 from utils.logger import logging
 from utils.mode_manager import ModeManager
 
 # Define color constants
 BUTTON_DEFAULT_COLOR = Color(50, 50, 80)
 BUTTON_ACTIVE_COLOR = Color(70, 70, 110)
+
 
 class RobotControlUI(App):
     """
@@ -228,7 +230,8 @@ class RobotControlUI(App):
         mode_manager: ModeManager,
         command_manager: Optional[CommandManager] = None,
         logger: Optional[logging.Logger] = None,
-        task_name: str = None):
+        task_name: str = None,
+    ):
         super().__init__()
         self.mode_manager = mode_manager
         self.command_manager = command_manager
@@ -263,18 +266,19 @@ class RobotControlUI(App):
                         controller_type = task = interface = robot = "Unknown"
                     subtitle = f"[b]Controller:[/b] {controller_type.upper()}    [b]Task:[/b] {task.capitalize()}    [b]Interface:[/b] {interface.capitalize()}    [b]Robot:[/b] {robot.capitalize()}"
                     yield Static(subtitle, id="subtitle")
-                    yield Static("Current Status: IDLE", id="status")
+                    yield Static("Current Status: ZERO", id="status")
 
                     # Main menu with mode buttons
                     with Vertical(id="main-menu", classes="menu"):
                         yield Static("Robot Modes", classes="section-header")
 
-                        # Always include IDLE button in main menu
-                        yield Button("IDLE", classes="mode-button", id="mode-idle")
+                        # Always include ZERO and DAMPING buttons in main menu
+                        yield Button("ZERO", classes="mode-button", id="mode-zero")
+                        yield Button("DAMPING", classes="mode-button", id="mode-damping")
 
-                        # Generate other mode-level buttons dynamically
+                        # Generate other mode-level buttons dynamically (excluding ZERO and DAMPING)
                         for mode in self.mode_structure.keys():
-                            if mode.upper() != "IDLE":
+                            if mode.upper() not in ["ZERO", "DAMPING"]:
                                 yield Button(
                                     mode,
                                     classes="mode-button",
@@ -286,8 +290,9 @@ class RobotControlUI(App):
                         with Vertical(id=f"{mode.lower()}-menu", classes="menu"):
                             yield Static(f"{mode} Submodes", classes="section-header")
 
-                            # Always add IDLE button to each submode menu
-                            yield Button("IDLE", classes="mode-button", id="mode-idle")
+                            # Always add ZERO and DAMPING buttons to each submode menu
+                            yield Button("ZERO", classes="mode-button", id="mode-zero")
+                            yield Button("DAMPING", classes="mode-button", id="mode-damping")
 
                             # Add submodes if applicable
                             if submodes:
@@ -316,7 +321,7 @@ class RobotControlUI(App):
         """
         # Set initial mode if not already set
         if not self.mode_manager.get_current_mode_info()["mode"]:
-            self.mode_manager.set_mode("IDLE")
+            self.mode_manager.set_mode("ZERO")
 
         # self.extend_ui_with_command()
         self.show_widgets()
@@ -334,13 +339,21 @@ class RobotControlUI(App):
             self.switch_to_menu("main-menu")
             return
 
-        # Special handling for IDLE mode
-        if button_id == "mode-idle":
-            self.mode_manager.set_mode("IDLE")
+        # Special handling for ZERO mode
+        if button_id == "mode-zero":
+            self.mode_manager.set_mode("ZERO")
 
             # Update UI to reflect current state
             self.update_status()
-            self.logger.info("Switched to IDLE mode")
+            self.logger.info("Switched to ZERO mode")
+            return
+
+        if button_id == "mode-damping":
+            self.mode_manager.set_mode("DAMPING")
+
+            # Update UI to reflect current state
+            self.update_status()
+            self.logger.info("Switched to DAMPING mode")
             return
 
         # Mode selection
@@ -361,7 +374,6 @@ class RobotControlUI(App):
             if button_id.startswith(f"{mode.lower()}-"):
                 submode = button_id.replace(f"{mode.lower()}-", "").upper()
                 self.mode_manager.set_mode(mode, submode)
-
 
                 break
 
@@ -503,9 +515,9 @@ class RobotControlUI(App):
         self.query_one("#status").update(status_text)
 
     def on_unmount(self) -> None:
-        """Set robot to IDLE mode when UI is closed."""
-        self.mode_manager.set_mode("IDLE")
-        
+        """Set robot to DAMPING mode when UI is closed."""
+        self.mode_manager.set_mode("DAMPING")
+
 
 class CommandWidget(Vertical):
     """

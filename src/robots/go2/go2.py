@@ -1,29 +1,31 @@
-from typing import Dict, TYPE_CHECKING
-
-from robots.robot_base import RobotBase
-from utils.mj_wrapper import MjRobotWrapper
-from controllers.stand_controller import (
-    Go2StayDownController,
-    Go2StandUpController,
-    Go2StandDownController,
-)
-from controllers.rl_contact_locomotion_controller import RLQuadrupedLocomotionContactController
-from controllers.rl_velocity_locomotion_controller import RLQuadrupedLocomotionVelocityController
+from typing import TYPE_CHECKING, Dict, Type
 
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as Go2LowState_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_ as Go2LowCmd_
+from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as Go2LowState_
 
-from state_manager.msg_handlers import go2_low_state_handler, sport_mode_state_handler, go2_vicon_handler
+from controllers.rl_contact_locomotion_controller import RLQuadrupedLocomotionContactController
+from controllers.rl_velocity_locomotion_controller import RLQuadrupedLocomotionVelocityController
+from controllers.stand_controller import (
+    Go2StandDownController,
+    Go2StandUpController,
+    Go2StayDownController,
+)
+from robots.robot_base import RobotBase
+from state_manager.msg_handlers import go2_low_state_handler, go2_vicon_handler, sport_mode_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
+from utils.joint_mapping import JointMappingInterface
+from utils.mj_wrapper import MjRobotWrapper
 
 if TYPE_CHECKING:
     from controllers.controller_base import ControllerBase
+
 
 class Go2(RobotBase):
     """
     This class provides robot-specific data and available controllers for the Go2 robot based on the desired task.
     """
+
     def __init__(self, task, logger):
         """
         Initialize the Go2 robot.
@@ -36,9 +38,41 @@ class Go2(RobotBase):
         self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
         self.low_cmd_msg = unitree_go_msg_dds__LowCmd_
         self.low_cmd_msg_type = Go2LowCmd_
-        
-        self.stand_down_joint_pos = [ 0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375, 0.0473455, 1.22187, -2.44375, -0.0473455, 1.22187, -2.44375, ]
-        self.stand_up_joint_pos = [ 0.1, 0.8, -1.5, -0.1, 0.8, -1.5, 0.1, 1.0, -1.5, -0.1, 1.0, -1.5, ]
+
+        self.joint_mapper = JointMappingInterface("go2")
+
+        # Keep backward compatibility with existing mapping arrays
+        self.joints_unitree2isaac = self.joint_mapper.mujoco_to_isaac_mapping
+        self.joints_isaac2unitree = self.joint_mapper.isaac_to_mujoco_mapping
+
+        self.stand_down_joint_pos = [
+            0.0473455,
+            1.22187,
+            -2.44375,
+            -0.0473455,
+            1.22187,
+            -2.44375,
+            0.0473455,
+            1.22187,
+            -2.44375,
+            -0.0473455,
+            1.22187,
+            -2.44375,
+        ]
+        self.stand_up_joint_pos = [
+            0.1,
+            0.8,
+            -1.5,
+            -0.1,
+            0.8,
+            -1.5,
+            0.1,
+            1.0,
+            -1.5,
+            -0.1,
+            1.0,
+            -1.5,
+        ]
 
     @property
     def name(self):
@@ -49,7 +83,7 @@ class Go2(RobotBase):
             str: The name of the robot.
         """
         return "UnitreeGo2"
-    
+
     @property
     def feet_names(self):
         """
@@ -81,6 +115,25 @@ class Go2(RobotBase):
             "RL_hip_joint",
             "RL_thigh_joint",
             "RL_calf_joint",
+        ]
+
+    def isaaclab_joint_names(self):
+        """
+        Returns the names of the joints as in IsaacLab order.
+        """
+        return [
+            "FL_hip_joint",
+            "FR_hip_joint",
+            "RL_hip_joint",
+            "RR_hip_joint",
+            "FL_thigh_joint",
+            "FR_thigh_joint",
+            "RL_thigh_joint",
+            "RR_thigh_joint",
+            "FL_calf_joint",
+            "FR_calf_joint",
+            "RL_calf_joint",
+            "RR_calf_joint",
         ]
 
     @property
@@ -122,7 +175,7 @@ class Go2(RobotBase):
             str: The path to the XML file of the robot.
         """
         return "/home/atari/workspace/DOOM/src/robots/go2/go2.xml"
-    
+
     @property
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":
         """
@@ -172,7 +225,7 @@ class Go2(RobotBase):
         else:
             controllers = {}
         return controllers
-    
+
     @property
     def subscribers(self) -> Dict[str, ROS2StateSubscriber | DDSStateSubscriber]:
         """
@@ -201,6 +254,7 @@ class Go2(RobotBase):
 
         if "sim" in self.task:
             from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_
+
             dds_sportsmode_state_sub = DDSStateSubscriber(
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
@@ -210,6 +264,7 @@ class Go2(RobotBase):
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
         else:
             from vicon_receiver.msg import Position
+
             ros2_vicon_sub = ROS2StateSubscriber(
                 topic="/vicon/Go2/Go2",
                 node_name="vicon_state",

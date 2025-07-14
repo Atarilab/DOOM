@@ -1,12 +1,13 @@
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 from commands.command_manager import CommandManager
 from controllers.stand_controller import ControllerBase
 from state_manager.obs_manager import ObservationManager
 
+
 class ModeManager:
     """
-    A flexible mode management system that allows dynamic registration of modes (controllers). 
+    A flexible mode management system that allows dynamic registration of modes (controllers).
     Modes are defined as a dictionary of controllers, where the key is the mode name and the value is a dictionary of controllers.
     """
 
@@ -66,15 +67,15 @@ class ModeManager:
         if submode is not None:
             self.logger.debug(f"Mode set to: {self._current_mode} - {self._current_submode}")
 
-        # Run set_mode function if it exists in the controller
+        # Get the new controller
         if self._current_submode:
             controller = self._modes[self._current_mode][self._current_submode]
         else:
             controller = self._modes[self._current_mode].get("default", None)
 
+        # Run set_mode function if it exists in the controller
         if controller and hasattr(controller, "set_mode"):
             controller.set_mode()
-
         else:
             self.logger.debug(f"Mode set to: {self._current_mode}")
 
@@ -116,7 +117,7 @@ class ModeManager:
         :return: Dictionary with current mode and submode
         """
         return {"mode": self._current_mode, "submode": self._current_submode}
-    
+
     def get_mode_info(self, mode_name: str) -> Dict[str, Any]:
         """
         Get mode and submode information for a given mode.

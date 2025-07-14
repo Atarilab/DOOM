@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union, TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Dict, List, Type, Union
+
 from controllers.controller_base import ControllerBase
 
 if TYPE_CHECKING:
@@ -16,6 +17,9 @@ class RobotBase(ABC):
         self.task = task
         self.logger = logger
         self.mj_model = None
+
+        self.joints_unitree2isaac = None
+        self.joints_isaac2unitree = None
 
     @property
     @abstractmethod
@@ -46,21 +50,19 @@ class RobotBase(ABC):
     @abstractmethod
     def xml_path(self) -> str:
         pass
-    
+
     @property
     @abstractmethod
-    def subscribers(self)-> "Dict[str, Union[ROS2StateSubscriber, DDSStateSubscriber]]":
+    def subscribers(self) -> "Dict[str, Union[ROS2StateSubscriber, DDSStateSubscriber]]":
         pass
-    
+
     @property
     @abstractmethod
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":
         pass
-    
+
     def get_joint_names(self) -> List[str]:
         return self.joint_names
-    
+
     def get_num_joints(self) -> int:
         return self.num_joints
-        
-        

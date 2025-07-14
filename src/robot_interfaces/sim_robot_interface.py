@@ -1,28 +1,27 @@
 # robot_interfaces/sim_robot_interface.py
 import os
 import threading
-import time
 from threading import Thread
+import time
 
 import mujoco
 import mujoco.viewer
 import numpy as np
-from robot_interfaces.robot_interface_base import RobotInterfaceBase
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
+
 from utils.unitree_sdk2py_bridge import UnitreeSdk2Bridge
 
 
-class SimRobotInterface(RobotInterfaceBase):
+class SimRobotInterface():
     def __init__(self, config):
 
         self.robot_name = config["ROBOT"]
         self.robot_scene = os.path.join(os.getcwd(), "robots", self.robot_name, config["SCENE"])
-        
 
         # Initialize Mujoco model and data
         self.mj_model = mujoco.MjModel.from_xml_path(self.robot_scene)
         self.mj_data = mujoco.MjData(self.mj_model)
-        
+
         # Check for object body in the scene
         self.object_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "object")
 
@@ -111,13 +110,6 @@ class SimRobotInterface(RobotInterfaceBase):
             self.locker.release()
             time.sleep(self.viewer_dt)
 
-    def send_command(self, command):
-        self.sim.data.ctrl[:] = command["command"]
-        self.sim.step()
-
-    def receive_state(self):
-        return {"observation": self.sim.data.qpos[:]}
-
     def stop(self, logger):
         """Gracefully stop the simulation and viewer threads."""
         if self.viewer.is_running():
@@ -126,6 +118,7 @@ class SimRobotInterface(RobotInterfaceBase):
         self.viewer_thread.join()
         self.sim_thread.join()
         logger.info("Simulation exited successfully.")
+
 
 class ElasticBand:
 

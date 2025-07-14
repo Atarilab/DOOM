@@ -2,6 +2,7 @@ import time
 from typing import Dict, List, Optional
 
 import numpy as np
+
 from state_manager.estimators import VelocityEstimator
 from utils.logger import logging
 from utils.math import quat_to_rotmatrix
@@ -47,16 +48,26 @@ def go2_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger]
         go2_low_state_handler.filtered_acc = accelerometer
         go2_low_state_handler.filtered_quat = quaternion
     else:
-        go2_low_state_handler.filtered_joint_pos = alpha * joint_positions + (1 - alpha) * go2_low_state_handler.filtered_joint_pos
-        go2_low_state_handler.filtered_joint_vel = alpha * joint_velocities + (1 - alpha) * go2_low_state_handler.filtered_joint_vel
-        go2_low_state_handler.filtered_joint_acc = alpha * joint_accelerations + (1 - alpha) * go2_low_state_handler.filtered_joint_acc
-        go2_low_state_handler.filtered_joint_tau = alpha * joint_tau_est + (1 - alpha) * go2_low_state_handler.filtered_joint_tau
+        go2_low_state_handler.filtered_joint_pos = (
+            alpha * joint_positions + (1 - alpha) * go2_low_state_handler.filtered_joint_pos
+        )
+        go2_low_state_handler.filtered_joint_vel = (
+            alpha * joint_velocities + (1 - alpha) * go2_low_state_handler.filtered_joint_vel
+        )
+        go2_low_state_handler.filtered_joint_acc = (
+            alpha * joint_accelerations + (1 - alpha) * go2_low_state_handler.filtered_joint_acc
+        )
+        go2_low_state_handler.filtered_joint_tau = (
+            alpha * joint_tau_est + (1 - alpha) * go2_low_state_handler.filtered_joint_tau
+        )
         go2_low_state_handler.filtered_gyro = alpha * gyroscope + (1 - alpha) * go2_low_state_handler.filtered_gyro
         go2_low_state_handler.filtered_acc = alpha * accelerometer + (1 - alpha) * go2_low_state_handler.filtered_acc
         go2_low_state_handler.filtered_quat = alpha * quaternion + (1 - alpha) * go2_low_state_handler.filtered_quat
 
     # Normalize the filtered quaternion
-    go2_low_state_handler.filtered_quat = go2_low_state_handler.filtered_quat / np.linalg.norm(go2_low_state_handler.filtered_quat)
+    go2_low_state_handler.filtered_quat = go2_low_state_handler.filtered_quat / np.linalg.norm(
+        go2_low_state_handler.filtered_quat
+    )
 
     # Construct and return the parsed states dictionary
     states = {
@@ -94,11 +105,9 @@ def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = 
         go2_vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
 
     # Calculate base position in meters
-    base_position = np.array([
-        (msg["x_trans"] + x_offset) * 0.001,
-        (msg["y_trans"] + y_offset) * 0.001,
-        (msg["z_trans"] + z_offset) * 0.001
-    ])
+    base_position = np.array(
+        [(msg["x_trans"] + x_offset) * 0.001, (msg["y_trans"] + y_offset) * 0.001, (msg["z_trans"] + z_offset) * 0.001]
+    )
 
     # Base quaternion in order (w, x, y, z)
     base_quaternion = np.array([msg["w"], msg["x_rot"], msg["y_rot"], msg["z_rot"]])
@@ -107,6 +116,7 @@ def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = 
     if not hasattr(go2_vicon_handler, "filtered_quaternion"):
         go2_vicon_handler.filtered_quaternion = base_quaternion
     else:
+        # TODO: Check if this is required (is this about makeing quat unique?)
         dot_product = np.dot(go2_vicon_handler.filtered_quaternion, base_quaternion)
         if dot_product < 0:
             base_quaternion = -base_quaternion  # Ensure shortest path
@@ -146,7 +156,7 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
         sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
     base_pos_w = msg["position"]
-    base_quat = msg["imu_state"].quaternion
+    msg["imu_state"].quaternion
 
     states = {
         "robot/base_pos_w": base_pos_w,
@@ -155,17 +165,18 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
 
     return states
 
+
 def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Extracts the object state, and returns the object position, object velocity, object orientation, and object angular velocity."""
-    
+
     base_pos_w = msg["position"]
     base_quat = msg["imu_state"].quaternion
     lin_vel_w = msg["velocity"]
     ang_vel_w = msg["imu_state"].gyroscope
-    
+
     lin_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, lin_vel_w)
     ang_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, ang_vel_w)
-    
+
     return {
         "object/base_pos_w": base_pos_w,
         "object/base_quat": base_quat,
@@ -173,7 +184,8 @@ def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
         "object/ang_vel_w": ang_vel_w,
         "object/lin_vel_b": lin_vel_b,
         "object/ang_vel_b": ang_vel_b,
-        }
+    }
+
 
 def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
@@ -195,19 +207,25 @@ def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
 
     # Extract motor states
     motor_states = msg["motor_state"]
-    
+
     # Extract IMU states
     imu_state = msg["imu_state"]
-    
+
     states = {
         "mode_machine": msg["mode_machine"],
-        "robot/joint_pos": np.array([motor_states[i].q for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))]),
-        "robot/joint_vel": np.array([motor_states[i].dq for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))]),
-        "robot/joint_tau_est": np.array([motor_states[i].tau_est for i in leg_joint2motor_idx + arm_waist_joint2motor_idx]),
+        "robot/joint_pos": np.array(
+            [motor_states[i].q for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))]
+        ),
+        "robot/joint_vel": np.array(
+            [motor_states[i].dq for i in range(len(leg_joint2motor_idx + arm_waist_joint2motor_idx))]
+        ),
+        "robot/joint_tau_est": np.array(
+            [motor_states[i].tau_est for i in leg_joint2motor_idx + arm_waist_joint2motor_idx]
+        ),
         "robot/gyroscope": imu_state.gyroscope,
         "robot/accelerometer": imu_state.accelerometer,
         "robot/base_quat": imu_state.quaternion,
         "robot/base_rpy": imu_state.rpy,
     }
-    
+
     return states

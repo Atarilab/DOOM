@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
@@ -9,12 +9,13 @@ from tf2_ros import TransformBroadcaster
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
+
 from utils.joystick_interface import JoystickManager
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
-    from utils.mode_manager import ModeManager
     from state_manager.state_manager import StateManager
+    from utils.mode_manager import ModeManager
 
 
 class LowLevelCmdPublisher(Node):
@@ -60,11 +61,7 @@ class LowLevelCmdPublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Initialize joystick manager with debug mode support
-        self.joystick_manager = JoystickManager(
-            mode_manager=self.mode_manager, 
-            logger=self.logger,
-            debug=debug
-        )
+        self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, logger=self.logger, debug=debug)
 
         # Create timer for periodic command publishing
         self.timer = self.create_timer(self.dt, self.low_level_cmd_callback, clock=self.get_clock())
@@ -80,9 +77,9 @@ class LowLevelCmdPublisher(Node):
 
         for i in range(len(self.dds_cmd.motor_cmd)):
             self.dds_cmd.motor_cmd[i].mode = 0x01  # PMSM mode
-            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[
-                i
-            ].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
+            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = (
+                self.dds_cmd.motor_cmd[i].kd
+            ) = self.dds_cmd.motor_cmd[i].tau = 0.0
 
     def _init_cmd_g1(self, mode_machine, mode_pr):
         """Initialize command message with default values for g1."""
@@ -92,9 +89,9 @@ class LowLevelCmdPublisher(Node):
 
         for i in range(len(self.dds_cmd.motor_cmd)):
             self.dds_cmd.motor_cmd[i].mode = 1
-            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[
-                i
-            ].dq = self.dds_cmd.motor_cmd[i].kd = self.dds_cmd.motor_cmd[i].tau = 0.0
+            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = (
+                self.dds_cmd.motor_cmd[i].kd
+            ) = self.dds_cmd.motor_cmd[i].tau = 0.0
 
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
@@ -127,7 +124,7 @@ class LowLevelCmdPublisher(Node):
 
             # Compute motor commands
             try:
-                motor_commands = active_controller.compute_torques(combined_state, {})
+                motor_commands = active_controller.compute_lowlevelcmd(combined_state)
             except Exception as e:
                 self.logger.error(f"Error computing motor commands: {e}")
                 return
@@ -135,6 +132,7 @@ class LowLevelCmdPublisher(Node):
             try:
                 # Update low-level command to the robot
                 num_joints = self.robot.get_num_joints()
+                # self.logger.debug(f"motor_commands: {motor_commands}")
                 for i in range(num_joints):
                     motor = motor_commands[f"motor_{i}"]
                     for attr in ["q", "kp", "dq", "kd", "tau"]:
@@ -205,7 +203,7 @@ class LowLevelCmdPublisher(Node):
 
     def cleanup(self):
         """Clean up resources."""
-        if hasattr(self, 'joystick_manager'):
+        if hasattr(self, "joystick_manager"):
             self.joystick_manager.cleanup()
 
 

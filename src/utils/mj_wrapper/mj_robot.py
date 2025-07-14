@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import mujoco
 import numpy as np
+
 from utils.math import quat_to_rotmatrix
 
 
@@ -53,10 +54,10 @@ class MjRobotWrapper:
         Args:
             state: Dictionary containing robot state. Uses state["base_pos_w"]
                   and state["base_quat"] for the initial frame.
-            caller: Name of the controller calling this method. Must be "IdleController".
+            caller: Name of the controller calling this method. Must be "ZeroTorqueController".
         """
-        if caller != "IdleController":
-            raise RuntimeError("set_initial_world_frame can only be called from IdleController")
+        if caller != "ZeroTorqueController":
+            raise RuntimeError("set_initial_world_frame can only be called from ZeroTorqueController")
 
         try:
             # Use the base position and orientation from the state
@@ -99,8 +100,8 @@ class MjRobotWrapper:
                 self.data.qpos[0:3] = state["robot/base_pos_w"]
             if "robot/base_quat" in state:
                 self.data.qpos[3:7] = state["robot/base_quat"]
-        self.data.qpos[-self.num_joints:] = q
-        self.data.qvel[-self.num_joints:] = v
+        self.data.qpos[-self.num_joints :] = q
+        self.data.qvel[-self.num_joints :] = v
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -372,16 +373,17 @@ class MjRobotWrapper:
             raise ValueError("Base body not found in model")
 
         base_pos = self.data.xpos[base_idx]
-        
+
         # Convert quaternion to rotation matrix
         from scipy.spatial.transform import Rotation as R
+
         if quat.shape[0] == 4:  # wxyz format
             # Convert to xyzw format for scipy
             quat_xyzw = np.array([quat[1], quat[2], quat[3], quat[0]])
             rot = R.from_quat(quat_xyzw)
         else:  # xyzw format
             rot = R.from_quat(quat)
-            
+
         base_rot = rot.as_matrix()
 
         # Get the original shape
@@ -425,16 +427,17 @@ class MjRobotWrapper:
             raise ValueError("Base body not found in model")
 
         base_pos = self.data.xpos[base_idx]
-        
+
         # Convert quaternion to rotation matrix
         from scipy.spatial.transform import Rotation as R
+
         if quat.shape[0] == 4:  # wxyz format
             # Convert to xyzw format for scipy
             quat_xyzw = np.array([quat[1], quat[2], quat[3], quat[0]])
             rot = R.from_quat(quat_xyzw)
         else:  # xyzw format
             rot = R.from_quat(quat)
-            
+
         base_rot = rot.as_matrix()
 
         # Get the original shape

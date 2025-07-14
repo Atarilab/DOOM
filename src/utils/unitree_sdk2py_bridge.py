@@ -5,10 +5,8 @@ import mujoco
 import numpy as np
 import pygame
 from scipy.spatial.transform import Rotation as R
-
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__SportModeState_, unitree_go_msg_dds__WirelessController_
-
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import SportModeState_, WirelessController_
 from unitree_sdk2py.utils.thread import RecurrentThread
 
@@ -61,18 +59,20 @@ class UnitreeSdk2Bridge:
         self.low_state_puber.Init()
         self.lowStateThread = RecurrentThread(interval=self.dt, target=self.PublishLowState, name="sim_lowstate")
         self.lowStateThread.Start()
-        
+
         self.high_state = unitree_go_msg_dds__SportModeState_()
         self.high_state_puber = ChannelPublisher(TOPIC_HIGHSTATE, SportModeState_)
         self.high_state_puber.Init()
         self.HighStateThread = RecurrentThread(interval=self.dt, target=self.PublishHighState, name="sim_highstate")
         self.HighStateThread.Start()
-        
+
         if self.object_id != -1:
             self.object_state = unitree_go_msg_dds__SportModeState_()
             self.object_state_puber = ChannelPublisher(TOPIC_OBJECTSTATE, SportModeState_)
             self.object_state_puber.Init()
-            self.objectstateThread = RecurrentThread(interval=self.dt, target=self.PublishObjectState, name="sim_objectstate")
+            self.objectstateThread = RecurrentThread(
+                interval=self.dt, target=self.PublishObjectState, name="sim_objectstate"
+            )
             self.objectstateThread.Start()
 
         if self.robot == "go2":
@@ -206,10 +206,10 @@ class UnitreeSdk2Bridge:
             self.high_state.velocity[2] = self.mj_data.sensordata[self.dim_motor_sensor + 15]
 
         self.high_state_puber.Write(self.high_state)
-        
+
     def PublishObjectState(self):
-        """ Publish the object states in the world frame."""
-        
+        """Publish the object states in the world frame."""
+
         # Get position and orientation (quaternion)
         pos = self.mj_data.xpos[self.object_id].copy()
         quat = self.mj_data.xquat[self.object_id].copy()
@@ -221,7 +221,7 @@ class UnitreeSdk2Bridge:
         # Convert to world frame
         lin_vel_w = rot.apply(lin_vel_b)
         ang_vel_w = rot.apply(ang_vel_b)
-        
+
         self.object_state.position[:] = pos
         self.object_state.velocity[:] = lin_vel_w
         self.object_state.imu_state.quaternion[:] = quat

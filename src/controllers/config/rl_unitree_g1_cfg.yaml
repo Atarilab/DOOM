@@ -1,0 +1,79 @@
+policy_path: "locomotion_g1/g1_unitree_locomotion.pt"
+policy_architecture: "recurrent"
+control_dt: 0.02
+decimation: 10
+action_dim: 12
+obs_dim: 47
+action_scale: 0.25 # 0.25
+stiffness: [
+            60,
+            60,
+            60,
+            100,
+            40,
+            40,  # legs
+            60,
+            60,
+            60,
+            100,
+            40,
+            40,  # legs
+            
+        ]
+damping: [
+            1,
+            1,
+            1,
+            2,
+            1,
+            1,  # legs
+            1,
+            1,
+            1,
+            2,
+            1,
+            1,  # legs
+            
+        ]
+
+default_joint_pos: [-0.1,  0.0,  0.0,  0.3, -0.2, 0.0, 
+                  -0.1,  0.0,  0.0,  0.3, -0.2, 0.0]
+
+arm_waist_kps: [60,
+            40,
+            40,  # waist
+            40,
+            40,
+            40,
+            40,
+            40,
+            40,
+            40,  # arms
+            40,
+            40,
+            40,
+            40,
+            40,
+            40,
+            40,  # arms
+          ]
+
+arm_waist_kds: [
+            1,
+            1,
+            1,  # waist
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,  # arms
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,  # arms
+]

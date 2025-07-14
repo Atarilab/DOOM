@@ -2,8 +2,9 @@ import logging
 import os
 from typing import Dict
 
-from tasks.task_configs import TASK_CONFIG
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize
+
+from tasks.task_configs import TASK_CONFIG
 from utils.config_loader import load_config
 
 

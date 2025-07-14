@@ -1,6 +1,6 @@
+from abc import ABC, abstractmethod
 import logging
 import threading
-from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional
 
 import rclpy
@@ -15,22 +15,18 @@ class StateSubscriber(ABC):
     @abstractmethod
     def start_subscription(self):
         """Start the state subscription."""
-        pass
 
     @abstractmethod
     def stop_subscription(self):
         """Stop the state subscription."""
-        pass
 
     @abstractmethod
     def get_latest_state(self) -> Dict[str, Any]:
         """Retrieve the latest state."""
-        pass
 
     @abstractmethod
     def spin_once(self):
         """Spin the subscriber node once."""
-        pass
 
 
 class DDSStateSubscriber(StateSubscriber):
@@ -95,7 +91,6 @@ class DDSStateSubscriber(StateSubscriber):
 
     def stop_subscription(self):
         """Stop DDS subscription."""
-        pass
 
     def get_latest_state(self) -> Dict[str, Any]:
         """Retrieve the latest state."""
@@ -104,7 +99,6 @@ class DDSStateSubscriber(StateSubscriber):
 
     def spin_once(self):
         """Spin the subscriber node once. This is not required for Unitree Cyclone DDS messages."""
-        pass
 
 
 class ROS2StateSubscriber(StateSubscriber):

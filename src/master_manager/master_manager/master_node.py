@@ -5,9 +5,8 @@ import time
 
 import rclpy
 
-
 # DOOM Imports
-from controllers.stand_controller import IdleController
+from controllers.stand_controller import DampingController, ZeroTorqueController
 from master_manager.low_level_cmd_publisher import LowLevelCmdPublisher
 from robots import resolve_robot
 from state_manager.state_manager import StateManager
@@ -18,7 +17,7 @@ from utils.ui_interface import RobotControlUI
 
 node = None
 state_manager = None
-import traceback
+
 
 async def main_async(args=None):
     """
@@ -41,9 +40,7 @@ async def main_async(args=None):
     # Parse arguments
     parser = argparse.ArgumentParser(description="ATARI DOOM Robot Controller")
     parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run")
-    parser.add_argument(
-        "--log", type=str, default="test", help="Experiment name to log information"
-    )
+    parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
     parser.add_argument("--enable-ui", action="store_true", help="Enable the Robot Control UI")
 
@@ -54,10 +51,13 @@ async def main_async(args=None):
     logger = get_logger(f"{args.task}_robot_controller", log_file, debug=args.debug)
 
     try:
-        logger.info('Starting robot controller for task: {}', args.task)
+        logger.info("Starting robot controller for task: {}", args.task)
 
         # Load configurations
         configs = await initialize_robot_controller(args.task, logger)
+
+        # Add debug flag to configs
+        configs["debug"] = args.debug
 
         # Initialize communication channel
         await initialize_channel(args.task, configs["robot_interface_config"], logger)
@@ -74,7 +74,8 @@ async def main_async(args=None):
 
         # Create mode manager and register idle (damping) controller
         mode_manager = ModeManager(logger=logger)
-        mode_manager.register_mode("IDLE", {"default": IdleController(robot, configs)})
+        mode_manager.register_mode("ZERO", {"default": ZeroTorqueController(robot, configs)})
+        mode_manager.register_mode("DAMPING", {"default": DampingController(robot, configs)})
 
         # Register controllers available for the robot
         for controller_type, controllers in robot.available_controllers.items():
@@ -84,8 +85,8 @@ async def main_async(args=None):
             }
             mode_manager.register_mode(controller_type, controller_dict)
 
-        # Set idle mode by default
-        mode_manager.set_mode("IDLE")
+        # Set ZERO mode by default
+        mode_manager.set_mode("ZERO")
 
         # Create low level command publisher node
         node = LowLevelCmdPublisher(
@@ -138,12 +139,12 @@ async def main_async(args=None):
     except KeyboardInterrupt:
         logger.info("Received KeyboardInterrupt. Shutting down...")
 
-        # Set controller to idle mode before shutting down
-        mode_manager.set_mode("IDLE")
-        logger.info("Set controller to IDLE mode before shutdown")
+        # Set controller to DAMPING mode before shutting down
+        mode_manager.set_mode("DAMPING")
+        logger.info("Set controller to DAMPING mode before shutdown")
 
     except Exception as e:
-        logger.exception('An error occurred: {}', e)
+        logger.exception("An error occurred: {}", e)
         raise
     finally:
         if node:

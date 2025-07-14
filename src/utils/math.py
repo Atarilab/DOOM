@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import numpy as np
-import torch
 from scipy.spatial.transform import Rotation as R
+import torch
 
 GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
 
@@ -93,24 +93,24 @@ def quat_to_rotmatrix(q: np.ndarray, order="wxyz") -> np.ndarray:
 def euler_to_quaternion(roll: float, pitch: float, yaw: float, order="wxyz") -> torch.Tensor:
     """
     Convert Euler angles to quaternion.
-    
+
     Args:
         roll: Roll angle in radians
         pitch: Pitch angle in radians
         yaw: Yaw angle in radians
         order: The convention/order of the quaternion in the output. Defaults to 'wxyz'
-        
+
     Returns:
         The corresponding quaternion. Shape is (4,)
     """
     # Create a rotation object from Euler angles
-    r = R.from_euler('xyz', [roll, pitch, yaw])
-    
+    r = R.from_euler("xyz", [roll, pitch, yaw])
+
     # Convert to quaternion
     quat = r.as_quat()  # Returns in xyzw format
-    
+
     # Convert to wxyz format if needed
     if order == "wxyz":
         quat = np.array([quat[3], quat[0], quat[1], quat[2]])
-    
+
     return torch.tensor(quat, dtype=torch.float32)

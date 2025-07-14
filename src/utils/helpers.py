@@ -7,7 +7,9 @@ import torch
 
 
 class ObservationHistoryStorage:
-    def __init__(self, num_envs: int, policy_architecture: str, num_obs: int, max_length: int, device: torch.device = "cpu"):
+    def __init__(
+        self, num_envs: int, policy_architecture: str, num_obs: int, max_length: int, device: torch.device = "cpu"
+    ):
         """
         Initialize a FIFO queue for state history, starting with zeros at initialization.
 
@@ -59,7 +61,6 @@ class ObservationHistoryStorage:
         else:
             return obs.unsqueeze(0)
 
-
     def reset(self, done: torch.Tensor):
         """Reset the buffer for environments that are done.
 
@@ -110,3 +111,26 @@ def reorder_robot_states(states: np.ndarray, origin_order: List[str], target_ord
 
     # Reorder states using advanced NumPy indexing
     return states[reorder_indices]
+
+
+def create_joint_mapping(list_a: list, list_b: list) -> list:
+    """
+    Creates a mapping from list A to list B.
+
+    Args:
+        list_a (list): Source list of joint names
+        list_b (list): Target list of joint names
+
+    Returns:
+        list: List of indices where each element i gives the index in list_b
+                that corresponds to list_a[i]. Returns -1 if not found.
+    """
+    mapping = []
+    for item in list_a:
+        try:
+            idx = list_b.index(item)
+            mapping.append(idx)
+        except ValueError:
+            # Item not found in list_b
+            mapping.append(-1)
+    return mapping
