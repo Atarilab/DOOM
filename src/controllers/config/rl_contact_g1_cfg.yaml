@@ -3,6 +3,7 @@ policy_architecture: "recurrent"
 control_dt: 0.002
 decimation: 10
 action_dim: 17
+use_threading: True
 obs_dim: 126
 action_scale: 0.25 # 0.25
 stiffness: 

@@ -1,17 +1,20 @@
 import os
-import time
-import torch
 import threading
+import time
 import traceback
-import numpy as np
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
-from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped
+import numpy as np
+from rclpy.node import Node
 from tf2_ros import StaticTransformBroadcaster
+import torch
 
-from utils.helpers import ObservationHistoryStorage
 from controllers.controller_base import ControllerBase
+from utils.helpers import ObservationHistoryStorage
+
+if TYPE_CHECKING:
+    from robots.robot_base import RobotBase
 
 
 class RLControllerBase(ControllerBase, Node):
@@ -60,6 +63,40 @@ class RLControllerBase(ControllerBase, Node):
         # Set up observation and action processing
         self._configure_processing_infrastructure(configs)
 
+        # Thread control variables
+        self._threads_running = False
+        self._threads_initialized = False
+        self._previous_active_state = False
+
+    @property
+    def active(self):
+        """Get the active state of the controller."""
+        return self._active
+
+    @active.setter
+    def active(self, value):
+        """Set the active state and manage threads accordingly."""
+        # Store the previous state to detect changes
+        self._previous_active_state = getattr(self, "_active", False)
+        self._active = value
+        
+        # If threading is not required, skip starting/stopping the threads
+        if not hasattr(self, "use_threading"):
+            self.use_threading = False            
+        if not self.use_threading:
+            return
+        
+        # If transitioning from active to inactive, stop threads
+        if self._previous_active_state and not value:
+            self._stop_processing_threads()
+            if self.logger:
+                self.logger.debug("RL controller deactivated, stopped processing threads")
+        # If transitioning from inactive to active, start threads
+        elif not self._previous_active_state and value:
+            self._start_processing_threads()
+            if self.logger:
+                self.logger.debug("RL controller activated, started processing threads")
+
     def _load_policy_model(self, configs: Dict[str, Any]):
         """
         Load and prepare the neural network policy model.
@@ -77,9 +114,7 @@ class RLControllerBase(ControllerBase, Node):
         self.policy.eval()
 
         # Precompute static configurations
-        self.action_scale = torch.tensor(
-            configs["controller_config"]["action_scale"], dtype=torch.float32
-        )
+        self.action_scale = torch.tensor(configs["controller_config"]["action_scale"], dtype=torch.float32)
         self.policy_architecture = configs["controller_config"].get("policy_architecture", "mlp")
 
     def _initialize_controller_parameters(self, configs: Dict[str, Any]):
@@ -96,6 +131,7 @@ class RLControllerBase(ControllerBase, Node):
         self.action_dim = controller_config.get("action_dim", None)
         self.control_dt = controller_config.get("control_dt", None)
         self.decimation = controller_config.get("decimation", None)
+        self.policy_dt = self.control_dt * self.decimation  
 
         self.default_joint_pos = (
             torch.tensor(
@@ -137,6 +173,7 @@ class RLControllerBase(ControllerBase, Node):
         # Performance optimization: Preallocate tensors
         action_dim = configs["controller_config"].get("action_dim", None)
         obs_dim = configs["controller_config"].get("obs_dim", None)
+        self.use_threading = configs["controller_config"].get("use_threading", False)
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
@@ -145,27 +182,74 @@ class RLControllerBase(ControllerBase, Node):
             policy_architecture=self.policy_architecture,
             num_obs=obs_dim,
             max_length=1,
-            device="cpu",
+            device=torch.device("cpu"),
         )
 
-        # Start concurrent processing threads
-        self._init_processing_threads()
+        # Initialize processing threads (but don't start them yet)
+        if self.use_threading:   
+            self._init_processing_threads()
 
     def _init_processing_threads(self):
-        """Initialize and start concurrent processing threads."""
-        self.obs_processing_thread = threading.Thread(
-            target=self._process_observations, daemon=True
-        )
-        self.policy_inference_thread = threading.Thread(
-            target=self._run_policy_inference, daemon=True
-        )
-        self.obs_processing_thread.start()
-        self.policy_inference_thread.start()
+        """Initialize concurrent processing threads (but don't start them)."""
+        self.obs_processing_thread = threading.Thread(target=self._process_observations, daemon=not self.debug)
+        self.policy_inference_thread = threading.Thread(target=self._run_policy_inference, daemon=not self.debug)
+        self._threads_initialized = True
+
+    def _start_processing_threads(self):
+        """Start the processing threads if they're not already running."""
+        # If threading is not required, skip starting the threads
+        if not self.use_threading:
+            return
+
+        if not self._threads_initialized:
+            self._init_processing_threads()
+
+        # Check if threads are already running or alive
+        if not self._threads_running and not self.obs_processing_thread.is_alive() and not self.policy_inference_thread.is_alive():
+            self._threads_running = True
+            self.obs_processing_thread.start()
+            self.policy_inference_thread.start()
+            if self.logger:
+                self.logger.debug("RL controller processing threads started")
+        elif self.logger:
+            self.logger.debug("Threads already running or alive, skipping start")
+
+    def _stop_processing_threads(self):
+        """Stop the processing threads."""
+        # If threading is not required, skip stopping the threads
+        if not self.use_threading:
+            return
+        
+        if self._threads_running:
+            self._threads_running = False
+            # Wait for threads to finish (with timeout)
+            if self.obs_processing_thread.is_alive():
+                self.obs_processing_thread.join(timeout=1.0)
+            if self.policy_inference_thread.is_alive():
+                self.policy_inference_thread.join(timeout=1.0)
+            
+            # Reinitialize threads so they can be started again
+            self._init_processing_threads()
+            
+            if self.logger:
+                self.logger.debug("RL controller processing threads stopped and reinitialized")
+
+    def set_mode(self):
+        """
+        Override set_mode to initialize the controller when mode is set.
+        Thread management is handled automatically by the active property setter.
+        """
+        super().set_mode()
 
     def _process_observations(self):
         """Continuously process observations in a separate thread"""
-        while True:
+        while self._threads_running:
             try:
+                # Check if controller is active
+                if not self.active:
+                    time.sleep(0.01)  # Sleep when inactive
+                    continue
+
                 with self._lock:
                     current_state = self.latest_state
 
@@ -176,9 +260,15 @@ class RLControllerBase(ControllerBase, Node):
                 # Compute and store observations
                 with torch.no_grad():
                     try:
+                        # Check if obs_manager is available
+                        if self.obs_manager is None:
+                            time.sleep(0.01)  # Wait for obs_manager to be set
+                            continue
+                            
                         obs = self.obs_manager.compute(current_state)
                         obs_tensor = torch.cat([v.reshape(-1) for v in obs.values()])
                         self.obs_buffer.add(obs_tensor.unsqueeze(0))
+
                     except Exception as e:
                         print(f"Error converting observations to tensor: {e}")
                         print("Observations that caused the error:")
@@ -199,40 +289,54 @@ class RLControllerBase(ControllerBase, Node):
                 time.sleep(0.1)  # Prevent rapid error loops
 
     def _run_policy_inference(self):
-        """Continuously run policy inference in a separate thread at a fixed dt of 0.02 seconds"""
-        dt = self.control_dt * self.decimation  # Fixed time step in seconds (0.02)
+        """Continuously run policy inference in a separate thread.
+
+        NOTE: I have commented out the sleep to make the policy inference run at the same rate as the control frequency.
+        Need to confirm if this is a good idea.
+        """
         last_time = time.time()
 
-        while True:
+        while self._threads_running:
             try:
+                # Check if controller is active
+                if not self.active:
+                    time.sleep(0.01)  # Sleep when inactive
+                    continue
 
                 # Calculate time since last iteration
                 current_time = time.time()
                 elapsed = current_time - last_time
 
-                # Sleep if we're ahead of schedule
-                if elapsed < dt:
-                    time.sleep(dt - elapsed)
-                    current_time = time.time()  # Update current time after sleep
+                # # Sleep if we're ahead of schedule
+                # if elapsed < self.policy_dt:
+                #     time.sleep(self.policy_dt - elapsed)
+                #     current_time = time.time()  # Update current time after sleep
 
                 # Update last time for next iteration
                 last_time = current_time
 
                 try:
                     obs = self.obs_buffer.get()
-
+                    
+                    # Check if we have valid observations
+                    if obs.numel() == 0 or obs.sum() == 0:
+                        time.sleep(0.01)  # Wait for observations
+                        continue
+                        
                     # Policy inference
                     with torch.no_grad():
-                        raw_action = self.policy(obs)
+                        raw_action = self.policy(obs).squeeze(0).squeeze(0)
+                    self.raw_action.copy_(raw_action)
 
-                    self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
-                    self.logger.error(f"Policy inference error: {e}")
+                    if self.logger:
+                        self.logger.error(f"Policy inference error: {e}")
                     time.sleep(0.1)  # Prevent rapid error loops
                     continue
 
             except Exception as e:
-                self.logger.error(f"Policy inference thread error: {e}")
+                if self.logger:
+                    self.logger.error(f"Policy inference thread error: {e}")
                 time.sleep(0.1)  # Prevent rapid error loops
 
     def compute_joint_pos_targets(self):
@@ -270,4 +374,11 @@ class RLControllerBase(ControllerBase, Node):
 
             return joint_pos_targets
         except Exception as e:
-            self.logger.error(f"Error computing joint pos targets: {e}")
+            if self.logger:
+                self.logger.error(f"Error computing joint pos targets: {e}")
+            return self.default_joint_pos.cpu().numpy()[self.actions_mapping]
+
+    def __del__(self):
+        """Cleanup method to ensure threads are stopped when controller is destroyed."""
+        if self.use_threading:
+            self._stop_processing_threads()

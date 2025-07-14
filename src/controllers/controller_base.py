@@ -1,13 +1,14 @@
-import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Callable, TYPE_CHECKING
+import threading
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 import numpy as np
-from commands.command_manager import CommandManager
-from state_manager.obs_manager import ObservationManager
 
 if TYPE_CHECKING:
+    from commands.command_manager import CommandManager
     from robots.robot_base import RobotBase
+    from state_manager.obs_manager import ObservationManager
+
 
 class ControllerBase(ABC):
     """
@@ -43,6 +44,7 @@ class ControllerBase(ABC):
         self.latest_state = None
         self.name = None
         self.active = False
+        self.debug = self.configs.get("debug", False)
 
         # Joint mapping and limits
         self._setup_joint_limits()
@@ -51,7 +53,7 @@ class ControllerBase(ABC):
         """
         Define joystick button mappings for this controller.
         Override this method in subclasses to define controller-specific mappings.
-        
+
         Returns:
             Dict mapping button names to callback functions.
             Example: {"A": lambda: self.do_something()}
@@ -86,7 +88,7 @@ class ControllerBase(ABC):
             joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor,
         ]
 
-    def set_obs_manager(self, obs_manager: ObservationManager):
+    def set_obs_manager(self, obs_manager: "ObservationManager"):
         """
         Configure observation manager for the controller.
 
@@ -98,7 +100,7 @@ class ControllerBase(ABC):
         if hasattr(self, "register_observations"):
             self.register_observations()
 
-    def set_cmd_manager(self, cmd_manager: CommandManager):
+    def set_cmd_manager(self, cmd_manager: "CommandManager"):
         """
         Configure command manager for the controller.
 
@@ -138,8 +140,12 @@ class ControllerBase(ABC):
         :return: Positions constrained within soft limits
         """
         if joint_indices is not None:
-            return np.clip(joint_pos_targets[joint_indices], self.soft_dof_pos_limit[0][joint_indices], self.soft_dof_pos_limit[1][joint_indices])
-        
+            return np.clip(
+                joint_pos_targets[joint_indices],
+                self.soft_dof_pos_limit[0][joint_indices],
+                self.soft_dof_pos_limit[1][joint_indices],
+            )
+
         return np.clip(joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
 
     def register_commands(self):
@@ -148,31 +154,28 @@ class ControllerBase(ABC):
         This method can be overridden by subclasses to register specific commands.
         By default, it does nothing.
         """
-        pass
-    
+
     @abstractmethod
     def register_observations(self):
         """
         Register required observations for the specific controller mode.
         Implementations should maintain a consistent observation order.
         """
-        pass
 
     @abstractmethod
-    def compute_torques(self, state: Dict[str, Any], desired_goal: Dict[str, Any]) -> Dict[str, Any]:
+    def compute_lowlevelcmd(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Compute control torques based on current state and desired goal.
 
         :param state: Current robot/environment state
-        :param desired_goal: Target state or task objective
-        :return: Control torques for robot actuation
+        :return: Motor commands for robot actuation
         """
         if self.robot.mj_model is not None:
             self.robot.mj_model.update(state)
-            
+
     @abstractmethod
     def set_mode(self):
         """
         When the mode is set, this method is called to initialize the controller and set up initial values.
         """
-        pass
+        self.active = True

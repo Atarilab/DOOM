@@ -1,9 +1,9 @@
 ROBOT: "g1"
 SCENE: "scene_29dof.xml"
 ELASTIC_BAND: True
-BASE_LINK: "pelvis"
+BASE_LINK: "torso_link"
 
-SIMULATION_DT: 0.005
+SIMULATION_DT: 0.002
 VIEWER_DT: 0.02  # 50 fps for viewer
 PRINT_SCENE_INFORMATION: True
 INTERFACE: "lo"

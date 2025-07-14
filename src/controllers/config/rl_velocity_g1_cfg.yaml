@@ -1,70 +1,16 @@
-policy_path: "locomotion_g1/g1_unitree_locomotion.pt"
+policy_path: "locomotion_g1/g1_isaaclab_velocity_latest.pt"
 policy_architecture: "recurrent"
-control_dt: 0.002
-decimation: 10
-action_dim: 12
-obs_dim: 47
-action_scale: 0.25 # 0.25
-stiffness: 
-  - 100
-  - 100
-  - 100
-  - 150
-  - 40
-  - 40
-  - 100
-  - 100
-  - 100
-  - 150
-  - 40
-  - 40
-damping: 
-  - 2
-  - 2
-  - 2
-  - 4
-  - 2
-  - 2
-  - 2
-  - 2
-  - 2
-  - 4
-  - 2
-  - 2
-default_joint_pos: # only leg joint positions ( 0 used for arm and waist joints)
-  - -0.1
-  - 0.0
-  - 0.0
-  - 0.3
-  - -0.2
-  - 0.0
-  - -0.1
-  - 0.0
-  - 0.0
-  - 0.3
-  - -0.2
-  - 0.0
+control_dt: 0.02
+decimation: 4
+action_dim: 29
+obs_dim: 99
+action_scale: 0.5 # 0.25
+use_threading: True
 
-leg_joint2motor_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-
-arm_waist_joint2motor_idx: 
-  - 12
-  - 13
-  - 14
-  - 15
-  - 16
-  - 17
-  - 18
-  - 19
-  - 20
-  - 21
-  - 22
-  - 23
-  - 24
-  - 25
-  - 26
-  - 27
-  - 28
+ISAAC_LAB_DEFAULT_JOINT_POS: [-0.2000, -0.2000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,
+         0.0000,  0.4200,  0.4200, -0.4500, -0.4500, -0.2300, -0.2300,  0.5000,
+        -0.5000,  0.0000,  0.0000,  0.0000,  0.0000,  0.8700,  0.8700,  0.0000,
+         0.0000,  0.0000,  0.0000, -0.8000,  0.8000]
 
 arm_waist_kps: 
   - 300
@@ -102,4 +48,4 @@ arm_waist_kds:
   - 2
   - 1
   - 1
-  - 1                            
+  - 1     

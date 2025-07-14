@@ -6,6 +6,7 @@ obs_dim: 48
 action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
+use_threading: True
 default_joint_pos:
   - 0.1
   - 0.8

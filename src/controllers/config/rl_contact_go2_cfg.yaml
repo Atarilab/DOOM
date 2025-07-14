@@ -1,15 +1,16 @@
 # policy_path: "contact_policy_actuatorRand.pt"
-# policy_path: "contact_policy_feetRandom.pt"
+# policy_path: "locomotion_go2/contact_policy_feetRandom.pt"
 policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
-# policy_path: "contact_policy_latest.pt"
+# policy_path: "locomotion_go2/contact_policy_latest.pt"
 fixed_feet_positions: false
 obs_dim: 82
 control_dt: 0.001
-decimation: 3
+decimation: 4
 action_dim: 12
-action_scale: 0.4
+action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
+use_threading: True
 feet_step_size: 0.0
 horizon_length: 200
 action_filter_alpha: 0.5
@@ -23,18 +24,18 @@ visualize:
   contact_status: false
   
 default_joint_pos:
-  - 0.1
-  - 0.8
-  - -1.5
-  - -0.1
-  - 0.8
-  - -1.5
-  - 0.1
-  - 1.0
-  - -1.5
-  - -0.1
-  - 1.0
-  - -1.5
+  - 0.1  # FR_hip_joint
+  - 0.8  # FR_thigh_joint
+  - -1.5 # FR_calf_joint
+  - -0.1 # FL_hip_joint
+  - 0.8  # FL_thigh_joint
+  - -1.5 # FL_calf_joint
+  - 0.1  # RR_hip_joint
+  - 1.0  # RR_thigh_joint
+  - -1.5 # RR_calf_joint
+  - -0.1 # RL_hip_joint
+  - 1.0  # RL_thigh_joint
+  - -1.5 # RL_calf_joint
 
 ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joint_names object
   - "FL_hip_joint" # 0
@@ -49,23 +50,7 @@ ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joi
   - "FR_calf_joint" # 9
   - "RL_calf_joint" # 10
   - "RR_calf_joint" # 11
-
-JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING:
-  [3, 0, 9, 6, 4, 1, 10, 7, 5, 2, 11, 8]
-JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
-    1,
-    5,
-    9,
-    0,
-    4,
-    8,
-    3,
-    7,
-    11,
-    2,
-    6,
-    10, 
-  ] 
+  
 
 ISAAC_LAB_DEFAULT_JOINT_POS: [
     0.1000, # 0
