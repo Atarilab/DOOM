@@ -103,6 +103,7 @@ class Go2StandUpController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
             ),
         )
 
@@ -152,6 +153,7 @@ class Go2StandDownController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
             ),
         )
 
@@ -199,6 +201,7 @@ class Go2StayDownController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
             ),
         )
 
@@ -242,6 +245,7 @@ class Go2StanceController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
             ),
         )
 
@@ -307,6 +311,8 @@ class G1StandUpController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
+                
             ),
         )
 
@@ -368,6 +374,7 @@ class G1StayUpController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
             ),
         )
 
@@ -441,6 +448,7 @@ class G1LowLevelController(ControllerBase):
             "time",
             ObsTerm(
                 current_time,
+                obs_dim=1,
             ),
         )
 

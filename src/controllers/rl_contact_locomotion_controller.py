@@ -1,19 +1,19 @@
 import threading
 import time
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 import numpy as np
-import torch
-from commands.command_manager import CommandTerm
-
-from state_manager.obs_manager import ObsTerm
 from std_msgs.msg import ColorRGBA, Float32MultiArray, MultiArrayDimension
+import torch
 from visualization_msgs.msg import Marker, MarkerArray
 
+from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
+from state_manager.obs_manager import ObsTerm
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
+
 
 class RLQuadrupedLocomotionContactController(RLControllerBase):
     """
@@ -31,7 +31,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.command_duration = 0.35  # Duration of each contact plan in seconds
         self.pending_command_duration = self.command_duration  # Initialize pending command duration
         self.command_duration_change_pending = False  # Flag to indicate pending command duration change
-        self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool)  # Current contact pattern
+        self.current_contact_plan = torch.ones((2, 4), dtype=torch.bool, device=self.device)  # Current contact pattern
         self.command_start_time = time.time()  # When the current plan started
         # Thread synchronization for gait changes
         self._gait_lock = threading.RLock()  # Reentrant lock for gait changes
@@ -39,11 +39,14 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
         # Default offset values ( stride lengths and stance widths would be add to these values )
         self.default_offset = torch.tensor(
-            [(0.1934, 0.1465, 0.0),
-            (0.1934, -0.1465, 0.0),
-            (-0.1934, 0.1465, 0.0),
-            (-0.1934, -0.1465, 0.0),],
+            [
+                (0.1934, 0.1465, 0.0),
+                (0.1934, -0.1465, 0.0),
+                (-0.1934, 0.1465, 0.0),
+                (-0.1934, -0.1465, 0.0),
+            ],
             dtype=torch.float32,
+            device=self.device,
         )
         self.current_offset = self.default_offset.clone()
         self.pending_stance_width_front = self.current_offset[0, 1]
@@ -56,10 +59,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.feet_step_size = configs["controller_config"]["feet_step_size"]
         self.lateral_pos = 0.0
         self.future_feet_positions_init_frame = None
-        self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3)
-        self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3)
+        self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3, device=self.device)
+        self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3, device=self.device)
         self.desired_ee_position_w = np.zeros((4, 3))
-        
+
         # Heading command for feet positions
         self.heading_command = 0.0  # Default heading (in radians)
         self.heading_command_lock = threading.RLock()  # Lock for heading command updates
@@ -98,7 +101,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     [False, False, False, False],  # Phase 1: FL and RR in contact
                 ]
             ),
-            
             "pace": torch.tensor(
                 [
                     [True, False, True, False],  # Phase 1: FL and RL in contact
@@ -170,7 +172,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 ]
             ),
             "crawl-clockwise": torch.tensor(
-                [                    
+                [
                     [True, True, True, False],  # Phase 2: FL, FR, RL in contact, RR moving
                     [False, True, True, True],  # Phase 1: FR, RL, RR in contact, FL moving
                     [True, False, True, True],  # Phase 4: FL, RL, RR in contact, FR moving
@@ -185,19 +187,19 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     [False, False, False, False],  # Phase 3: FL and RR in contact
                 ]
             ),
-            
-
         }
         self.current_gait = "stance"  # Default gait
         self.pending_gait_change = None  # Store pending gait change
         self.in_transition = False  # Flag to indicate if we're in a transition phase
         self.transition_counter = 0  # Counter to track resample steps during transition
-        self.transition_duration = configs["controller_config"]["transition_duration"]  # Number of resample steps for transition (increased from 2)
+        self.transition_duration = configs["controller_config"][
+            "transition_duration"
+        ]  # Number of resample steps for transition (increased from 2)
         self.transition_progress = 0.0
         self.transition_start_gait = None  # Starting gait for transition
         self.transition_end_gait = None  # Ending gait for transition
         self.time_left = self.command_duration
-        self.current_contact_plan = self.gait_patterns[self.current_gait]
+        self.current_contact_plan = self.gait_patterns[self.current_gait].to(self.device)
         self.current_goal_idx = 0
         self.goal_completion_counter = 0
 
@@ -206,42 +208,47 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         Register observations for contact-conditioned locomotion.
         Includes contact pattern and timing information.
         """
-        from state_manager.observations import (  
-            joint_pos_rel,
-            joint_vel,
-            lin_vel_b,
+        from state_manager.observations import (
             ang_vel_b,
-            last_action,
-            projected_gravity_b,
             contact_locations_b,
             contact_plan,
             contact_time_left,
             ee_pos_rel_b,
+            joint_pos_rel,
+            joint_vel,
+            last_action,
+            lin_vel_b,
+            projected_gravity_b,
         )
-        self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
-        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
-        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
+
+        self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b, obs_dim=3, device=self.device))
+        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, obs_dim=3, device=self.device))
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "contact_locations",
             ObsTerm(
                 contact_locations_b,
+                obs_dim=24,
                 params={
                     "mj_model": self.robot.mj_model,
                     "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "obs_horizon": 2,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
+                device=self.device,
             ),
         )
         self.obs_manager.register(
             "contact_time_left",
-            ObsTerm(contact_time_left, params={"contact_time_left": lambda: self.time_left}),
+            ObsTerm(contact_time_left, params={"contact_time_left": lambda: self.time_left}, obs_dim=1, device=self.device),
         )
         self.obs_manager.register(
             "contact_plan",
             ObsTerm(
                 contact_plan,
                 params={"contact_plan": lambda: self.current_contact_plan},
+                obs_dim=8,
+                device=self.device,
             ),
         )
         self.obs_manager.register(
@@ -252,11 +259,13 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     "default_joint_pos": self.default_joint_pos.numpy(),
                     "mapping": self.joint_obs_unitree_to_isaac_mapping,
                 },
+                obs_dim=12,
+                device=self.device,
             ),
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}),
+            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=12, device=self.device),
         )
         self.obs_manager.register(
             "ee_pos_rel_b",
@@ -267,13 +276,15 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
+                obs_dim=4,
+                device=self.device,
             ),
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
+            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=12, device=self.device),
         )
-        
+
     def register_commands(self):
         """Register contact command parameters."""
         self.command_manager.register(
@@ -299,7 +310,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         with self._gait_lock:
             self.current_gait = "stance"
             self.current_contact_plan = self.gait_patterns["stance"]
-            
+
             self.pending_gait_change = None
             self.in_transition = False
             self.transition_counter = 0
@@ -313,21 +324,20 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.pending_step_size = 0.0
             self.pending_lateral_pos = 0.0
 
-        base_pos_w = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32)
+        base_pos_w = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device)
         self.lateral_pos = base_pos_w[1]
         self.generate_future_feet_positions(pos=base_pos_w)
 
-    def compute_torques(self, state, desired_goal):
+    def compute_lowlevelcmd(self, state):
         """
         Compute motor commands using the learned policy.
 
         :param state: Current robot state
-        :param desired_goal: Desired goal state (not used in this implementation)
         :return: Motor commands dictionary
         """
         if self.robot.mj_model is not None:
             self.robot.mj_model.update(state)
-            
+
         start_time = time.perf_counter()
 
         # Update the latest state for the observation processing thread
@@ -344,7 +354,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 self._resample_commands()
                 # self._update_desired_ee_positions()
                 self._update_action_scale()
-                
+
                 if self.visualize["feet_error"]:
                     self.pub_feet_error()
                     self.pub_feet_error_norm()
@@ -353,58 +363,55 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.pub_current_contact_locations()
 
         if self.visualize["foot_forces"]:
-            self.pub_foot_forces(state["robot/foot_forces"])
-            self.pub_contact_status(state["robot/foot_forces"])
+            self.pub_foot_forces(self.latest_state["robot/foot_forces"])
+            self.pub_contact_status(self.latest_state["robot/foot_forces"])
         if self.visualize["contact_plan"]:
             self.pub_contact_plan()
 
         # self.logger.debug(f"Time left: {self.time_left:.2f} seconds")
-        try:
-            joint_pos_targets = self.compute_joint_pos_targets()
-
-            # Prepare motor commands
-            self.cmd = {
-                f"motor_{i}": {
-                    "q": joint_pos_targets[i],
-                    "kp": self.Kp,
-                    "dq": 0.0,
-                    "kd": self.Kd,
-                    "tau": 0.0,
-                }
-                for i in range(self.robot.num_joints)
-            }
-
-            # Track command preparation time
-            self.cmd_preparation_time = time.perf_counter() - start_time
-            
-        except Exception as e:
-            self.logger.error(f"Error computing torques: {e}")
-            self.cmd = {
-                f"motor_{i}": {
-                    "q": self.default_joint_pos[i],
-                    "kp": self.Kp,
-                    "dq": 0.0,
-                    "kd": self.Kd,
-                    "tau": 0.0,
-                }
-                for i in range(self.robot.num_joints)
-            }
         
+        # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
+        # else we can compute the joint pos targets directly from the obs tensor
+        if not self.use_threading:
+            obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
+            joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
+        else:
+            joint_pos_targets = self.compute_joint_pos_targets()
+            
+        # Clip the joint pos targets for safety
+        if hasattr(self, "soft_dof_pos_limit"):
+            joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
+
+        # Prepare motor commands
+        self.cmd = {
+            f"motor_{i}": {
+                "q": joint_pos_targets[i],
+                "kp": self.Kp,
+                "dq": 0.0,
+                "kd": self.Kd,
+                "tau": 0.0,
+            }
+            for i in range(self.robot.num_joints)
+        }
+
+        # Track command preparation time
+        self.cmd_preparation_time = time.perf_counter() - start_time
+
         return self.cmd
-    
+
     def _update_action_scale(self):
         """Update the action scale based on the current gait."""
-        
+
         # self.action_scale = 0.4 if self.current_gait in ["jump", "bound", "trot-jump1", "trot-jump2", "trot-fly", "pace-jump1", "pace-jump2", "crawl-anticlockwise", "crawl-clockwise", "random1", "random2", "random3", "random4"] else 0.35
-        self.action_scale = 0.4
+        self.action_scale = 0.35
 
     def _resample_commands(self):
         """Resample the commands for the controller with thread safety."""
         try:
             with self._gait_lock:
                 # Apply pending step size change if any
-                
-                if hasattr(self, 'step_size_change_pending') and self.step_size_change_pending:
+
+                if hasattr(self, "step_size_change_pending") and self.step_size_change_pending:
                     self.feet_step_size = self.pending_step_size
                     self.step_size_change_pending = False
                     if self.logger is not None:
@@ -412,8 +419,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     # Regenerate future feet positions with new step size
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
                     self.generate_future_feet_positions(pos=avg_base_xy)
-                    
-                
+
                 # Apply pending heading change if any
                 if self.heading_change_pending:
                     self.heading_command = self.pending_heading
@@ -423,7 +429,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     # Regenerate future feet positions with new heading
                     self.generate_future_feet_positions()
 
-                
                 if self.lateral_pos_change_pending:
                     self.lateral_pos = self.pending_lateral_pos
                     self.lateral_pos_change_pending = False
@@ -433,14 +438,14 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
                     avg_base_xy[1] = self.lateral_pos
                     self.generate_future_feet_positions(pos=avg_base_xy)
-                
+
                 # Apply pending command duration change if any
                 if self.command_duration_change_pending:
                     self.command_duration = self.pending_command_duration
                     self.command_duration_change_pending = False
                     if self.logger is not None:
                         self.logger.debug(f"Applied command duration change: {self.command_duration:.2f} seconds")
-                
+
                 # Apply pending offset change if any
                 if self.stance_width_change_pending:
                     self.current_offset[0, 1] = self.pending_stance_width_front
@@ -455,7 +460,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
 
                     self.generate_future_feet_positions(pos=avg_base_xy)
-                    
+
                 # Handle gait transitions
                 if self.pending_gait_change is not None:
                     if not self.in_transition:
@@ -467,10 +472,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                         self.transition_end_gait = self.pending_gait_change
 
                         # For safety, start with a stable stance if transitioning to a dynamic gait
-                        if self.pending_gait_change in [gait for gait in self.gait_patterns.keys() if gait not in ["transition", "stance"]]:
+                        if self.pending_gait_change in [
+                            gait for gait in self.gait_patterns.keys() if gait not in ["transition", "stance"]
+                        ]:
                             self.current_gait = "transition"
                             self.current_contact_plan = self.gait_patterns["transition"]
-                            
+
                         if self.transition_duration == 0:
                             self.in_transition = False
                             self.current_gait = self.pending_gait_change
@@ -484,7 +491,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                             self.pending_gait_change = None
                             self.transition_start_gait = None
                             self.transition_end_gait = None
-                            
+
                             # Signal that the gait change is complete
                             self._gait_change_event.set()
 
@@ -517,19 +524,20 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
                             self.logger.debug(f"Transition complete, applied gait: {self.current_gait}")
 
-
                 # Normal gait progression (only if not in transition phase)
                 if not self.in_transition and self.current_gait not in ["stance", "transition"]:
                     self.goal_completion_counter += 1
-                    
+
                     # Handle different gait phases
                     if "crawl" in self.current_gait:
                         # For crawl gait or trot fly, cycle through 4 phases
                         self.current_goal_idx += 1 if (self.goal_completion_counter) % 4 == 0 else 0
-                        self.current_contact_plan = torch.stack([
-                            self.gait_patterns[self.current_gait][(self.goal_completion_counter) % 4],
-                            self.gait_patterns[self.current_gait][(self.goal_completion_counter + 1) % 4]    
-                        ])
+                        self.current_contact_plan = torch.stack(
+                            [
+                                self.gait_patterns[self.current_gait][(self.goal_completion_counter) % 4],
+                                self.gait_patterns[self.current_gait][(self.goal_completion_counter + 1) % 4],
+                            ]
+                        )
                     # elif self.current_gait == "jump":
                     #     self.current_goal_idx += 1 if (self.goal_completion_counter) % 4 == 0 else 0
                     #     self.current_contact_plan = torch.stack(
@@ -538,8 +546,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     #             self.current_contact_plan[0],
                     #         ]
                     #     )
-                        
-                        
+
                     else:
                         # For other gaits (2 phases), alternate between phases
                         self.current_goal_idx += (
@@ -551,19 +558,19 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                                 self.current_contact_plan[0],
                             ]
                         )
-                
+
                 # Safety mechanism, if the goal index exceeds the horizon length, reset the goal index and replan feet sequences
                 if self.current_goal_idx >= self.horizon_length:
-                    base_pos_w = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32)
+                    base_pos_w = torch.tensor(
+                        self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device
+                    )
                     self.generate_future_feet_positions(pos=base_pos_w)
-                        
+
             # if self.current_gait == "jump" and self.current_contact_plan[0].sum() == 4:
             #     self.command_duration = 0.35
             # else:
             #     self.command_duration = 0.35
-            
-            
-                        
+
         except Exception as e:
             if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
                 self.logger.error(f"Error resampling commands: {e}")
@@ -580,18 +587,18 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
         # Use current offset values
         offset = self.current_offset.clone()
-        
+
         # Use the heading command relative to robot's yaw
         with self.heading_command_lock:
             # Convert heading command to tensor for calculations
-            heading_command_tensor = torch.tensor(self.heading_command, dtype=torch.float32)
+            heading_command_tensor = torch.tensor(self.heading_command, dtype=torch.float32, device=self.device)
             # Calculate target yaw by adding the heading command to the robot's yaw
             target_yaw = heading_command_tensor
-            
+
         # Create rotation matrix for the target yaw
         cos_yaw = torch.cos(target_yaw)
         sin_yaw = torch.sin(target_yaw)
-        rotation_matrix = torch.tensor([[cos_yaw, -sin_yaw, 0], [sin_yaw, cos_yaw, 0], [0, 0, 1]], dtype=torch.float32)
+        rotation_matrix = torch.tensor([[cos_yaw, -sin_yaw, 0], [sin_yaw, cos_yaw, 0], [0, 0, 1]], dtype=torch.float32, device=self.device)
 
         # Rotate the offset positions
         rotated_offset = torch.matmul(rotation_matrix, offset.T).T
@@ -599,21 +606,19 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # Check if pos is a tensor of zeros (default case)
         if torch.all(pos == 0):
             # Get the robot's current position
-            robot_pos = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32)
+            robot_pos = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device)
             # Use only the x-dimension of the robot's position
-            pos = torch.tensor([robot_pos[0],self.lateral_pos, 0.0], dtype=torch.float32)
+            pos = torch.tensor([robot_pos[0], self.lateral_pos, 0.0], dtype=torch.float32, device=self.device)
 
         self.future_feet_positions_w[:] = (pos + rotated_offset).unsqueeze(1)
 
         stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32).unsqueeze(0) * torch.tensor(
-            self.feet_step_size, dtype=torch.float32
+            self.feet_step_size, dtype=torch.float32, device=self.device
         ).unsqueeze(-1)
-        
+
         # r = torch.zeros(4, self.horizon_length)
         # x_rand = r.uniform_(-0.06, 0.06).clone()
         # y_rand = r.uniform_(-0.06, 0.06).clone()
-        
-        
 
         # Apply stride in the direction of the target heading
         direction_x = cos_yaw
@@ -621,31 +626,30 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
         # self.future_feet_positions_w[:, :, 2] = -0.02 if self.interface == "real" else 0.08
-        self.future_feet_positions_w[:, :, 2] = 0.03
-        
+        self.future_feet_positions_w[:, :, 2] = 0.08
+
         # if self.current_gait in ["trot", "pace"]:
         #     self.future_feet_positions_w[[1, 2], :, 0] -= (self.feet_step_size / 2) * direction_x
         #     self.future_feet_positions_w[[1, 2], :, 1] -= (self.feet_step_size / 2) * direction_y
-            
+
         # if self.current_gait in ["pace"]:
         #     self.future_feet_positions_w[[0, 3], :, 0] += 0.12 * direction_x
         #     self.future_feet_positions_w[[0, 3], :, 1] += 0.12 * direction_y
-        self.future_feet_positions_init_frame = self.robot.mj_model.transform_world_to_init_frame(
-            self.future_feet_positions_w.numpy()
-        )
-       
-        
+        # self.future_feet_positions_init_frame = self.robot.mj_model.transform_world_to_init_frame(
+        #     self.future_feet_positions_w.numpy()
+        # )
+
         if self.visualize["future_feet_positions"]:
             self.pub_future_feet_positions()
-    
+
     """
     Joystick mappings and callbacks        
     """
-    
+
     def get_joystick_mappings(self):
         """
         Define joystick button mappings for gait changes and heading control.
-        
+
         Returns:
             Dict mapping button names to callback functions.
         """
@@ -660,7 +664,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             # Crawl Gaits
             "L2-Y": lambda: self.change_commands({"gait": "crawl-anticlockwise"}),
             "L2-A": lambda: self.change_commands({"gait": "crawl-clockwise"}),
-            
             # Pace-Jump Gaits
             "R1-X": lambda: self.change_commands({"gait": "pace-jump1"}),
             "R1-B": lambda: self.change_commands({"gait": "pace-jump2"}),
@@ -676,7 +679,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             # Step Size
             "up": lambda: self._handle_step_size_change("up"),
             "down": lambda: self._handle_step_size_change("down"),
-            # Lateral Position 
+            # Lateral Position
             "left": lambda: self._handle_lateral_pos_change("left"),
             "right": lambda: self._handle_lateral_pos_change("right"),
             # Command Duration
@@ -692,10 +695,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         
 
     """
-    Function handlers for changing the contact commands for the rl-contact-locomotion controller
+    Handler functions for changing the contact commands for the rl-contact-locomotion controller
     - gait, step size, heading, lateral position, command duration, stance width
     """
-    
+
     def change_commands(self, new_commands: Dict[str, Any]):
         """Change the robot's contact commands with thread safety.
 
@@ -731,7 +734,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         except Exception as e:
             self.logger.error(f"Contact command update failed: {e}")
 
-
     def _handle_step_size_change(self, direction: str):
         """Handle forwardstep size changes."""
         # Increase step size by 0.01 meters when up button is pressed
@@ -741,7 +743,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             new_step_size = self.feet_step_size - 0.1
         # Limit maximum step size to 0.2 meters for safety
         new_step_size = max(-0.3, min(new_step_size, 0.3))
-        
+
         # Set the pending step size change instead of applying it immediately
         with self._gait_lock:
             self.pending_step_size = new_step_size
@@ -750,13 +752,13 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
     def _handle_heading_change(self, direction: str):
         """
         Handle heading changes using directional buttons.
-        
+
         Args:
             direction: String indicating the direction to turn ("left" or "right")
         """
         # Define heading change amount in radians
         heading_change = 0.05  # About 11.5 degrees
-        
+
         with self._gait_lock:
             if direction == "left":
                 # Turn left (positive heading)
@@ -764,10 +766,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             elif direction == "right":
                 # Turn right (negative heading)
                 self.pending_heading = self.heading_command - heading_change
-                
+
             # # Keep heading within -pi to pi range
             # self.pending_heading = (self.pending_heading + np.pi) % (2 * np.pi) - np.pi
-            
+
             # Set the pending flag
             self.heading_change_pending = True
 
@@ -783,26 +785,26 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
     def _handle_command_duration_change(self, direction: str):
         """
         Handle command duration changes.
-        
+
         Args:
             direction: String indicating whether to increase or decrease the duration
         """
         # Define duration change amount in seconds
         duration_change = 0.1  # 50ms change
-        
+
         with self._gait_lock:
             if direction == "increase":
                 # Increase command duration
-                self.pending_command_duration = min(1.0,self.command_duration + duration_change)
+                self.pending_command_duration = min(1.0, self.command_duration + duration_change)
             elif direction == "decrease":
                 # Decrease command duration (with a minimum value)
                 self.pending_command_duration = max(0.1, self.command_duration - duration_change)
             elif direction == "default":
                 self.pending_command_duration = 0.35
-                
+
             # Set the pending flag
             self.command_duration_change_pending = True
-            
+
             if self.logger is not None:
                 self.logger.debug(f"Pending command duration change: {self.pending_command_duration:.2f} seconds")
 
@@ -810,30 +812,40 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         """Handle offset changes."""
         # Define offset change amount in meters
         stance_width_change = 0.4  # 2cm change
-        
+
         with self._gait_lock:
             if direction == "increase":
                 # Increase offset values
                 if side == "front":
-                    self.pending_stance_width_front = self.current_offset[0, 1] + stance_width_change  # Modify y-coordinate (stance width)
+                    self.pending_stance_width_front = (
+                        self.current_offset[0, 1] + stance_width_change
+                    )  # Modify y-coordinate (stance width)
                 elif side == "rear":
-                    self.pending_stance_width_rear = self.current_offset[2, 1] + stance_width_change  # Modify y-coordinate (stance width)
+                    self.pending_stance_width_rear = (
+                        self.current_offset[2, 1] + stance_width_change
+                    )  # Modify y-coordinate (stance width)
             elif direction == "decrease":
                 # Decrease offset values
                 if side == "front":
-                    self.pending_stance_width_front = self.current_offset[0, 1] - stance_width_change  # Modify y-coordinate (stance width)
+                    self.pending_stance_width_front = (
+                        self.current_offset[0, 1] - stance_width_change
+                    )  # Modify y-coordinate (stance width)
                 elif side == "rear":
-                    self.pending_stance_width_rear = self.current_offset[2, 1] - stance_width_change  # Modify y-coordinate (stance width)
-                
+                    self.pending_stance_width_rear = (
+                        self.current_offset[2, 1] - stance_width_change
+                    )  # Modify y-coordinate (stance width)
+
             # Set bounds for stance width (0.1m to 0.3m)
             self.pending_stance_width_front = max(0.02, min(0.3, self.pending_stance_width_front))
             self.pending_stance_width_rear = max(0.02, min(0.3, self.pending_stance_width_rear))
-                
+
             # Set the pending flag
             self.stance_width_change_pending = True
-            
+
             if self.logger is not None:
-                self.logger.debug(f"Pending stance width change: {self.pending_stance_width_front:.3f} meters (front) and {self.pending_stance_width_rear:.3f} meters (rear)")
+                self.logger.debug(
+                    f"Pending stance width change: {self.pending_stance_width_front:.3f} meters (front) and {self.pending_stance_width_rear:.3f} meters (rear)"
+                )
 
     def _handle_reset(self):
         """Reset command duration and offset values to default."""
@@ -841,17 +853,14 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             # Reset command duration
             self.pending_command_duration = 0.35
             self.command_duration_change_pending = True
-            
+
             # Reset offset values
             self.pending_stance_width_front = self.default_offset[0, 1]
             self.pending_stance_width_rear = self.default_offset[0, 1]
             self.stance_width_change_pending = True
-            
+
             if self.logger is not None:
                 self.logger.debug("Reset command duration and stance width values to default")
-
-
-
 
     """
     Helper functions to initialize publishers for visualization.
@@ -862,8 +871,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         Initialize publishers for visualization.
         """
         # Initialize visualization flags from configs
-        self.visualize = {key: configs["controller_config"]["visualize"][key] for key in configs["controller_config"]["visualize"]}
-        
+        self.visualize = {
+            key: configs["controller_config"]["visualize"][key] for key in configs["controller_config"]["visualize"]
+        }
+
         if self.visualize["future_feet_positions"]:
             self.feet_trajectory_pub = self.create_publisher(MarkerArray, "feet_trajectories", 10)
         if self.visualize["current_contact_locations"]:
@@ -877,7 +888,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.foot_forces_pub = self.create_publisher(Float32MultiArray, "foot_forces", 10)
         if self.visualize["contact_status"]:
             self.contact_status_pub = self.create_publisher(Float32MultiArray, "contact_status", 10)
-            
+
     def pub_feet_error(self):
         """
         Visualizes the feet error in the world frame.
@@ -894,7 +905,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             ]
 
             # Get feet positions from the state manager
-            feet_errors = self.robot.mj_model.get_feet_positions_world() - self.future_feet_positions_w[:, self.current_goal_idx].numpy()
+            feet_errors = (
+                self.robot.mj_model.get_feet_positions_world()
+                - self.future_feet_positions_w[:, self.current_goal_idx].numpy()
+            )
             if feet_errors is not None:
                 for i, (name, color) in enumerate(zip(feet_names, colors)):
                     marker = Marker()
@@ -1054,8 +1068,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         """
         try:
             # Calculate error norms directly
-            feet_errors = np.linalg.norm(self.robot.mj_model.get_feet_positions_world() - self.future_feet_positions_w[:, self.current_goal_idx].numpy(), axis=-1)
-            
+            feet_errors = np.linalg.norm(
+                self.robot.mj_model.get_feet_positions_world()
+                - self.future_feet_positions_w[:, self.current_goal_idx].numpy(),
+                axis=-1,
+            )
+
             # Create Float32MultiArray message
             msg = Float32MultiArray()
             msg.layout.dim = [MultiArrayDimension()]
@@ -1081,18 +1099,18 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             msg.layout.dim[0].label = "feet"
             msg.layout.dim[0].size = 4
             msg.layout.dim[0].stride = 4
-            
+
             # Convert boolean contact plan to float values (0.0 for False, 1.0 for True)
             contact_plan_values = [float(x) for x in self.current_contact_plan[0]]
             msg.data = contact_plan_values
 
             # Publish the message
             self.contact_plan_pub.publish(msg)
-            
+
         except Exception as e:
             if self.logger is not None:
                 self.logger.error(f"Failed to publish contact plan: {e}")
-        
+
     def pub_contact_status(self, foot_forces):
         """
         Publishes the foot forces in the world frame.
@@ -1112,7 +1130,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.contact_status_pub.publish(msg)
         except Exception as e:
             self.logger.error(f"Failed to publish contact status: {e}")
-            
+
     def pub_foot_forces(self, foot_forces):
         """
         Publishes the foot forces in the world frame.

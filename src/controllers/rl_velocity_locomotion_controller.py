@@ -22,7 +22,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
         super().__init__(robot=robot, configs=configs)
 
         # Default velocity commands
-        self.velocity_commands = torch.tensor([0.0, 0.0, 0.0])
+        self.velocity_commands = torch.tensor([0.0, 0.0, 0.0], device=self.device)
 
     def set_mode(self):
         """Runs when the mode is changed in the UI."""
@@ -107,14 +107,16 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
             velocity_commands,
         )
 
-        self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
-        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
-        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
+        self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b, obs_dim=3, device=self.device))
+        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, obs_dim=3, device=self.device))
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "velocity_commands",
             ObsTerm(
                 velocity_commands,
                 params={"velocity_commands": lambda: self.velocity_commands},
+                obs_dim=3,
+                device=self.device,
             ),
         )
         self.obs_manager.register(
@@ -125,15 +127,17 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
                     "default_joint_pos": self.default_joint_pos.numpy(),
                     "mapping": self.joint_obs_unitree_to_isaac_mapping,
                 },
+                obs_dim=12,
+                device=self.device,
             ),
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}),
+            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=12, device=self.device),
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
+            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=12, device=self.device),
         )
 
     def get_joystick_mappings(self):
@@ -184,7 +188,15 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
         start_time = time.perf_counter()
 
         try:
-            joint_pos_targets = self.compute_joint_pos_targets()
+            if not self.use_threading:
+                obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
+                joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
+            else:
+                joint_pos_targets = self.compute_joint_pos_targets()
+                
+            # Clip the joint pos targets for safety
+            if hasattr(self, "soft_dof_pos_limit"):
+                joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
             # Prepare motor commands
             self.cmd = {
@@ -226,8 +238,9 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         super().__init__(robot=robot, configs=configs)
 
-        self.velocity_commands = torch.tensor([0.0, 0.0, 0.0])
-        self.max_cmd = torch.tensor([0.8, 0.5, 1.57])
+        # Ensure tensors are on the correct device
+        self.velocity_commands = torch.tensor([0.0, 0.0, 0.0], device=self.device)
+        self.max_cmd = torch.tensor([0.8, 0.5, 1.57], device=self.device)
         
 
         # self.leg_kps = self.Kp
@@ -485,12 +498,12 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
 class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
     """
     Velocity-conditioned humanoid RL Locomotion Controller for Unitree G1
-    Uses contact-implicit reinforcement learning policy
+    This is a velocity-conditioned locomotion policy controller using a cyclic phase, provided by Unitree.
+    Only the leg joints (12) are actuated, the arm and waist joints (17) are PD controlled to zero positions.
     """
 
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         super().__init__(robot=robot, configs=configs)
-        self.device = "cuda:0"
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0], device=self.device)
         self.max_cmd = torch.tensor([0.8, 0.5, 1.57])
 
@@ -499,6 +512,7 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
 
         self.leg_joint2motor_idx = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], device=self.device)
         self.arm_waist_joint2motor_idx = torch.tensor([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28], device=self.device)
+        self.actions_mapping = self.leg_joint2motor_idx
         self.Kp = configs["controller_config"]["stiffness"]
         self.Kd = configs["controller_config"]["damping"]
 
@@ -507,42 +521,22 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
 
         self.counter = 0
         
-        # Performance optimization: Pre-allocate tensors on GPU
-        
-        self.obs_tensor = torch.zeros(1, configs["controller_config"]["obs_dim"], dtype=torch.float32, device=self.device)  # Adjust size based on actual obs dim
-        self.joint_pos_buffer = torch.zeros(12, dtype=torch.float32, device=self.device)
-        self.joint_vel_buffer = torch.zeros(12, dtype=torch.float32, device=self.device)
-        self.ang_vel_buffer = torch.zeros(3, dtype=torch.float32, device=self.device)
-        self.gravity_buffer = torch.zeros(3, dtype=torch.float32, device=self.device)
-        self.cmd_buffer = torch.zeros(3, dtype=torch.float32, device=self.device)
-        self.action_buffer = torch.zeros(12, dtype=torch.float32, device=self.device)  # Adjust size based on action dim
-        self.phase_buffer = torch.zeros(2, dtype=torch.float32, device=self.device)
         
         # Pre-compute scaling factors
         self.ang_vel_scale = 0.25
         self.joint_vel_scale = 0.05
-        
         self.cmd_scale = torch.tensor([2.0, 2.0, 0.25], device=self.device)
-        
-        # Cache for phase computation
         self.period = 0.8
-        self.two_pi = 2 * np.pi
+
         
         # Pre-allocate motor command dictionary
         self.G1_NUM_MOTOR = 29
         self.cmd = {f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(self.G1_NUM_MOTOR)}
         self.cmd["mode_pr"] = 0  # Mode.PR
-        
+        self.default_joint_pos_np = self.default_joint_pos.cpu().numpy()
         # Move all tensors to GPU for consistency
         self.default_joint_pos = self.default_joint_pos.to(self.device)
-        self.action_scale = self.action_scale.to(self.device)
         self.velocity_commands = self.velocity_commands.to(self.device)
-        
-        # Initialize raw_action on GPU if not already done
-        if not hasattr(self, 'raw_action') or self.raw_action is None:
-            self.raw_action = torch.zeros(12, dtype=torch.float32, device=self.device)
-        else:
-            self.raw_action = self.raw_action.to(self.device)
         
         # Pre-allocate joint position targets on GPU
         self.joint_pos_targets = self.default_joint_pos.clone()
@@ -632,13 +626,15 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
             velocity_commands,
         )
 
-        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, params={"scale": 0.25}))
-        self.obs_manager.register("projected_gravity", ObsTerm(unitree_gravity_orientation))
+        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, params={"scale": 0.25}, obs_dim=3, device=self.device))
+        self.obs_manager.register("projected_gravity", ObsTerm(unitree_gravity_orientation, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "velocity_commands",
             ObsTerm(
                 velocity_commands,
                 params={"velocity_commands": lambda: self.velocity_commands * self.cmd_scale},
+                obs_dim=3,
+                device=self.device,
             ),
         )
 
@@ -647,85 +643,25 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos,
+                    "default_joint_pos": self.default_joint_pos_np,
                     "mapping": self.leg_joint2motor_idx,
                 },
+                obs_dim=12,
+                device=self.device,
             ),
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.leg_joint2motor_idx, "scale": 0.05}),
+            ObsTerm(joint_vel, obs_dim=12, params={"mapping": self.leg_joint2motor_idx, "scale": 0.05}, device=self.device),
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
+            ObsTerm(last_action, obs_dim=12, params={"last_action": lambda: self.raw_action}, device=self.device),
         )
-        # self.obs_manager.register(
-        #     "phase",
-        #     ObsTerm(phase_with_timing, params={"logger": lambda: self.logger, "period": 0.8, "control_dt": self.control_dt, "decimation": self.decimation}),
-        # )
-
-    def _compute_gravity_from_quat(self, quat):
-        """Optimized gravity computation from quaternion."""
-        qw, qx, qy, qz = quat
-        self.gravity_buffer[0] = 2 * (-qz * qx + qw * qy)
-        self.gravity_buffer[1] = -2 * (qz * qy + qw * qx)
-        self.gravity_buffer[2] = 1 - 2 * (qw * qw + qz * qz)
-        return self.gravity_buffer
-
-    def _compute_phase(self, count):
-        """Optimized phase computation."""
-        phase = count % self.period / self.period
-        self.phase_buffer[0] = np.sin(self.two_pi * phase)
-        self.phase_buffer[1] = np.cos(self.two_pi * phase)
-        return self.phase_buffer
-
-    def _build_observation_tensor(self, state):
-        """Build observation tensor efficiently using pre-allocated buffers."""
-        # Update buffers with new data (minimal device transfers)
-        joint_pos = torch.tensor(state["robot/joint_pos"][:12], dtype=torch.float32, device=self.device)
-        self.joint_pos_buffer.copy_(joint_pos - self.default_joint_pos)
-        
-        self.joint_vel_buffer.copy_(torch.tensor(state["robot/joint_vel"][:12], dtype=torch.float32, device=self.device) * self.joint_vel_scale)
-        self.ang_vel_buffer.copy_(torch.tensor(state["robot/gyroscope"], dtype=torch.float32, device=self.device) * self.ang_vel_scale)
-        
-        # Compute gravity efficiently
-        self._compute_gravity_from_quat(state["robot/base_quat"])
-        
-        # Update command and action buffers - ensure they're on the right device
-        if not isinstance(self.velocity_commands, torch.Tensor):
-            self.velocity_commands = torch.tensor(self.velocity_commands, dtype=torch.float32, device=self.device)
-        self.cmd_buffer.copy_(self.velocity_commands)
-        
-        # Ensure raw_action is a tensor on the correct device
-        if not isinstance(self.raw_action, torch.Tensor):
-            self.raw_action = torch.tensor(self.raw_action, dtype=torch.float32, device=self.device)
-        elif self.raw_action.device != self.device:
-            self.raw_action = self.raw_action.to(self.device)
-        self.action_buffer.copy_(self.raw_action)
-        
-        # Compute phase
-        count = self.counter * self.control_dt
-        self._compute_phase(count)
-        
-        # Concatenate efficiently using pre-allocated tensor
-        # Assuming observation order: ang_vel(3) + gravity(3) + cmd(3) + qj(12) + dqj(12) + action(12) + phase(2) = 47
-        start_idx = 0
-        self.obs_tensor[0, start_idx:start_idx+3] = self.ang_vel_buffer
-        start_idx += 3
-        self.obs_tensor[0, start_idx:start_idx+3] = self.gravity_buffer
-        start_idx += 3
-        self.obs_tensor[0, start_idx:start_idx+3] = self.cmd_buffer
-        start_idx += 3
-        self.obs_tensor[0, start_idx:start_idx+12] = self.joint_pos_buffer
-        start_idx += 12
-        self.obs_tensor[0, start_idx:start_idx+12] = self.joint_vel_buffer
-        start_idx += 12
-        self.obs_tensor[0, start_idx:start_idx+12] = self.action_buffer
-        start_idx += 12
-        self.obs_tensor[0, start_idx:start_idx+2] = self.phase_buffer
-        
-        return self.obs_tensor
+        self.obs_manager.register(
+            "phase",
+            ObsTerm(phase_with_timing, obs_dim=2, params={"counter": lambda: self.counter, "period": 0.8, "control_dt": self.control_dt, "decimation": self.decimation}, device=self.device),
+        )
 
     def compute_lowlevelcmd(self, state):
         """
@@ -739,33 +675,19 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
         
         if self.counter % self.decimation == 0:
             # Build observation tensor efficiently
-            obs_tensor = self._build_observation_tensor(state)
-            
-            obs_time = time.perf_counter() - start_time
-            if self.logger:
-                self.logger.debug(f"Obs preparation time (in seconds): {obs_time}")
-            
-            # Policy inference
-            policy_start_time = time.perf_counter()
-            with torch.no_grad():
-                action = self.policy(obs_tensor)
-                self.raw_action = action.detach().squeeze()
-            policy_time = time.perf_counter() - policy_start_time
-            if self.logger:
-                self.logger.debug(f"Policy execution time (in seconds): {policy_time}")
-            
-            # Update joint position targets
-            self.joint_pos_targets = self.default_joint_pos + self.raw_action * self.action_scale
-        
-        if not hasattr(self, "joint_pos_targets"):
-            self.joint_pos_targets = self.default_joint_pos.clone()
+            obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
+            self.joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
+            # Clip the joint pos targets for safety
+            if hasattr(self, "soft_dof_pos_limit"):
+                self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets, joint_indices=self.leg_joint2motor_idx.cpu().numpy())
+
 
         # Build motor commands efficiently using pre-allocated dictionary
         # Leg joints
         for i in range(len(self.leg_joint2motor_idx)):
             motor_idx = self.leg_joint2motor_idx[i]
             self.cmd[f"motor_{motor_idx}"].update({
-                "q": float(self.joint_pos_targets[i].cpu().item()),
+                "q": float(self.joint_pos_targets[i]),
                 "kp": float(self.leg_kps[i]),
                 "dq": 0.0,
                 "kd": float(self.leg_kds[i]),

@@ -1,7 +1,8 @@
 policy_path: "locomotion_g1/g1_unitree_locomotion.pt"
 policy_architecture: "recurrent"
-control_dt: 0.001
-decimation: 20
+device: "cuda:0"
+control_dt: 0.002
+decimation: 10
 action_dim: 12
 use_threading: False
 obs_dim: 47

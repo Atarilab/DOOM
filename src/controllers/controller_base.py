@@ -37,14 +37,15 @@ class ControllerBase(ABC):
         self.robot: "RobotBase" = robot
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
-        self.logger = None
-        self.mode_manager = None  # Will be set by the mode manager when registering
         self.configs = configs
         self.control_dt = configs["controller_config"]["control_dt"]
-        self.latest_state = None
+        self.debug = configs["controller_config"].get("debug", False)
+        self.device = configs["controller_config"].get("device", "cpu")
+        
         self.name = None
+        self.logger = None
         self.active = False
-        self.debug = self.configs.get("debug", False)
+        self.latest_state = None
 
         # Joint mapping and limits
         self._setup_joint_limits()
@@ -99,6 +100,7 @@ class ControllerBase(ABC):
         # Automatically register observations if method exists
         if hasattr(self, "register_observations"):
             self.register_observations()
+            self.obs_manager.preallocate_full_tensor(batch_size=1)
 
     def set_cmd_manager(self, cmd_manager: "CommandManager"):
         """

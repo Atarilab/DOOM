@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
@@ -134,3 +134,39 @@ def create_joint_mapping(list_a: list, list_b: list) -> list:
             # Item not found in list_b
             mapping.append(-1)
     return mapping
+
+def tensorify(data: Union[np.ndarray, torch.Tensor, list, float, tuple], 
+                  dtype: torch.dtype = torch.float32,
+                  device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    Helper function to ensure data is a torch tensor with consistent dtype and device.
+    
+    :param data: Input data (numpy array, torch tensor, list, or scalar)
+    :param dtype: Desired tensor dtype
+    :param device: Desired tensor device (if None, keeps original device)
+    :return: torch.Tensor with specified dtype and device
+    """
+    if isinstance(data, torch.Tensor):
+        tensor = data.to(dtype=dtype)    
+    elif isinstance(data, np.ndarray):
+        tensor = torch.from_numpy(data).to(dtype=dtype)
+    else: # Handle lists, scalars, etc.
+        tensor = torch.tensor(data, dtype=dtype)
+    
+    if device is not None:
+        tensor = tensor.to(device)
+    return tensor
+
+class EMAFilter:
+    def __init__(self, alpha: float, action_dim: int):
+        self.alpha = alpha
+        self.filtered_value = np.zeros(action_dim)
+        self.is_first_action = True
+
+    def filter(self, new_value: np.ndarray) -> np.ndarray:
+        if self.is_first_action:
+            self.filtered_value = new_value
+            self.is_first_action = False
+        else:
+            self.filtered_value = self.alpha * new_value + (1 - self.alpha) * self.filtered_value
+        return self.filtered_value
