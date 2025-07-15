@@ -70,6 +70,21 @@ class ObservationHistoryStorage:
 
         done_indices = torch.nonzero(done == 1)
         self.buffer[done_indices] = 0.0
+        
+
+class EMAFilter:
+    def __init__(self, alpha: float, action_dim: int, device: torch.device = torch.device("cpu")):
+        self.alpha = alpha
+        self.filtered_value = torch.zeros(action_dim, device=device)
+        self.is_first_action = True
+
+    def filter(self, new_value: torch.Tensor) -> torch.Tensor:
+        if self.is_first_action:
+            self.filtered_value = new_value
+            self.is_first_action = False
+        else:
+            self.filtered_value = self.alpha * new_value + (1 - self.alpha) * self.filtered_value
+        return self.filtered_value
 
 
 def reorder_robot_states(states: np.ndarray, origin_order: List[str], target_order: List[str]) -> np.ndarray:
@@ -156,17 +171,3 @@ def tensorify(data: Union[np.ndarray, torch.Tensor, list, float, tuple],
     if device is not None:
         tensor = tensor.to(device)
     return tensor
-
-class EMAFilter:
-    def __init__(self, alpha: float, action_dim: int):
-        self.alpha = alpha
-        self.filtered_value = np.zeros(action_dim)
-        self.is_first_action = True
-
-    def filter(self, new_value: np.ndarray) -> np.ndarray:
-        if self.is_first_action:
-            self.filtered_value = new_value
-            self.is_first_action = False
-        else:
-            self.filtered_value = self.alpha * new_value + (1 - self.alpha) * self.filtered_value
-        return self.filtered_value

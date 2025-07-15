@@ -644,7 +644,7 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
                 joint_pos_rel,
                 params={
                     "default_joint_pos": self.default_joint_pos_np,
-                    "mapping": self.leg_joint2motor_idx,
+                    "mapping": self.leg_joint2motor_idx.cpu().numpy(),
                 },
                 obs_dim=12,
                 device=self.device,
@@ -652,7 +652,7 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, obs_dim=12, params={"mapping": self.leg_joint2motor_idx, "scale": 0.05}, device=self.device),
+            ObsTerm(joint_vel, obs_dim=12, params={"mapping": self.leg_joint2motor_idx.cpu().numpy(), "scale": 0.05}, device=self.device),
         )
         self.obs_manager.register(
             "last_action",

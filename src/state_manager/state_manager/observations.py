@@ -60,13 +60,7 @@ def joint_pos_rel(
     
     # Get joint positions and ensure they're numpy arrays for consistent subtraction
     joint_pos_data = states[f"{asset_name}/joint_pos"][mapping]
-    if isinstance(joint_pos_data, torch.Tensor):
-        joint_pos_data = joint_pos_data.cpu().numpy()
-    
-    # Ensure default_joint_pos is also a numpy array
-    if isinstance(default_joint_pos, torch.Tensor):
-        default_joint_pos = default_joint_pos.cpu().numpy()
-    
+
     result = joint_pos_data - default_joint_pos
     return tensorify(result, dtype=dtype, device=device) * scale
 

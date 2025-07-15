@@ -158,7 +158,7 @@ class RLControllerBase(ControllerBase, Node):
         # Initialize raw_action on GPU if not already done
         self.raw_action = torch.zeros(self.action_dim, dtype=torch.float32, device=self.device)
         # Filter coefficient (0 < alpha < 1), lower values = more smoothing
-        self.filtered_action = EMAFilter(configs.get("action_filter_alpha", 1.0), self.action_dim)
+        self.filtered_action = EMAFilter(configs.get("action_filter_alpha", 1.0), self.action_dim, device=self.device)
         
         # Initial state and commands
         self.latest_state = None
@@ -369,7 +369,7 @@ class RLControllerBase(ControllerBase, Node):
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Error computing joint pos targets: {e}")
-            return self.default_joint_pos.cpu().numpy()[self.actions_mapping]
+            return self.default_joint_pos_np[self.actions_mapping]
         
     def compute_joint_pos_targets_from_policy(self, obs_tensor: torch.Tensor):
         """
@@ -385,11 +385,11 @@ class RLControllerBase(ControllerBase, Node):
                 self.raw_action.copy_(raw_action)
                 
                 # Apply exponential moving average filter to smooth actions
-                filtered_action = self.filtered_action.filter(raw_action.cpu().numpy())
+                filtered_action = self.filtered_action.filter(raw_action)
                 joint_pos_targets = (
-                        (filtered_action * self.action_scale + self.default_joint_pos_np)[self.actions_mapping]
+                        (filtered_action * self.action_scale + self.default_joint_pos)[self.actions_mapping]
                     )
-            return joint_pos_targets
+            return joint_pos_targets.cpu().numpy()
         
         except Exception as e:
             if self.logger:

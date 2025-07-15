@@ -156,7 +156,7 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
         sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
     base_pos_w = msg["position"]
-    msg["imu_state"].quaternion
+    base_quat = msg["imu_state"].quaternion
 
     states = {
         "robot/base_pos_w": base_pos_w,
