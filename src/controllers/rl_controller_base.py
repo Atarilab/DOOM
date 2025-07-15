@@ -11,7 +11,7 @@ from tf2_ros import StaticTransformBroadcaster
 import torch
 
 from controllers.controller_base import ControllerBase
-from utils.helpers import ObservationHistoryStorage
+from utils.helpers import EMAFilter, ObservationHistoryStorage
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
@@ -110,12 +110,17 @@ class RLControllerBase(ControllerBase, Node):
         )
 
         # Use TorchScript for optimized inference
-        self.policy = torch.jit.load(model_path).to("cpu")
+        self.policy = torch.jit.load(model_path).to(configs["controller_config"]["device"])
         self.policy.eval()
+        
+        if self.logger:
+            self.logger.info(f"Policy loaded from {model_path} on device {self.policy.device}")
 
         # Precompute static configurations
-        self.action_scale = torch.tensor(configs["controller_config"]["action_scale"], dtype=torch.float32)
+        self.action_scale = configs["controller_config"]["action_scale"]
         self.policy_architecture = configs["controller_config"].get("policy_architecture", "mlp")
+        
+        
 
     def _initialize_controller_parameters(self, configs: Dict[str, Any]):
         """
@@ -134,32 +139,27 @@ class RLControllerBase(ControllerBase, Node):
         self.policy_dt = self.control_dt * self.decimation  
 
         self.default_joint_pos = (
-            torch.tensor(
-                controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None), dtype=torch.float32
-            )
+            torch.tensor(controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None), dtype=torch.float32, device=self.device)
             if controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None) is not None
-            else torch.tensor(controller_config["default_joint_pos"], dtype=torch.float32)
+            else torch.tensor(controller_config.get("default_joint_pos", None), dtype=torch.float32, device=self.device)
         )
+        self.default_joint_pos_np = self.default_joint_pos.cpu().numpy()
 
-        self.actions_mapping = np.array(
-            controller_config.get(
-                "JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING", np.arange(self.action_dim)
-        ))
+        if hasattr(self.robot, "joints_isaac2unitree"):
+            self.actions_mapping = torch.tensor(self.robot.joints_isaac2unitree)
+        else:
+            self.actions_mapping = torch.tensor(np.arange(self.robot.num_joints))
 
-        self.joint_obs_unitree_to_isaac_mapping = (
-            torch.tensor(
-                controller_config.get("JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING", None)
-            )
-            if controller_config.get("JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING", None)
-            is not None
-            else None
-        )
+        if hasattr(self.robot, "joints_unitree2isaac"):
+            self.joint_obs_unitree_to_isaac_mapping = torch.tensor(self.robot.joints_unitree2isaac)
+        else:
+            self.joint_obs_unitree_to_isaac_mapping = torch.tensor(np.arange(self.robot.num_joints))
 
+        # Initialize raw_action on GPU if not already done
+        self.raw_action = torch.zeros(self.action_dim, dtype=torch.float32, device=self.device)
         # Filter coefficient (0 < alpha < 1), lower values = more smoothing
-        self.action_filter_alpha = controller_config.get("action_filter_alpha", 1.0)
-        self.filtered_action = torch.zeros(self.action_dim, dtype=torch.float32)
-        self.is_first_action = True
-
+        self.filtered_action = EMAFilter(configs.get("action_filter_alpha", 1.0), self.action_dim)
+        
         # Initial state and commands
         self.latest_state = None
         self.cmd = {}
@@ -307,10 +307,10 @@ class RLControllerBase(ControllerBase, Node):
                 current_time = time.time()
                 elapsed = current_time - last_time
 
-                # # Sleep if we're ahead of schedule
-                # if elapsed < self.policy_dt:
-                #     time.sleep(self.policy_dt - elapsed)
-                #     current_time = time.time()  # Update current time after sleep
+                # Sleep if we're ahead of schedule
+                if elapsed < self.policy_dt:
+                    time.sleep(self.policy_dt - elapsed)
+                    current_time = time.time()  # Update current time after sleep
 
                 # Update last time for next iteration
                 last_time = current_time
@@ -341,7 +341,10 @@ class RLControllerBase(ControllerBase, Node):
 
     def compute_joint_pos_targets(self):
         """
-        Compute joint position targets based on the policy output.
+        Compute joint position targets based from pre-computed policy output.
+        We also apply an exponential moving average filter to smooth the actions.
+        
+        Note: We use this when we run with threading, where policy inference and observation processing are done in separate threads.
         """
         try:
             # Ensure we have processed observations and have a valid action
@@ -349,33 +352,48 @@ class RLControllerBase(ControllerBase, Node):
                 # If no observations yet, use default joint positions
                 joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_mapping]
             else:
-                # Apply exponential moving average filter to smooth actions
-                if self.is_first_action:
-                    self.filtered_action = self.raw_action
-                    self.is_first_action = False
-                else:
-                    # EMA filter: filtered = alpha * new + (1 - alpha) * previous
-                    self.filtered_action = (
-                        self.action_filter_alpha * self.raw_action
-                        + (1 - self.action_filter_alpha) * self.filtered_action
-                    )
+                filtered_action = self.filtered_action.filter(self.raw_action.cpu().numpy())
 
                 # Compute joint position targets from the filtered policy output
                 joint_pos_targets = (
-                    (self.filtered_action * self.action_scale + self.default_joint_pos)
+                    (filtered_action * self.action_scale + self.default_joint_pos)
                     .cpu()
                     .numpy()[self.actions_mapping]
                 )
 
-            # # Clip the joint pos targets for safety
-            # if hasattr(self, "soft_dof_pos_limit"):
-            #     joint_indices = self.policy_joint_indices if hasattr(self, "policy_joint_indices") else None
-            #     joint_pos_targets = self._clip_dof_pos(joint_pos_targets, joint_indices=joint_indices)
+            # Clip the joint pos targets for safety
+            if hasattr(self, "soft_dof_pos_limit"):
+                joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
             return joint_pos_targets
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Error computing joint pos targets: {e}")
+            return self.default_joint_pos.cpu().numpy()[self.actions_mapping]
+        
+    def compute_joint_pos_targets_from_policy(self, obs_tensor: torch.Tensor):
+        """
+        Compute joint position targets directly from the policy output.
+        Compute full tensor obs, pass it to the policy, and then compute the joint pos targets. 
+        We also apply an exponential moving average filter to smooth the actions.
+        
+        Note: We use this when we do not run with threading, where policy inference and observation processing are done here.
+        """
+        try:
+            with torch.no_grad():
+                raw_action = self.policy(obs_tensor).detach().squeeze(0)
+                self.raw_action.copy_(raw_action)
+                
+                # Apply exponential moving average filter to smooth actions
+                filtered_action = self.filtered_action.filter(raw_action.cpu().numpy())
+                joint_pos_targets = (
+                        (filtered_action * self.action_scale + self.default_joint_pos_np)[self.actions_mapping]
+                    )
+            return joint_pos_targets
+        
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error computing joint pos targets from policy: {e}")
             return self.default_joint_pos.cpu().numpy()[self.actions_mapping]
 
     def __del__(self):

@@ -51,7 +51,7 @@ async def main_async(args=None):
     logger = get_logger(f"{args.task}_robot_controller", log_file, debug=args.debug)
 
     try:
-        logger.info("Starting robot controller for task: {}", args.task)
+        logger.info("Starting robot controller for task: %s", args.task)
 
         # Load configurations
         configs = await initialize_robot_controller(args.task, logger)
@@ -73,7 +73,7 @@ async def main_async(args=None):
             state_manager.add_subscriber(name, subscriber)
 
         # Create mode manager and register idle (damping) controller
-        mode_manager = ModeManager(logger=logger)
+        mode_manager = ModeManager(logger=logger, device=configs["controller_config"]["device"])
         mode_manager.register_mode("ZERO", {"default": ZeroTorqueController(robot, configs)})
         mode_manager.register_mode("DAMPING", {"default": DampingController(robot, configs)})
 
@@ -144,7 +144,7 @@ async def main_async(args=None):
         logger.info("Set controller to DAMPING mode before shutdown")
 
     except Exception as e:
-        logger.exception("An error occurred: {}", e)
+        logger.exception("An error occurred: %s", e)
         raise
     finally:
         if node:

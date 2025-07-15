@@ -4,13 +4,14 @@ policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
 # policy_path: "locomotion_go2/contact_policy_latest.pt"
 fixed_feet_positions: false
 obs_dim: 82
-control_dt: 0.001
+control_dt: 0.01
 decimation: 4
 action_dim: 12
 action_scale: 0.35
 stiffness: 25.0
 damping: 0.5
-use_threading: True
+use_threading: False
+device: "cuda:0"  
 feet_step_size: 0.0
 horizon_length: 200
 action_filter_alpha: 0.5

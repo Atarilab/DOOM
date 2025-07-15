@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
             if ! docker ps -a --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
                 # If container doesn't exist, create and start a new container
                 xhost +local:root & \
-                docker run -it --privileged \
+                docker run --shm-size=1g -it --privileged \
                     --env-file .env.docker \
                     --network host \
                     --device /dev/input \

@@ -11,13 +11,14 @@ class ModeManager:
     Modes are defined as a dictionary of controllers, where the key is the mode name and the value is a dictionary of controllers.
     """
 
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, device=None):
         self._modes: Dict[str, Dict[str, ControllerBase]] = {}
         self._current_mode: Optional[str] = None
         self._current_submode: Optional[str] = None
         self._mode_obs_managers: Dict[str, ObservationManager] = {}
         self._submode_cmd_managers: Dict[str, CommandManager] = {}
         self.logger = logger
+        self.device = device
 
     def register_mode(self, mode_name: str, controllers: Dict[str, ControllerBase]):
         """
@@ -27,7 +28,7 @@ class ModeManager:
         :param controllers: Dictionary of controllers for this mode
         """
         # Create an observation manager for each submode
-        obs_managers = {submode_name: ObservationManager(logger=self.logger) for submode_name in controllers.keys()}
+        obs_managers = {submode_name: ObservationManager(logger=self.logger, device=self.device) for submode_name in controllers.keys()}
 
         self._modes[mode_name] = controllers
         self._mode_obs_managers[mode_name] = obs_managers
