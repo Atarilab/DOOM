@@ -43,8 +43,9 @@ class ObservationHistoryStorage:
             )
 
         # Shift the buffer to make space for the new observation
-        self.buffer[:, : -self.num_obs] = self.buffer[:, self.num_obs :].clone()
-
+        # Use roll operation which is more efficient than clone + assignment
+        self.buffer = torch.roll(self.buffer, shifts=-self.num_obs, dims=1)
+        
         # Add the new observation at the end
         self.buffer[:, -self.num_obs :] = observation
 
@@ -55,11 +56,11 @@ class ObservationHistoryStorage:
         Returns:
             torch.Tensor: Observation tensor with correct shape for policy.
         """
-        obs = self.buffer.detach().clone()
+        # Avoid unnecessary detach().clone() - just return a view or reference
         if self.policy_architecture == "recurrent":
-            return obs
+            return self.buffer
         else:
-            return obs.unsqueeze(0)
+            return self.buffer.unsqueeze(0)
 
     def reset(self, done: torch.Tensor):
         """Reset the buffer for environments that are done.

@@ -136,6 +136,7 @@ class RLControllerBase(ControllerBase, Node):
         self.action_dim = controller_config.get("action_dim", None)
         self.control_dt = controller_config.get("control_dt", None)
         self.decimation = controller_config.get("decimation", None)
+        self.use_buffer = controller_config.get("use_buffer", False)
         self.policy_dt = self.control_dt * self.decimation  
 
         self.default_joint_pos = (
@@ -182,7 +183,8 @@ class RLControllerBase(ControllerBase, Node):
         Override set_obs_manager to initialize obs_buffer after obs_manager is set.
         """
         super().set_obs_manager(obs_manager)
-        self._initialize_obs_buffer()
+        if self.use_buffer:
+            self._initialize_obs_buffer()
 
     def _initialize_obs_buffer(self):
         """
@@ -190,14 +192,8 @@ class RLControllerBase(ControllerBase, Node):
         This is called by set_obs_manager in the base class.
         """
         if hasattr(self, 'obs_manager') and self.obs_manager is not None:
-            # Observation history storage
-            self.obs_buffer = ObservationHistoryStorage(
-                num_envs=1,
-                policy_architecture=self.policy_architecture,
-                num_obs=self.obs_manager.get_full_obs_dim(),
-                max_length=1,
-                device=self.device,
-            )
+            self.obs_manager.initialize_obs_buffer(max_buffer_length=1, policy_architecture=self.policy_architecture)
+                
 
     def _init_processing_threads(self):
         """Initialize concurrent processing threads (but don't start them)."""
@@ -250,6 +246,11 @@ class RLControllerBase(ControllerBase, Node):
         Thread management is handled automatically by the active property setter.
         """
         super().set_mode()
+        self.raw_action.zero_()
+        self.filtered_action.is_first_action = True
+        self.filtered_action.filtered_value.zero_()
+        if self.use_buffer:
+            self.obs_manager.reset_buffer(done=torch.tensor([False]))
 
     def _process_observations(self):
         """Continuously process observations in a separate thread"""
@@ -275,19 +276,11 @@ class RLControllerBase(ControllerBase, Node):
                             time.sleep(0.01)  # Wait for obs_manager to be set
                             continue
                             
-                        obs = self.obs_manager.compute(current_state)
-                        obs_tensor = torch.cat([v.reshape(-1) for v in obs.values()])
-                        self.obs_buffer.add(obs_tensor.unsqueeze(0))
+                        # Use compute_full_tensor for efficient observation processing
+                        obs_tensor = self.obs_manager.compute_full_tensor(current_state, batch_idx=0)
 
                     except Exception as e:
-                        print(f"Error converting observations to tensor: {e}")
-                        print("Observations that caused the error:")
-                        for obs_name, obs_value in obs.items():
-                            print(f"{obs_name}: {type(obs_value)}")
-                            if isinstance(obs_value, (np.ndarray, torch.Tensor)):
-                                print(f"  Shape: {obs_value.shape}")
-                            else:
-                                print(f"  Value: {obs_value}")
+                        print(f"Error computing full observation tensor: {e}")
                         time.sleep(0.1)  # Prevent rapid error loops
                         continue
 
@@ -326,10 +319,13 @@ class RLControllerBase(ControllerBase, Node):
                 last_time = current_time
 
                 try:
-                    obs = self.obs_buffer.get()
+                    if self.use_buffer:
+                        obs = self.obs_manager.get_from_buffer()
+                    else:
+                        obs = self.obs_manager.get_latest_full_obs_tensor()
                     
                     # Check if we have valid observations
-                    if obs.numel() == 0 or obs.sum() == 0:
+                    if obs is None or obs.numel() == 0 or obs.sum() == 0:
                         time.sleep(0.01)  # Wait for observations
                         continue
                         
@@ -358,7 +354,7 @@ class RLControllerBase(ControllerBase, Node):
         """
         try:
             # Ensure we have processed observations and have a valid action
-            if self.obs_buffer.get().numel() == 0 or self.obs_buffer.get().sum() == 0:
+            if self.raw_action.sum() == 0:
                 # If no observations yet, use default joint positions
                 joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_mapping]
             else:

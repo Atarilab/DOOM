@@ -1,6 +1,8 @@
 import logging
-from typing import Any, Callable, Dict, Optional, Union, Tuple
+from typing import Any, Callable, Dict, Optional
 import torch
+
+from utils.helpers import ObservationHistoryStorage
 
 
 class ObsTerm:
@@ -127,7 +129,7 @@ class ObservationManager:
     and can be directly passed to your controller/policy.
     """
 
-    def __init__(self, logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None):
+    def __init__(self, logger: Optional[logging.Logger] = None, device: torch.device = torch.device("cpu")):
         """
         Initialize the observation manager.
 
@@ -144,6 +146,8 @@ class ObservationManager:
         self.full_obs_tensor = None
         self.full_obs_dim = 0
         self.obs_start_indices = {}  # Track start indices for each observation
+        self.obs_buffer = None
+        
 
     def register(self, name: str, obs_term: ObsTerm):
         """
@@ -180,6 +184,53 @@ class ObservationManager:
             )
             if self.logger:
                 self.logger.info(f"Preallocated full observation tensor with shape: ({batch_size}, {self.full_obs_dim})")
+    
+    def initialize_obs_buffer(self, max_buffer_length: int, policy_architecture: str):
+        """
+        Initialize the observation buffer.
+        This should be called after all observations are registered.
+        """
+        self.obs_buffer = ObservationHistoryStorage(
+                num_envs=1,
+                policy_architecture=policy_architecture,
+                num_obs=self.full_obs_dim,
+                max_length=max_buffer_length,
+                device=self.device,
+            )
+            
+        if self.logger:
+            self.logger.info(f"Initialized observation buffer with {self.full_obs_dim} observations")
+             
+    
+    def add_to_buffer(self, observation: torch.Tensor):
+        """
+        Add observation to the buffer if enabled.
+        
+        :param observation: Observation tensor to add
+        """
+        if self.obs_buffer is not None:
+            self.obs_buffer.add(observation)
+            
+    
+    def get_from_buffer(self) -> Optional[torch.Tensor]:
+        """
+        Get observation from the buffer if enabled.
+        
+        :return: Observation tensor from buffer, or None if buffer not enabled
+        """
+        if self.obs_buffer is not None:
+            return self.obs_buffer.get()
+        return None
+    
+    
+    def reset_buffer(self, done: torch.Tensor):
+        """
+        Reset the buffer for environments that are done.
+        
+        :param done: Mask of done environments
+        """
+        if self.obs_buffer is not None:
+            self.obs_buffer.reset(done)
 
     def compute(self, combined_state: Dict[str, Any], batch_idx: int = 0) -> Dict[str, Any]:
         """
@@ -200,7 +251,8 @@ class ObservationManager:
                 # Only include in returned observations if include is True
                 if obs_term._include:
                     observations[name] = computed_obs
-                    self.full_obs_tensor[batch_idx, self.obs_start_indices[name]:self.obs_start_indices[name] + obs_term._obs_dim] = computed_obs
+                    if self.full_obs_tensor is not None:
+                        self.full_obs_tensor[batch_idx, self.obs_start_indices[name]:self.obs_start_indices[name] + obs_term._obs_dim] = computed_obs
                         
             except Exception as e:
                 if self.logger:
@@ -221,7 +273,17 @@ class ObservationManager:
 
         # Compute all observations (this will also fill the preallocated tensor)
         self.compute(combined_state, batch_idx)
+        if self.obs_buffer is not None:
+            self.add_to_buffer(self.full_obs_tensor)
         
+        return self.full_obs_tensor
+    
+    def get_latest_full_obs_tensor(self) -> Optional[torch.Tensor]:
+        """
+        Get the latest full observation tensor.
+        
+        :return: Latest full observation tensor
+        """
         return self.full_obs_tensor
 
     def get_observation(self, name: str) -> Any:
