@@ -3,7 +3,6 @@
 policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
 # policy_path: "locomotion_go2/contact_policy_latest.pt"
 fixed_feet_positions: false
-obs_dim: 82
 control_dt: 0.01
 decimation: 4
 action_dim: 12

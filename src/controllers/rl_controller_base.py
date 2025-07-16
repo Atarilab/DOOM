@@ -67,6 +67,7 @@ class RLControllerBase(ControllerBase, Node):
         self._threads_running = False
         self._threads_initialized = False
         self._previous_active_state = False
+        
 
     @property
     def active(self):
@@ -121,7 +122,6 @@ class RLControllerBase(ControllerBase, Node):
         self.policy_architecture = configs["controller_config"].get("policy_architecture", "mlp")
         
         
-
     def _initialize_controller_parameters(self, configs: Dict[str, Any]):
         """
         Initialize controller-specific parameters.
@@ -158,7 +158,7 @@ class RLControllerBase(ControllerBase, Node):
         # Initialize raw_action on GPU if not already done
         self.raw_action = torch.zeros(self.action_dim, dtype=torch.float32, device=self.device)
         # Filter coefficient (0 < alpha < 1), lower values = more smoothing
-        self.filtered_action = EMAFilter(configs.get("action_filter_alpha", 1.0), self.action_dim, device=self.device)
+        self.filtered_action = EMAFilter(controller_config.get("action_filter_alpha", 1.0), self.action_dim, device=self.device)
         
         # Initial state and commands
         self.latest_state = None
@@ -171,23 +171,33 @@ class RLControllerBase(ControllerBase, Node):
         :param configs: Configuration dictionary
         """
         # Performance optimization: Preallocate tensors
-        action_dim = configs["controller_config"].get("action_dim", None)
-        obs_dim = configs["controller_config"].get("obs_dim", None)
         self.use_threading = configs["controller_config"].get("use_threading", False)
-        self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
-
-        # Observation history storage
-        self.obs_buffer = ObservationHistoryStorage(
-            num_envs=1,
-            policy_architecture=self.policy_architecture,
-            num_obs=obs_dim,
-            max_length=1,
-            device=torch.device("cpu"),
-        )
 
         # Initialize processing threads (but don't start them yet)
         if self.use_threading:   
             self._init_processing_threads()
+
+    def set_obs_manager(self, obs_manager):
+        """
+        Override set_obs_manager to initialize obs_buffer after obs_manager is set.
+        """
+        super().set_obs_manager(obs_manager)
+        self._initialize_obs_buffer()
+
+    def _initialize_obs_buffer(self):
+        """
+        Initialize the observation buffer once the obs_manager is available.
+        This is called by set_obs_manager in the base class.
+        """
+        if hasattr(self, 'obs_manager') and self.obs_manager is not None:
+            # Observation history storage
+            self.obs_buffer = ObservationHistoryStorage(
+                num_envs=1,
+                policy_architecture=self.policy_architecture,
+                num_obs=self.obs_manager.get_full_obs_dim(),
+                max_length=1,
+                device=self.device,
+            )
 
     def _init_processing_threads(self):
         """Initialize concurrent processing threads (but don't start them)."""
@@ -352,7 +362,7 @@ class RLControllerBase(ControllerBase, Node):
                 # If no observations yet, use default joint positions
                 joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_mapping]
             else:
-                filtered_action = self.filtered_action.filter(self.raw_action.cpu().numpy())
+                filtered_action = self.filtered_action.filter(self.raw_action)
 
                 # Compute joint position targets from the filtered policy output
                 joint_pos_targets = (

@@ -500,6 +500,6 @@ def contact_locations_b(
     :return: Contact locations in base frame tensor
     """
     result = mj_model.transform_world_to_base(
-        future_feet_positions_w()[:, current_goal_idx(): current_goal_idx() + obs_horizon].numpy()
+        future_feet_positions_w()[:, current_goal_idx(): current_goal_idx() + obs_horizon]
     ).flatten()
     return tensorify(result, dtype=dtype, device=device)

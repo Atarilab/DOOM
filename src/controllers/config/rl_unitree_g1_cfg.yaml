@@ -5,8 +5,8 @@ control_dt: 0.002
 decimation: 10
 action_dim: 12
 use_threading: False
-obs_dim: 47
 action_scale: 0.25 # 0.25
+action_filter_alpha: 0.9
 stiffness: [
             60,
             60,
