@@ -203,26 +203,6 @@ def root_quat_w(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, dt
     return tensorify(result, dtype=dtype, device=device) * scale
 
 
-def unitree_gravity_orientation(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
-    """
-    The orientation of the gravity vector in the unitree frame.
-    """
-    base_quat = states[f"{asset_name}/base_quat"]
-    quat = tensorify(base_quat, dtype=dtype, device=device)
-    
-    qw = quat[0]
-    qx = quat[1]
-    qy = quat[2]
-    qz = quat[3]
-
-    gravity_orientation = torch.zeros(3, dtype=dtype, device=device)
-    gravity_orientation[0] = 2 * (-qz * qx + qw * qy)
-    gravity_orientation[1] = -2 * (qz * qy + qw * qx)
-    gravity_orientation[2] = 1 - 2 * (qw * qw + qz * qz)
-    
-    return gravity_orientation * scale
-
-
 def projected_gravity_b(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
     """
     The projected gravity vector.

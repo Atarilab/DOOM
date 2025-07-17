@@ -169,14 +169,11 @@ class RLControllerBase(ControllerBase, Node):
 
         :param configs: Configuration dictionary
         """
-        # Performance optimization: Preallocate tensors
         self.use_threading = configs["controller_config"].get("use_threading", False)
 
         # Initialize thread manager if threading is enabled
         if self.use_threading:
             self.thread_manager = ThreadManager(logger=self.logger, debug=self.debug)
-            # Add processing threads to the manager
-            # We need to pass the bound methods correctly
             self.thread_manager.add_thread("observation_processing", self._process_observations)
             self.thread_manager.add_thread("policy_inference", self._run_policy_inference)
 
@@ -187,6 +184,7 @@ class RLControllerBase(ControllerBase, Node):
         """
         if hasattr(self, 'obs_manager') and self.obs_manager is not None:
             self.obs_manager.initialize_obs_buffer(max_buffer_length=1, policy_architecture=self.policy_architecture)
+            
             
     def set_obs_manager(self, obs_manager):
         """
