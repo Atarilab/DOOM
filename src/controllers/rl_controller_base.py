@@ -11,7 +11,8 @@ from tf2_ros import StaticTransformBroadcaster
 import torch
 
 from controllers.controller_base import ControllerBase
-from utils.helpers import EMAFilter, ObservationHistoryStorage
+from utils.helpers import EMAFilter
+from utils.thread_manager import ThreadManager
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
@@ -64,8 +65,6 @@ class RLControllerBase(ControllerBase, Node):
         self._configure_processing_infrastructure(configs)
 
         # Thread control variables
-        self._threads_running = False
-        self._threads_initialized = False
         self._previous_active_state = False
         
 
@@ -89,14 +88,12 @@ class RLControllerBase(ControllerBase, Node):
         
         # If transitioning from active to inactive, stop threads
         if self._previous_active_state and not value:
-            self._stop_processing_threads()
-            if self.logger:
-                self.logger.debug("RL controller deactivated, stopped processing threads")
+            if hasattr(self, 'thread_manager'):
+                self.thread_manager.stop()
         # If transitioning from inactive to active, start threads
         elif not self._previous_active_state and value:
-            self._start_processing_threads()
-            if self.logger:
-                self.logger.debug("RL controller activated, started processing threads")
+            if hasattr(self, 'thread_manager'):
+                self.thread_manager.start()
 
     def _load_policy_model(self, configs: Dict[str, Any]):
         """
@@ -138,6 +135,7 @@ class RLControllerBase(ControllerBase, Node):
         self.decimation = controller_config.get("decimation", None)
         self.use_buffer = controller_config.get("use_buffer", False)
         self.policy_dt = self.control_dt * self.decimation  
+        self.counter = 0
 
         self.default_joint_pos = (
             torch.tensor(controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None), dtype=torch.float32, device=self.device)
@@ -174,17 +172,13 @@ class RLControllerBase(ControllerBase, Node):
         # Performance optimization: Preallocate tensors
         self.use_threading = configs["controller_config"].get("use_threading", False)
 
-        # Initialize processing threads (but don't start them yet)
-        if self.use_threading:   
-            self._init_processing_threads()
-
-    def set_obs_manager(self, obs_manager):
-        """
-        Override set_obs_manager to initialize obs_buffer after obs_manager is set.
-        """
-        super().set_obs_manager(obs_manager)
-        if self.use_buffer:
-            self._initialize_obs_buffer()
+        # Initialize thread manager if threading is enabled
+        if self.use_threading:
+            self.thread_manager = ThreadManager(logger=self.logger, debug=self.debug)
+            # Add processing threads to the manager
+            # We need to pass the bound methods correctly
+            self.thread_manager.add_thread("observation_processing", self._process_observations)
+            self.thread_manager.add_thread("policy_inference", self._run_policy_inference)
 
     def _initialize_obs_buffer(self):
         """
@@ -193,52 +187,15 @@ class RLControllerBase(ControllerBase, Node):
         """
         if hasattr(self, 'obs_manager') and self.obs_manager is not None:
             self.obs_manager.initialize_obs_buffer(max_buffer_length=1, policy_architecture=self.policy_architecture)
-                
-
-    def _init_processing_threads(self):
-        """Initialize concurrent processing threads (but don't start them)."""
-        self.obs_processing_thread = threading.Thread(target=self._process_observations, daemon=not self.debug)
-        self.policy_inference_thread = threading.Thread(target=self._run_policy_inference, daemon=not self.debug)
-        self._threads_initialized = True
-
-    def _start_processing_threads(self):
-        """Start the processing threads if they're not already running."""
-        # If threading is not required, skip starting the threads
-        if not self.use_threading:
-            return
-
-        if not self._threads_initialized:
-            self._init_processing_threads()
-
-        # Check if threads are already running or alive
-        if not self._threads_running and not self.obs_processing_thread.is_alive() and not self.policy_inference_thread.is_alive():
-            self._threads_running = True
-            self.obs_processing_thread.start()
-            self.policy_inference_thread.start()
-            if self.logger:
-                self.logger.debug("RL controller processing threads started")
-        elif self.logger:
-            self.logger.debug("Threads already running or alive, skipping start")
-
-    def _stop_processing_threads(self):
-        """Stop the processing threads."""
-        # If threading is not required, skip stopping the threads
-        if not self.use_threading:
-            return
-        
-        if self._threads_running:
-            self._threads_running = False
-            # Wait for threads to finish (with timeout)
-            if self.obs_processing_thread.is_alive():
-                self.obs_processing_thread.join(timeout=1.0)
-            if self.policy_inference_thread.is_alive():
-                self.policy_inference_thread.join(timeout=1.0)
             
-            # Reinitialize threads so they can be started again
-            self._init_processing_threads()
+    def set_obs_manager(self, obs_manager):
+        """
+        Override set_obs_manager to initialize obs_buffer after obs_manager is set.
+        """
+        super().set_obs_manager(obs_manager)
+        if self.use_buffer:
+            self._initialize_obs_buffer()
             
-            if self.logger:
-                self.logger.debug("RL controller processing threads stopped and reinitialized")
 
     def set_mode(self):
         """
@@ -246,15 +203,16 @@ class RLControllerBase(ControllerBase, Node):
         Thread management is handled automatically by the active property setter.
         """
         super().set_mode()
+        self.counter = 0
         self.raw_action.zero_()
         self.filtered_action.is_first_action = True
         self.filtered_action.filtered_value.zero_()
-        if self.use_buffer:
+        if self.use_buffer and self.obs_manager is not None:
             self.obs_manager.reset_buffer(done=torch.tensor([False]))
 
     def _process_observations(self):
         """Continuously process observations in a separate thread"""
-        while self._threads_running:
+        while hasattr(self, 'thread_manager') and self.thread_manager.should_continue():
             try:
                 # Check if controller is active
                 if not self.active:
@@ -299,7 +257,7 @@ class RLControllerBase(ControllerBase, Node):
         """
         last_time = time.time()
 
-        while self._threads_running:
+        while hasattr(self, 'thread_manager') and self.thread_manager.should_continue():
             try:
                 # Check if controller is active
                 if not self.active:
@@ -401,8 +359,15 @@ class RLControllerBase(ControllerBase, Node):
             if self.logger:
                 self.logger.error(f"Error computing joint pos targets from policy: {e}")
             return self.default_joint_pos.cpu().numpy()[self.actions_mapping]
-
+        
+    
+    #####################
+    # Thread management #
+    #####################
+        
     def __del__(self):
         """Cleanup method to ensure threads are stopped when controller is destroyed."""
-        if self.use_threading:
-            self._stop_processing_threads()
+        if hasattr(self, 'thread_manager'):
+            self.thread_manager.stop()
+
+
