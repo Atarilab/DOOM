@@ -1,9 +1,10 @@
-policy_path: "policies/velocity_policy_unidirectional.pt"
-control_dt: 0.001
-decimation: 4
+policy_path: "policies/IsaacLab policies/flatAmpVision/2025-08-06_18-54-23_flat_test_DR5_improved_minimal_motion_files_SEED_1/policy.pt"
+control_dt: 0.002
+decimation: 1
+SIMULATION_DT: 0.005
 action_dim: 12
 obs_dim: 48
-action_scale: 0.35
+action_scale: 0.25
 stiffness: 25.0
 damping: 0.5
 default_joint_pos:
@@ -36,20 +37,8 @@ ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joi
 
 JOINT_OBSERVATION_UNITREE_TO_ISAAC_LAB_MAPPING:
   [3, 0, 9, 6, 4, 1, 10, 7, 5, 2, 11, 8]
-JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING: [
-    1,
-    5,
-    9,
-    0,
-    4,
-    8,
-    3,
-    7,
-    11,
-    2,
-    6,
-    10,
-  ] 
+JOINT_ACTION_ISAAC_LAB_TO_UNITREE_MAPPING:
+  [1, 5, 9, 0, 4, 8, 3, 7, 11, 2, 6, 10]
 
 ISAAC_LAB_DEFAULT_JOINT_POS: [
     0.1000, # 0

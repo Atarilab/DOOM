@@ -160,7 +160,7 @@ class JoystickManager:
                         self.mode_manager.set_mode("STANDING", "STAY_DOWN")
                         self._last_command_time = current_time
                     elif key_state[self.key_map["L1"]] and key_state[self.key_map["R1"]] and self.active_controller.__class__.__name__ == "StandUpController":
-                        self.mode_manager.set_mode("RL-CONTACT", "RL-CONTACT")
+                        self.mode_manager.set_mode("RL-VELOCITY", "RL-VELOCITY")
                         self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available

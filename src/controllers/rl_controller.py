@@ -1,14 +1,16 @@
 import os
 import threading
 import time
-from typing import Any, Dict, Callable
+from typing import Any, Callable, Dict
 
+from geometry_msgs.msg import Point, TransformStamped
 import numpy as np
+from rclpy.node import Node
+from tf2_ros import StaticTransformBroadcaster
 import torch
+
 from commands.command_manager import CommandTerm
 from controllers.controller_base import ControllerBase
-from geometry_msgs.msg import Point, TransformStamped
-from rclpy.node import Node
 from state_manager.obs_manager import ObsTerm
 from state_manager.observations import (
     ang_vel_b,
@@ -19,7 +21,6 @@ from state_manager.observations import (
     projected_gravity_b,
     velocity_commands,
 )
-from tf2_ros import StaticTransformBroadcaster
 from utils.helpers import ObservationHistoryStorage
 
 
@@ -134,7 +135,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.raw_action = torch.zeros(action_dim, dtype=torch.float32, device="cpu")
 
         # Observation history storage
-        self.obs_buffer = ObservationHistoryStorage(num_envs=1, num_obs=obs_dim, max_length=1, device="cpu")
+        self.obs_buffer = ObservationHistoryStorage(num_envs=1, num_obs=obs_dim, max_length=5, device="cpu")
 
         # Start concurrent processing threads
         self._init_processing_threads()
@@ -212,6 +213,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                     # Policy inference
                     with torch.no_grad():
                         raw_action = self.policy(obs.unsqueeze(0))
+                        # self.command_manager.logger.debug(f"Raw actions: {raw_action}")
 
                     self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
@@ -261,6 +263,9 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
             # Clip the joint pos targets for safety
             joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
+            
+            # self.command_manager.logger.debug(f"Using calculated soft pos dof limits to clip actions: {self.soft_dof_pos_limit}")
+            
 
             # Prepare motor commands
             self.cmd = {
@@ -314,8 +319,8 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
                 new_velocity_commands[0] = new_commands["x_velocity"]
             if "y_velocity" in new_commands:
                 new_velocity_commands[1] = new_commands["y_velocity"]
-            if "yaw" in new_commands:
-                new_velocity_commands[2] = new_commands["yaw"]
+            if "yaw_rate" in new_commands:
+                new_velocity_commands[2] = new_commands["yaw_rate"]
                 
             self.velocity_commands = new_velocity_commands
             
@@ -370,7 +375,6 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         """
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
-        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
         self.obs_manager.register(
             "velocity_commands",
             ObsTerm(
@@ -378,6 +382,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
                 params={"velocity_commands": lambda: self.velocity_commands},
             ),
         )
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
         self.obs_manager.register(
             "joint_pos",
             ObsTerm(
@@ -417,3 +422,4 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
     def set_mode(self):
         """Runs when the mode is changed in the UI."""
         super().set_mode()
+        self.velocity_commands = torch.zeros_like(self.velocity_commands)
