@@ -213,7 +213,8 @@ class BaseRLLocomotionController(ControllerBase, Node):
                     # Policy inference
                     with torch.no_grad():
                         raw_action = self.policy(obs.unsqueeze(0))
-                        # self.command_manager.logger.debug(f"Raw actions: {raw_action}")
+                        raw_action = torch.clamp(raw_action, min=-3.5, max=3.5)
+                        #self.command_manager.logger.debug(f"Raw actions: {raw_action}")
 
                     self.raw_action.copy_(raw_action[0][0])
                 except Exception as e:
@@ -264,7 +265,12 @@ class BaseRLLocomotionController(ControllerBase, Node):
             # Clip the joint pos targets for safety
             joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
             
-            # self.command_manager.logger.debug(f"Using calculated soft pos dof limits to clip actions: {self.soft_dof_pos_limit}")
+            #self.command_manager.logger.debug(f"joint_pos_targets: {joint_pos_targets}")
+            
+            
+            #efforts = [joint_pos_targets[i] * self.Kp for i in range(12)]
+            
+            #self.command_manager.logger.debug(f"efforts calculated only kp: {efforts}")
             
 
             # Prepare motor commands
