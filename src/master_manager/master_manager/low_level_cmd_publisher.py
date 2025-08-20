@@ -61,7 +61,7 @@ class LowLevelCmdPublisher(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # Initialize joystick manager with debug mode support
-        self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, logger=self.logger, debug=debug)
+        self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, robot=self.robot.name, logger=self.logger, debug=debug)
 
         # Create timer for periodic command publishing
         self.timer = self.create_timer(self.dt, self.low_level_cmd_callback, clock=self.get_clock())

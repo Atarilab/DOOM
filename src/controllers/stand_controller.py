@@ -335,9 +335,8 @@ class G1PhasePDController(ControllerBase):
             
         self.step_counter = min(self.step_counter + 1, self.num_steps)
         return cmd
-    
 
-class G1StandUpController(G1PhasePDController):
+class G1LocoStandUpController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
@@ -345,7 +344,18 @@ class G1StandUpController(G1PhasePDController):
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         super().__init__(robot=robot, configs=configs)
 
-        self.name = "G1StandUpController"
+        self.name = "G1LocoStandUpController"
+        self.final_pos = self.configs["controller_config"]["default_joint_pos"]
+
+class G1ManiStandUpController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1ManiStandUpController"
         self.arm_waist_target = [0.0000,  0.0000,  0.0000,
                     -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
                     -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000]

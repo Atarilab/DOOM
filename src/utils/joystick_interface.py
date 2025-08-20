@@ -1,23 +1,25 @@
 import logging
 import threading
 import time
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import pygame
 
-from utils.mode_manager import ModeManager
+if TYPE_CHECKING:
+    from utils.mode_manager import ModeManager
 
 
 class JoystickManager:
     """Manages joystick input and mapping to robot commands."""
 
-    def __init__(self, mode_manager: ModeManager, logger: Optional[logging.Logger] = None, debug: bool = False):
+    def __init__(self, mode_manager: "ModeManager", robot: str, logger: Optional[logging.Logger] = None, debug: bool = False):
         self.logger = logger or logging.getLogger(__name__)
         self.joystick = None
         self.axis_id = {}
         self.button_id = {}
         self.key_map = {}
         self.mode_manager = mode_manager
+        self.robot = robot
         self.active_controller = None
         self.debug = debug
         self._setup_joystick()
@@ -151,59 +153,115 @@ class JoystickManager:
                 # Only process commands if cooldown period has passed
                 if time_since_last_command >= self._command_cooldown:
                     # Handle mode switching based on button combinations
-                    if key_state[self.key_map["select"]]:
-                        self.mode_manager.set_mode("ZERO")
-                        self._last_command_time = current_time
-                    elif key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ in [
-                        "DampingController",
-                        "ZeroTorqueController",
-                    ]:
-                        self.mode_manager.set_mode("STAND", "STAY_DOWN")
-                        self._last_command_time = current_time
-                    elif (
-                        key_state[self.key_map["start"]]
-                        and self.active_controller.__class__.__name__ != "DampingController"
-                    ):
-                        self.mode_manager.set_mode("DAMPING")
-                        self._last_command_time = current_time
-                    elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in {
-                        "Go2StayDownController",
-                        "Go2StandDownController",
-                    }:
-                        self.mode_manager.set_mode("STAND", "STAND_UP")
-                        self._last_command_time = current_time
-                    elif (
-                        key_state[self.key_map["down"]]
-                        and self.active_controller.__class__.__name__ == "Go2StandUpController"
-                    ):
-                        self.mode_manager.set_mode("STAND", "STAND_DOWN")
-                        self._last_command_time = current_time
-                    elif (
-                        key_state[self.key_map["down"]]
-                        and key_state[self.key_map["L1"]]
-                        and self.active_controller.__class__.__name__ == "Go2StandDownController"
-                    ):
-                        self.mode_manager.set_mode("STAND", "STAY_DOWN")
-                        self._last_command_time = current_time
-                    elif (
-                        key_state[self.key_map["L1"]]
-                        and key_state[self.key_map["R1"]]
-                        and self.active_controller.__class__.__name__ == "Go2StandUpController"
-                    ):
-                        # Cycle through available submodes of the for the main mode
-                        main_mode = list(self.mode_manager._modes.keys())[3]
-                        available_submodes = self.mode_manager.get_mode_info(main_mode)["submode"]
+                    if self.robot == "UnitreeGo2":
+                        if key_state[self.key_map["select"]]:
+                            self.mode_manager.set_mode("ZERO")
+                            self._last_command_time = current_time
+                        elif key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ in [
+                            "DampingController",
+                            "ZeroTorqueController",
+                        ]:
+                            self.mode_manager.set_mode("STAND", "STAY_DOWN")
+                            self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["start"]]
+                            and self.active_controller.__class__.__name__ != "DampingController"
+                        ):
+                            self.mode_manager.set_mode("DAMPING")
+                            self._last_command_time = current_time
+                        elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in {
+                            "Go2StayDownController",
+                            "Go2StandDownController",
+                        }:
+                            self.mode_manager.set_mode("STAND", "STAND_UP")
+                            self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["down"]]
+                            and self.active_controller.__class__.__name__ == "Go2StandUpController"
+                        ):
+                            self.mode_manager.set_mode("STAND", "STAND_DOWN")
+                            self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["down"]]
+                            and key_state[self.key_map["L1"]]
+                            and self.active_controller.__class__.__name__ == "Go2StandDownController"
+                        ):
+                            self.mode_manager.set_mode("STAND", "STAY_DOWN")
+                            self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["L1"]]
+                            and key_state[self.key_map["R1"]]
+                            and self.active_controller.__class__.__name__ == "Go2StandUpController"
+                        ):
+                            # Cycle through available submodes of the for the main mode
+                            main_mode = list(self.mode_manager._modes.keys())[3]
+                            available_submodes = self.mode_manager.get_mode_info(main_mode)["submode"]
 
-                        if main_mode not in self._submode_indices:
-                            self._submode_indices[main_mode] = 0
+                            if main_mode not in self._submode_indices:
+                                self._submode_indices[main_mode] = 0
 
-                        current_index = self._submode_indices[main_mode]
-                        self.mode_manager.set_mode(main_mode, available_submodes[current_index])
+                            current_index = self._submode_indices[main_mode]
+                            self.mode_manager.set_mode(main_mode, available_submodes[current_index])
 
-                        self.logger.info(f"Mode set to {main_mode} - {available_submodes[current_index]}")
+                            self.logger.info(f"Mode set to {main_mode} - {available_submodes[current_index]}")
 
-                        self._submode_indices[main_mode] = (current_index + 1) % len(available_submodes)
-                        self._last_command_time = current_time
+                            self._submode_indices[main_mode] = (current_index + 1) % len(available_submodes)
+                            self._last_command_time = current_time
+                            
+                    elif self.robot == "UnitreeG1":
+                        if key_state[self.key_map["select"]]:
+                            self.mode_manager.set_mode("ZERO")
+                            self._last_command_time = current_time
+                        elif key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ in [
+                            "DampingController",
+                            "ZeroTorqueController",
+                        ]:
+                            self.mode_manager.set_mode("STAND", "STAND_UP")
+                            self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["start"]]
+                            and self.active_controller.__class__.__name__ != "DampingController"
+                        ):
+                            self.mode_manager.set_mode("DAMPING")
+                            self._last_command_time = current_time
+                        # elif key_state[self.key_map["up"]] and self.active_controller.__class__.__name__ in {
+                        #     "Go2StayDownController",
+                        #     "Go2StandDownController",
+                        # }:
+                        #     self.mode_manager.set_mode("STAND", "STAND_UP")
+                        #     self._last_command_time = current_time
+                        # elif (
+                        #     key_state[self.key_map["down"]]
+                        #     and self.active_controller.__class__.__name__ == "Go2StandUpController"
+                        # ):
+                        #     self.mode_manager.set_mode("STAND", "STAND_DOWN")
+                        #     self._last_command_time = current_time
+                        # elif (
+                        #     key_state[self.key_map["down"]]
+                        #     and key_state[self.key_map["L1"]]
+                        #     and self.active_controller.__class__.__name__ == "Go2StandDownController"
+                        # ):
+                        #     self.mode_manager.set_mode("STAND", "STAY_DOWN")
+                        #     self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["L1"]]
+                            and key_state[self.key_map["R1"]]
+                            and self.active_controller.__class__.__name__ in ["G1LocoStandUpController", "G1ManiStandUpController"]
+                        ):
+                            # Cycle through available submodes of the for the main mode
+                            main_mode = list(self.mode_manager._modes.keys())[3]
+                            available_submodes = self.mode_manager.get_mode_info(main_mode)["submode"]
+
+                            if main_mode not in self._submode_indices:
+                                self._submode_indices[main_mode] = 0
+
+                            current_index = self._submode_indices[main_mode]
+                            self.mode_manager.set_mode(main_mode, available_submodes[current_index])
+
+                            self.logger.info(f"Mode set to {main_mode} - {available_submodes[current_index]}")
+
+                            self._submode_indices[main_mode] = (current_index + 1) % len(available_submodes)
+                            self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available
                     if self.active_controller and hasattr(self.active_controller, "get_joystick_mappings"):

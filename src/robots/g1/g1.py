@@ -9,7 +9,7 @@ from controllers.rl_velocity_locomotion_controller import (
     RLHumanoidLocomotionVelocityController,
     RLHumanoidUnitreeLocomotionVelocityController,
 )
-from controllers.stand_controller import G1LowLevelController, G1StandUpController, G1StayUpController, G1UpperExtendLateralController, G1UpperHomePosController
+from controllers.stand_controller import G1LocoStandUpController, G1LowLevelController, G1ManiStandUpController, G1StayUpController, G1UpperExtendLateralController, G1UpperHomePosController
 from robots.robot_base import RobotBase
 from state_manager.msg_handlers import g1_low_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
@@ -228,13 +228,14 @@ class G1(RobotBase):
         self.logger.info(f"Available task for {self.name}: {self.task}")
         controllers = {
                 "STAND": {
-                    "STAND_UP": G1StandUpController,
+                    "STAND_UP": G1LocoStandUpController,
                     "UPPER_EXTEND_LATERAL": G1UpperExtendLateralController,
                     "UPPER_HOME_POS": G1UpperHomePosController,
                 }
             }
         
         if "manicont" in self.task:
+            controllers["STAND"]["STAND_UP"] = G1ManiStandUpController
             controllers["BIMANUAL"] = {
                     # "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
                     "RL-CONTACT": RLHumanoidBimanualContactController,
