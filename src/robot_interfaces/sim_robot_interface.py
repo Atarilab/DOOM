@@ -31,6 +31,9 @@ class SimRobotInterface():
         # Base link
         self.base_link_name = config["BASE_LINK"]
 
+        # Fixed base position configuration
+        self.fixed_base_pos = config.get("FIXED_BASE_POS", None)  # [x, y, z] or None for no fixed position
+
         # Elastic band
         use_elastic_band = config.get("ELASTIC_BAND", False)
         self.elastic_band = ElasticBand() if use_elastic_band else None
@@ -67,6 +70,18 @@ class SimRobotInterface():
     def _simulation_thread(self):
         ChannelFactoryInitialize(self.domain_id, self.interface)
         unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data, robot=self.robot_name, object=self.object_id)
+
+        # Set fixed base position for the robot if configured
+        if self.fixed_base_pos is not None:
+            base_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, self.base_link_name)
+            if base_body_id >= 0:
+                # Set the initial position (x, y, z) for the base link
+                self.mj_data.qpos[:3] = np.array(self.fixed_base_pos)
+                # Set orientation to unit quaternion (no rotation - identity)
+                self.mj_data.qpos[3:7] = np.array([1.0, 0.0, 0.0, 0.0])  # w, x, y, z
+                # Reset velocities to zero
+                self.mj_data.qvel[:3] = np.zeros(3)
+                self.mj_data.qvel[3:6] = np.zeros(3)  # angular velocities
 
         if self.print_scene_info:
             unitree.PrintSceneInformation()
@@ -135,6 +150,7 @@ class ElasticBand:
           δx: desired position - current position
           dx: current velocity
         """
+        # self.point[:2] = x[:2]
         δx = self.point - x
         distance = np.linalg.norm(δx)
         direction = δx / distance

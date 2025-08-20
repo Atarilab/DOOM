@@ -9,7 +9,7 @@ from controllers.rl_velocity_locomotion_controller import (
     RLHumanoidLocomotionVelocityController,
     RLHumanoidUnitreeLocomotionVelocityController,
 )
-from controllers.stand_controller import G1LowLevelController, G1StandUpController, G1StayUpController
+from controllers.stand_controller import G1LowLevelController, G1StandUpController, G1StayUpController, G1UpperExtendLateralController, G1UpperHomePosController
 from robots.robot_base import RobotBase
 from state_manager.msg_handlers import g1_low_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
@@ -82,15 +82,18 @@ class G1(RobotBase):
             "left_knee_joint",
             "left_ankle_pitch_joint",
             "left_ankle_roll_joint",
+            
             "right_hip_pitch_joint",
             "right_hip_roll_joint",
             "right_hip_yaw_joint",
             "right_knee_joint",
             "right_ankle_pitch_joint",
             "right_ankle_roll_joint",
+            
             "waist_yaw_joint",
             "waist_roll_joint",
             "waist_pitch_joint",
+            
             "left_shoulder_pitch_joint",
             "left_shoulder_roll_joint",
             "left_shoulder_yaw_joint",
@@ -98,6 +101,7 @@ class G1(RobotBase):
             "left_wrist_roll_joint",
             "left_wrist_pitch_joint",
             "left_wrist_yaw_joint",
+            
             "right_shoulder_pitch_joint",
             "right_shoulder_roll_joint",
             "right_shoulder_yaw_joint",
@@ -142,7 +146,6 @@ class G1(RobotBase):
             "right_wrist_roll_joint",
             "right_wrist_pitch_joint",
             "right_wrist_yaw_joint",
-
             # 'left_hip_pitch_joint',
             # 'right_hip_pitch_joint',
             # 'waist_yaw_joint',
@@ -223,44 +226,29 @@ class G1(RobotBase):
             Dict[str, Dict[str, Type[ControllerBase]]]: A dictionary of available controllers for the G1 robot based on the desired task.
         """
         self.logger.info(f"Available task for {self.name}: {self.task}")
-        controllers = {}
-        if "contact" in self.task:
-            controllers = {
+        controllers = {
                 "STAND": {
                     "STAND_UP": G1StandUpController,
-                    "STAY_UP": G1StayUpController,
-                    "LOW_LEVEL": G1LowLevelController,
-                },
-                "LOCOMOTION": {
+                    "UPPER_EXTEND_LATERAL": G1UpperExtendLateralController,
+                    "UPPER_HOME_POS": G1UpperHomePosController,
+                }
+            }
+        
+        if "manicont" in self.task:
+            controllers["BIMANUAL"] = {
                     # "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
                     "RL-CONTACT": RLHumanoidBimanualContactController,
-                },
-            }
+                }
         elif "velocity" in self.task:
-            controllers = {
-                "STAND": {
-                    "STAND_UP": G1StandUpController,
-                    "STAY_UP": G1StayUpController,
-                    "LOW_LEVEL": G1LowLevelController,
-                },
-                "LOCOMOTION": {
+            controllers["LOCOMOTION"] = {
                     "RL-VELOCITY": RLHumanoidLocomotionVelocityController,
-                },
-            }
+                }
         elif "unitree" in self.task:
-            controllers = {
-                "STAND": {
-                    "STAND_UP": G1StandUpController,
-                    "STAY_UP": G1StayUpController,
-                    "LOW_LEVEL": G1LowLevelController,
-                },
-                "LOCOMOTION": {
+            controllers["LOCOMOTION"] = {
                     "RL-UNITREE": RLHumanoidUnitreeLocomotionVelocityController,
-                },
-            }
-
+                }
         else:
-            controllers = {}
+            raise ValueError(f"Invalid task: {self.task}")
 
         self.logger.info(f"Available controllers for {self.name}: {controllers}")
         return controllers
@@ -304,7 +292,7 @@ class G1(RobotBase):
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
 
-            if "contact" in self.task:
+            if "manicont" in self.task:
                 dds_object_state_sub = DDSStateSubscriber(
                     topic="rt/objectstate",
                     msg_type=SportModeState_,
