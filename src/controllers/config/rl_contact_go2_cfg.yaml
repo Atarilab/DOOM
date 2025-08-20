@@ -3,13 +3,14 @@
 policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
 # policy_path: "locomotion_go2/contact_policy_latest.pt"
 fixed_feet_positions: false
-control_dt: 0.01
+control_dt: 0.005
 decimation: 4
 action_dim: 12
 action_scale: 0.35
-stiffness: 25.0
+stiffness: 30.0
 damping: 0.5
 use_threading: False
+use_buffer: False
 device: "cuda:0"  
 feet_step_size: 0.0
 horizon_length: 200
@@ -22,35 +23,7 @@ visualize:
   contact_plan: false
   foot_forces: false
   contact_status: false
-  
-default_joint_pos:
-  - 0.1  # FR_hip_joint
-  - 0.8  # FR_thigh_joint
-  - -1.5 # FR_calf_joint
-  - -0.1 # FL_hip_joint
-  - 0.8  # FL_thigh_joint
-  - -1.5 # FL_calf_joint
-  - 0.1  # RR_hip_joint
-  - 1.0  # RR_thigh_joint
-  - -1.5 # RR_calf_joint
-  - -0.1 # RL_hip_joint
-  - 1.0  # RL_thigh_joint
-  - -1.5 # RL_calf_joint
 
-ISAACLAB_JOINT_ORDER: # breadth-first order, obtained from Aritculation.data.joint_names object
-  - "FL_hip_joint" # 0
-  - "FR_hip_joint" # 1
-  - "RL_hip_joint" # 2
-  - "RR_hip_joint" # 3
-  - "FL_thigh_joint" # 4
-  - "FR_thigh_joint" # 5
-  - "RL_thigh_joint" # 6
-  - "RR_thigh_joint" # 7
-  - "FL_calf_joint" # 8
-  - "FR_calf_joint" # 9
-  - "RL_calf_joint" # 10
-  - "RR_calf_joint" # 11
-  
 
 ISAAC_LAB_DEFAULT_JOINT_POS: [
     0.1000, # 0

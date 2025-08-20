@@ -17,7 +17,11 @@ TASK_CONFIG = {
     },
     "rl-contact-sim-g1": {
         "controller": "controllers/config/rl_contact_g1_cfg.yaml",
-        "robot_interface": "robot_interfaces/config/sim_g1_box_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/sim_box_g1_cfg.yaml",
+    },
+    "rl-manicont-sim-g1": {
+        "controller": "controllers/config/rl_manicont_g1_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/sim_box_g1_cfg.yaml",
     },
     # "rl-contact-real-g1": {
     #     "controller": "controllers/config/rl_contact_g1_cfg.yaml",
@@ -25,11 +29,11 @@ TASK_CONFIG = {
     # },
     "rl-velocity-sim-g1": {
         "controller": "controllers/config/rl_velocity_g1_cfg.yaml",
-        "robot_interface": "robot_interfaces/config/sim_g1_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/sim_flat_g1_cfg.yaml",
     },
     "rl-unitree-sim-g1": {
         "controller": "controllers/config/rl_unitree_g1_cfg.yaml",
-        "robot_interface": "robot_interfaces/config/sim_unitree_g1_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/sim_flat_g1_cfg.yaml",
     },
     # Add more tasks here as needed
 }
