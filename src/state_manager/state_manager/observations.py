@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from utils.helpers import reorder_robot_states, tensorify
-from utils.math import quat_rotate_inverse
+from utils.math import quat_rotate_inverse, quat_mul, quat_conjugate, combine_frame_transforms
 
 import logging
 
@@ -66,8 +66,13 @@ def joint_pos_rel(
 
 
 def joint_pos_limit_normalized(
-    states: Dict[str, Any], soft_dof_limits: np.ndarray, asset_name: str = "robot", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None
-) -> torch.Tensor:
+    states: Dict[str, Any],
+    soft_dof_limits: np.ndarray,
+    mapping: Optional[np.ndarray] = None,
+    asset_name: str = "robot",
+    dtype: torch.dtype = torch.float32,
+    device: Optional[torch.device] = None,
+    ) -> torch.Tensor:
     """The joint positions of the asset normalized with the asset's soft joint limits.
 
     :param states: State dictionary
@@ -78,18 +83,18 @@ def joint_pos_limit_normalized(
     :return: Normalized joint positions
     """
 
-    joint_pos = states[f"{asset_name}/joint_pos"]
+    joint_pos = states[f"{asset_name}/joint_pos"][mapping]
     
-    # Ensure joint_pos is a numpy array for consistent arithmetic operations
-    if isinstance(joint_pos, torch.Tensor):
-        joint_pos = joint_pos.cpu().numpy()
+    # # Ensure joint_pos is a numpy array for consistent arithmetic operations
+    # if isinstance(joint_pos, torch.Tensor):
+    #     joint_pos = joint_pos.cpu().numpy()
     
-    # Ensure soft_dof_limits is a numpy array
-    if isinstance(soft_dof_limits, torch.Tensor):
-        soft_dof_limits = soft_dof_limits.cpu().numpy()
+    # # Ensure soft_dof_limits is a numpy array
+    # if isinstance(soft_dof_limits, torch.Tensor):
+    #     soft_dof_limits = soft_dof_limits.cpu().numpy()
     
-    lower_limit = soft_dof_limits[:, 0]
-    upper_limit = soft_dof_limits[:, 1]
+    lower_limit = soft_dof_limits[0][mapping]
+    upper_limit = soft_dof_limits[1][mapping]
 
     offset = (lower_limit + upper_limit) * 0.5
     result = 2 * (joint_pos - offset) / (upper_limit - lower_limit)
@@ -315,7 +320,7 @@ def contact_plan(states: Dict[str, Any], contact_plan: Callable, dtype: torch.dt
     :param device: Desired tensor device
     :return: Contact plan
     """
-    result = contact_plan().view(-1)
+    result = contact_plan().reshape(-1)
     return tensorify(result, dtype=dtype, device=device)
 
 
@@ -482,4 +487,58 @@ def contact_locations_b(
     result = mj_model.transform_world_to_base(
         future_feet_positions_w()[:, current_goal_idx(): current_goal_idx() + obs_horizon]
     ).flatten()
+    return tensorify(result, dtype=dtype, device=device)
+
+
+def contact_pose_b(
+    states: Dict[str, Any],
+    contact_pose_b: Callable,
+    dtype: torch.dtype = torch.float32,
+    device: Optional[torch.device] = None,
+) -> torch.Tensor:
+    """
+    The contact poses in the base frame.
+    
+    :param states: State dictionary
+    :param contact_pose_b: Function to get contact poses in base frame
+    :param dtype: Desired tensor dtype
+    :param device: Desired tensor device
+    :return: Contact poses in base frame tensor
+    """
+    result = contact_pose_b().flatten()
+    return tensorify(result, dtype=dtype, device=device)
+
+
+def object_pose_command_b(states: Dict[str, Any], dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    The pose command of the object in the base frame.
+    """
+    object_pose_command_b = torch.zeros(7, dtype=dtype, device=device)
+    object_pose_command_b[:3] = torch.tensor([0.25, 0.0, -0.05], dtype=dtype, device=device)
+    object_pose_command_b[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=dtype, device=device)
+    
+    return tensorify(object_pose_command_b, dtype=dtype, device=device)
+
+
+def goal_pose_diff(states: Dict[str, Any], asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    The difference between the current goal pose and the current pose.
+    """
+    object_pos_w = torch.tensor(states[f"{asset_name}/base_pos_w"], dtype=dtype, device=device)
+    object_quat_w = torch.tensor(states[f"{asset_name}/base_quat"], dtype=dtype, device=device)
+    object_pose_command_b = torch.zeros(7, dtype=dtype, device=device)
+    object_pose_command_b[:3] = torch.tensor([0.25, 0.0, -0.05], dtype=dtype, device=device)
+    object_pose_command_b[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=dtype, device=device)
+    
+    goal_pos_w, goal_quat_w = combine_frame_transforms(
+        object_pos_w,
+        object_quat_w,
+        object_pose_command_b[:3],
+        object_pose_command_b[3:],
+    )
+
+    quat_diff = quat_mul(object_quat_w, quat_conjugate(goal_quat_w))
+    
+    pos_diff = goal_pos_w - object_pos_w
+    result = torch.cat([pos_diff, quat_diff], dim=-1)
     return tensorify(result, dtype=dtype, device=device)

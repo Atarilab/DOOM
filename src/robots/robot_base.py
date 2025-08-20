@@ -18,8 +18,6 @@ class RobotBase(ABC):
         self.logger = logger
         self.mj_model = None
 
-        self.joints_unitree2isaac = None
-        self.joints_isaac2unitree = None
 
     @property
     @abstractmethod
