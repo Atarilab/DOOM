@@ -161,6 +161,7 @@ class RLControllerBase(ControllerBase, Node):
         
         # Initial state and commands
         self.latest_state = None
+        self.joint_pos_targets = np.zeros(self.robot.num_joints, dtype=np.float32)
         self.cmd = {}
 
     def _configure_processing_infrastructure(self, configs: Dict[str, Any]):
@@ -312,7 +313,7 @@ class RLControllerBase(ControllerBase, Node):
             # Ensure we have processed observations and have a valid action
             if self.raw_action.sum() == 0:
                 # If no observations yet, use default joint positions
-                joint_pos_targets = self.default_joint_pos.cpu().numpy()[self.actions_mapping]
+                joint_pos_targets = self.default_joint_pos_np[self.actions_mapping]
             else:
                 filtered_action = self.filtered_action.filter(self.raw_action)
 

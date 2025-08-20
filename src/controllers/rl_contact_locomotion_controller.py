@@ -57,6 +57,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.future_feet_positions_init_frame = None
         self.horizon_length = configs["controller_config"]["horizon_length"]
         self.feet_step_size = configs["controller_config"]["feet_step_size"]
+        self.base_link = "base_link"
         self.lateral_pos = 0.0
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3, device=self.device)
@@ -615,7 +616,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # Check if pos is a tensor of zeros (default case)
         if torch.all(pos == 0):
             # Get the robot's current position
-            robot_pos = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device)
+            robot_pos = torch.tensor(self.robot.mj_model.get_body_position_world(self.base_link), dtype=torch.float32, device=self.device)
             # Use only the x-dimension of the robot's position
             pos = torch.tensor([robot_pos[0], self.lateral_pos, 0.0], dtype=torch.float32, device=self.device)
 
@@ -636,7 +637,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.future_feet_positions_w[:, :, 0] += stride_offsets.squeeze(-1) * direction_x
         self.future_feet_positions_w[:, :, 1] += stride_offsets.squeeze(-1) * direction_y
         # self.future_feet_positions_w[:, :, 2] = -0.02 if self.interface == "real" else 0.08
-        self.future_feet_positions_w[:, :, 2] = 0.08
+        self.future_feet_positions_w[:, :, 2] = 0.1
 
         # if self.current_gait in ["trot", "pace"]:
         #     self.future_feet_positions_w[[1, 2], :, 0] -= (self.feet_step_size / 2) * direction_x
@@ -1167,7 +1168,7 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
         super().__init__(robot, configs)
         
         self.default_offset = torch.tensor([[0.35, 0.15, 0.0], [0.35, -0.15, 0.0], [-0.8, 0.15, 0.0], [-0.8, -0.15, 0.0]])
-        
+        self.base_link = "torso_link"
         
     def register_observations(self):
         """
