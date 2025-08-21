@@ -1,13 +1,14 @@
+import json
 import os
 import threading
 import time
 from typing import Any, Callable, Dict
 
-from geometry_msgs.msg import Point, TransformStamped
 import numpy as np
+import torch
+from geometry_msgs.msg import Point, TransformStamped
 from rclpy.node import Node
 from tf2_ros import StaticTransformBroadcaster
-import torch
 
 from commands.command_manager import CommandTerm
 from controllers.controller_base import ControllerBase
@@ -22,6 +23,12 @@ from state_manager.observations import (
     velocity_commands,
 )
 from utils.helpers import ObservationHistoryStorage
+
+
+def to_serializable(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
 
 
 class BaseRLLocomotionController(ControllerBase, Node):
@@ -235,6 +242,10 @@ class BaseRLLocomotionController(ControllerBase, Node):
         :return: Motor commands dictionary
         """
         super().compute_torques(state, desired_goal)
+        
+        oliver_paper_01_log = {}
+        
+        oliver_paper_01_log["state"] = state
 
         start_time = time.perf_counter()
 
@@ -261,17 +272,22 @@ class BaseRLLocomotionController(ControllerBase, Node):
                     .cpu()
                     .numpy()[self.actions_isaac_to_unitree_mapping]
                 )
+                
+                
+            oliver_paper_01_log["joint_pos_targets"] = joint_pos_targets
+
 
             # Clip the joint pos targets for safety
             joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
-            
-            #self.command_manager.logger.debug(f"joint_pos_targets: {joint_pos_targets}")
-            
-            
-            #efforts = [joint_pos_targets[i] * self.Kp for i in range(12)]
-            
-            #self.command_manager.logger.debug(f"efforts calculated only kp: {efforts}")
-            
+
+            oliver_paper_01_log["joint_pos_targets_clipped"] = joint_pos_targets
+
+
+            # self.command_manager.logger.debug(f"joint_pos_targets: {joint_pos_targets}")
+
+            # efforts = [joint_pos_targets[i] * self.Kp for i in range(12)]
+
+            # self.command_manager.logger.debug(f"efforts calculated only kp: {efforts}")
 
             # Prepare motor commands
             self.cmd = {
@@ -284,6 +300,12 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 }
                 for i in range(12)
             }
+            oliver_paper_01_log["cmd"] = self.cmd
+            
+            self.command_manager.logger.debug(
+                f"OLIVER-PAPER-EXP-01: %s",
+                json.dumps(oliver_paper_01_log, default=to_serializable, separators=(",", ":"))
+            )
 
             # Track command preparation time
             self.cmd_preparation_time = time.perf_counter() - start_time
@@ -332,6 +354,10 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
             
             if self.command_manager and self.command_manager.logger:
                 self.command_manager.logger.debug(f"Command Updated: {new_commands}")
+                self.command_manager.logger.debug(
+                    f"OLIVER-PAPER-EXP-01 Command Updated: %s",
+                json.dumps(new_commands, default=to_serializable, separators=(",", ":"))
+                )
         except ValueError as e:
             # Log error or handle validation failure
             if self.command_manager and self.command_manager.logger:

@@ -8,7 +8,7 @@
     "ros.distro": "humble",
     // We use "black" as a formatter:
     "python.formatting.provider": "black",
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "python.formatting.blackArgs": [
         "--line-length",
         "120"
@@ -17,9 +17,9 @@
         "--profile",
         "black"
     ],
-    "editor.codeActionsOnSave": {
-        "source.organizeImports": "explicit"
-    },
+    //"editor.codeActionsOnSave": {
+    //    "source.organizeImports": "explicit"
+    //},
     // Use flake8 for linting
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
