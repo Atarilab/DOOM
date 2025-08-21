@@ -1,8 +1,8 @@
 import time
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
-import torch
 import numpy as np
+import torch
 
 from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
@@ -109,7 +109,6 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
 
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b, obs_dim=3, device=self.device))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, obs_dim=3, device=self.device))
-        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "velocity_commands",
             ObsTerm(
@@ -119,6 +118,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
                 device=self.device,
             ),
         )
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "joint_pos",
             ObsTerm(
@@ -190,7 +190,10 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
         try:
             if not self.use_threading:
                 obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
-                joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
+                obs = self.obs_manager.get_from_buffer().squeeze()
+                
+                                    
+                joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs)
             else:
                 joint_pos_targets = self.compute_joint_pos_targets()
                 
@@ -618,11 +621,11 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
 
         from state_manager.observations import (
             ang_vel_b,
-            projected_gravity_b,
             joint_pos_rel,
             joint_vel,
             last_action,
             phase_with_timing,
+            projected_gravity_b,
             velocity_commands,
         )
 

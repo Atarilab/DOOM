@@ -1,16 +1,19 @@
 # POLICY CONFIG
-policy_path: "locomotion_go2/velocity_policy_unidirectional.pt"
+policy_path: "locomotion_go2/oliver/flatAmpVision/2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_SEED_3/policy.pt"
 
-control_dt: 0.001
-decimation: 4
+control_dt: 0.002
+decimation: 1
 action_dim: 12
-action_scale: 0.35
-stiffness: 25.0
-damping: 0.5
+action_scale: 0.25
+stiffness: 27.0
+damping: 1.5
 
 # PROCESSING CONFIG
 device: "cuda:0"
-use_threading: False
+use_threading: True
+use_buffer: True
+obs_buffer_length: 5
+
 
 
 # MISC CONFIG
