@@ -250,9 +250,9 @@ The joystick interface is used to switch between different modes/controllers and
 This is an optional UI Interface that allows you to choose different modes and send commands to the robot from Terminal UI. In DOOM, we recommend using the joystick instead, since the UI contributes to additional CPU overhead.
 
 ## 📝 TODO
-- [ ] Test g1 velocity locomotion Policy
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
+- [x] Add g1 velocity locomotion Policy from unitree example (rl-unitree-sim-g1) and IsaacLab (rl-velocity-sim-g1)
 - [x] Create table with box env for G1
 - [x] Implement simple stand up, stand down controllers for G1
 - [x] Add G1 in sim
