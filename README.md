@@ -82,7 +82,11 @@ The various tasks are defined in [`tasks/task_configs.json`](src/tasks/task_conf
 - `rl-velocity-real-go2` (Status: ✅ )
 - `rl-contact-sim-go2` (Status: ✅ )
 - `rl-contact-real-go2` (Status: ✅ )
-- `rl-velocity-sim-g1` (Status: ⚠️ ) [WIP]: Stand Controllers work, not the policy
+- `rl-unitree-sim-g1` (Status: ✅ )
+- `rl-unitree-real-g1` (Status: 👀 ) - to be tested
+- `rl-velocity-sim-g1` (Status: ✅ ) 
+- `rl-velocity-real-g1` (Status: 👀 ) - to be tested
+- `rl-contact-sim-g1` (Status: ⚠️ )
   
 Once you've chosen the task you want to run, you can run the master node to control the robot using:
 ```bash
