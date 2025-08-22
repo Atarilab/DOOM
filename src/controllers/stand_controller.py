@@ -28,9 +28,9 @@ class ZeroTorqueController(ControllerBase):
 
     def compute_lowlevelcmd(self, state):
 
-        # When Init Controller is called, set the init frame
-        if self.robot.mj_model is not None:
-            self.robot.mj_model.set_initial_world_frame(state, caller=self.__class__.__name__)
+        # # When Init Controller is called, set the init frame
+        # if self.robot.mj_model is not None:
+        #     self.robot.mj_model.set_initial_world_frame(state, caller=self.__class__.__name__)
 
         super().compute_lowlevelcmd(state)
         cmd = {}
@@ -69,7 +69,7 @@ class DampingController(ControllerBase):
                 "q": 0.0,
                 "kp": 0.0,
                 "dq": 0.0,
-                "kd": 2.0,
+                "kd": self.robot.damping_gain,
                 "tau": 0.0,
             }
         return cmd
