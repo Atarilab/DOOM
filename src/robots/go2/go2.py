@@ -12,7 +12,7 @@ from controllers.stand_controller import (
     Go2StayDownController,
 )
 from robots.robot_base import RobotBase
-from state_manager.msg_handlers import go2_low_state_handler, go2_vicon_handler, sport_mode_state_handler
+from state_manager.msg_handlers import go2_low_state_handler, vicon_handler, sport_mode_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 from utils.joint_mapping import JointMappingInterface
 from utils.mj_wrapper import MjRobotWrapper
@@ -269,7 +269,7 @@ class Go2(RobotBase):
                 topic="/vicon/Go2/Go2",
                 node_name="vicon_state",
                 msg_type=Position,
-                handler_func=go2_vicon_handler,
+                handler_func=vicon_handler,
                 logger=self.logger,
             )
             _subscribers["vicon_state"] = ros2_vicon_sub

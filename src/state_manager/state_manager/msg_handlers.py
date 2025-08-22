@@ -85,7 +85,7 @@ def go2_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger]
     return states
 
 
-def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None) -> Dict[str, np.ndarray]:
+def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None) -> Dict[str, np.ndarray]:
     """
     Handles Vicon messages to extract base states and estimate velocities.
 
@@ -101,8 +101,8 @@ def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = 
     x_offset, y_offset, z_offset = 0.0, 0.0, 0.0
 
     # Initialize velocity estimator once using a singleton pattern
-    if not hasattr(go2_vicon_handler, "velocity_estimator"):
-        go2_vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
+    if not hasattr(vicon_handler, "velocity_estimator"):
+        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
 
     # Calculate base position in meters
     base_position = np.array(
@@ -113,29 +113,29 @@ def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = 
     base_quaternion = np.array([msg["w"], msg["x_rot"], msg["y_rot"], msg["z_rot"]])
 
     # Initialize or update filtered quaternion using spherical linear interpolation (slerp)
-    if not hasattr(go2_vicon_handler, "filtered_quaternion"):
-        go2_vicon_handler.filtered_quaternion = base_quaternion
+    if not hasattr(vicon_handler, "filtered_quaternion"):
+        vicon_handler.filtered_quaternion = base_quaternion
     else:
         # TODO: Check if this is required (is this about makeing quat unique?)
-        dot_product = np.dot(go2_vicon_handler.filtered_quaternion, base_quaternion)
+        dot_product = np.dot(vicon_handler.filtered_quaternion, base_quaternion)
         if dot_product < 0:
             base_quaternion = -base_quaternion  # Ensure shortest path
-        go2_vicon_handler.filtered_quaternion = 0.5 * base_quaternion + 0.5 * go2_vicon_handler.filtered_quaternion
-        go2_vicon_handler.filtered_quaternion /= np.linalg.norm(go2_vicon_handler.filtered_quaternion)  # Normalize
+        vicon_handler.filtered_quaternion = 0.5 * base_quaternion + 0.5 * vicon_handler.filtered_quaternion
+        vicon_handler.filtered_quaternion /= np.linalg.norm(vicon_handler.filtered_quaternion)  # Normalize
 
     # Estimate velocities
     current_time = time.time()
-    lin_vel_w, ang_vel_w = go2_vicon_handler.velocity_estimator.update(
-        base_position, go2_vicon_handler.filtered_quaternion, current_time, logger
+    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(
+        base_position, vicon_handler.filtered_quaternion, current_time, logger
     )
 
     # Transform linear velocity to base frame
-    rotation_matrix = quat_to_rotmatrix(go2_vicon_handler.filtered_quaternion, order="wxyz")
+    rotation_matrix = quat_to_rotmatrix(vicon_handler.filtered_quaternion, order="wxyz")
     lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w)
 
     return {
         "robot/base_pos_w": base_position,
-        "robot/base_quat": go2_vicon_handler.filtered_quaternion,
+        "robot/base_quat": vicon_handler.filtered_quaternion,
         "robot/lin_vel_w": lin_vel_w.tolist(),
         "robot/lin_vel_b": lin_vel_b,
     }

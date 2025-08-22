@@ -11,7 +11,7 @@ from controllers.rl_velocity_locomotion_controller import (
 )
 from controllers.stand_controller import G1LocoStandUpController, G1LowLevelController, G1ManiStandUpController, G1StayUpController, G1UpperExtendLateralController, G1UpperHomePosController
 from robots.robot_base import RobotBase
-from state_manager.msg_handlers import g1_low_state_handler
+from state_manager.msg_handlers import g1_low_state_handler, vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 from utils.helpers import create_joint_mapping
 from utils.mj_wrapper import MjRobotWrapper
@@ -309,7 +309,7 @@ class G1(RobotBase):
                 topic="/vicon/G1/G1",
                 node_name="vicon_state",
                 msg_type=Position,
-                handler_func=g1_vicon_handler,
+                handler_func=vicon_handler,
                 logger=self.logger,
             )
             _subscribers["vicon_state"] = ros2_vicon_sub
