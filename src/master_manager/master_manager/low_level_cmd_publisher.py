@@ -1,3 +1,4 @@
+import time
 import logging
 from typing import TYPE_CHECKING, Optional
 
@@ -10,6 +11,8 @@ from tf2_ros import TransformBroadcaster
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
+from unitree_sdk2py.utils.thread import RecurrentThread
+
 
 from utils.joystick_interface import JoystickManager
 
@@ -70,7 +73,11 @@ class LowLevelCmdPublisher(Node):
         self.joystick_manager = JoystickManager(mode_manager=self.mode_manager, robot=self.robot.name, logger=self.logger, debug=debug)
 
         # Create timer for periodic command publishing
-        self.timer = self.create_timer(self.dt, self.low_level_cmd_callback, clock=self.get_clock())
+        # self.timer = self.create_timer(self.dt, self.low_level_cmd_callback, clock=self.get_clock())
+        self.timer = RecurrentThread(
+            interval=self.dt, target=self.low_level_cmd_callback, name="control"
+        )
+        self.timer.Start()
 
         self.last_callback_time = self.get_clock().now().nanoseconds / 1e9
 
@@ -83,16 +90,18 @@ class LowLevelCmdPublisher(Node):
 
             # Check and release any existing mode
             status, result = self.msc.CheckMode()
-            while result and result.get('name'):
+            while result['name']:
                 self.logger.info(f"Releasing existing mode: {result['name']}")
                 self.msc.ReleaseMode()
                 status, result = self.msc.CheckMode()
-                import time
                 time.sleep(1)
                 
             self.logger.info("G1 motion switcher initialized successfully")
         except Exception as e:
-            self.logger.warning(f"Failed to initialize motion switcher: {e}")
+            raise RuntimeError(
+                "Unable to read from robot. Please ensure the robot is powered on, "
+                "or restart it to initialize correctly."
+            )
 
     def _init_cmd_go2(self):
         """Initialize command message with default values for go2."""
@@ -180,8 +189,8 @@ class LowLevelCmdPublisher(Node):
                     motor = motor_commands[f"motor_{i}"]
                     for attr in ["q", "kp", "dq", "kd", "tau"]:
                         setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
-                    if motor_commands.get("mode", None) is not None:
-                        self.dds_cmd.motor_cmd[i].mode = motor["mode"]
+                        if self.robot.name == "UnitreeG1":
+                            self.dds_cmd.motor_cmd[i].mode = 1                            
                 
                 # Update mode settings for G1
                 if self.robot.name == "UnitreeG1":
