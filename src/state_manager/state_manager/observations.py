@@ -305,7 +305,7 @@ def current_time(states: Dict[str, Any], dtype: torch.dtype = torch.float32, dev
     :param device: Desired tensor device
     :return: Current time as tensor
     """
-    return time.time()
+    return tensorify(time.time(), dtype=dtype, device=device)
 
 
 # Contact Explicit Additional Observations
