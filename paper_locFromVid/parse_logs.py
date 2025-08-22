@@ -5,12 +5,13 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 import yaml
+import numpy as np
 
 # Define the time format
 time_format = "%Y-%m-%d %H:%M:%S,%f"
 
 # Constants
-MASS = 15  # Mass of the robot in kg
+MASS = 15.019  # Mass of the robot in kg
 
 
 def get_cot(state):
@@ -275,9 +276,38 @@ if __name__ == "__main__":
             plot(vels_x, "x vel", output_dir, target_x, x_values_for_vlines)
             plot(vels_y, "y vel", output_dir, target_y, x_values_for_vlines)
             plot(yaws, "yaw", output_dir, target_yaw, x_values_for_vlines)
-            
-            
-            
+
             ###################### VALUES AND METRICS
-            # TODO
+            # NOTE this calculation is not entirely correct, as the indexes for the command changes are neglected
+
+            cots = cots[offset_index:end_index]
+            vels_x = vels_x[offset_index:end_index]
+            vels_y = vels_y[offset_index:end_index]
+            yaws = yaws[offset_index:end_index]
+
+            values = {
+                "cots": cots,
+                "vels_x": vels_x,
+                "vels_y": vels_y,
+                "yaws": yaws,
+            }
             
+            metrics = {
+                "mean_cots": np.mean(np.array(cots)).item(),
+                "mean_vels_x": np.mean(np.array(vels_x)).item(),
+                "mean_vels_y": np.mean(np.array(vels_y)).item(),
+                "mean_yaws": np.mean(np.array(yaws)).item(),
+                "std_cots": np.std(np.array(cots)).item(),
+                "std_vels_x": np.std(np.array(vels_x)).item(),
+                "std_vels_y": np.std(np.array(vels_y)).item(),
+                "std_yaws": np.std(np.array(yaws)).item(),
+            }
+            
+            # Save data to a YAML file
+            with open(os.path.join(output_dir, "metrics.yaml"), "w") as file:
+                yaml.dump(metrics, file)
+                            # Save data to a YAML file
+            with open(os.path.join(output_dir, "values.yaml"), "w") as file:
+                yaml.dump(values, file)
+
+            print(f"\nData saved to {os.path.join(output_dir, 'metrics.yaml')}")
