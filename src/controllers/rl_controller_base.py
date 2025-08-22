@@ -136,6 +136,8 @@ class RLControllerBase(ControllerBase, Node):
         self.use_buffer = controller_config.get("use_buffer", False)
         self.policy_dt = self.control_dt * self.decimation  
         self.counter = 0
+        
+        self.obs_buffer_length = controller_config.get("obs_buffer_length", 1)
 
         self.default_joint_pos = (
             torch.tensor(controller_config.get("ISAAC_LAB_DEFAULT_JOINT_POS", None), dtype=torch.float32, device=self.device)
@@ -184,7 +186,7 @@ class RLControllerBase(ControllerBase, Node):
         This is called by set_obs_manager in the base class.
         """
         if hasattr(self, 'obs_manager') and self.obs_manager is not None:
-            self.obs_manager.initialize_obs_buffer(max_buffer_length=1, policy_architecture=self.policy_architecture)
+            self.obs_manager.initialize_obs_buffer(max_buffer_length=self.obs_buffer_length, policy_architecture=self.policy_architecture)
             
             
     def set_obs_manager(self, obs_manager):
