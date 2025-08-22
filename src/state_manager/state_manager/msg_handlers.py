@@ -116,7 +116,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     if not hasattr(vicon_handler, "filtered_quaternion"):
         vicon_handler.filtered_quaternion = base_quaternion
     else:
-        # TODO: Check if this is required (is this about makeing quat unique?)
+        # TODO: Check if this is necessary (is this about makeing quat unique?)
         dot_product = np.dot(vicon_handler.filtered_quaternion, base_quaternion)
         if dot_product < 0:
             base_quaternion = -base_quaternion  # Ensure shortest path

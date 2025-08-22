@@ -23,6 +23,10 @@ TASK_CONFIG = {
         "controller": "controllers/config/rl_manicont_g1_cfg.yaml",
         "robot_interface": "robot_interfaces/config/sim_box_g1_cfg.yaml",
     },
+    "rl-manicont-real-g1": {
+        "controller": "controllers/config/rl_manicont_g1_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/real_g1_cfg.yaml",
+    },
     # "rl-contact-real-g1": {
     #     "controller": "controllers/config/rl_contact_g1_cfg.yaml",
     #     "robot_interface": "robot_interfaces/config/real_g1_cfg.yaml",
