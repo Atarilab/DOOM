@@ -33,6 +33,11 @@ class RobotBase(ABC):
     @abstractmethod
     def num_joints(self) -> int:
         pass
+    
+    @property
+    @abstractmethod
+    def damping_gain(self) -> float:
+        pass
 
     @property
     @abstractmethod

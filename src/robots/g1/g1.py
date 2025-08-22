@@ -183,6 +183,16 @@ class G1(RobotBase):
             int: The number of joints of the robot.
         """
         return len(self.joint_names)
+    
+    @property
+    def damping_gain(self):
+        """Returns the gain used for the damping mode
+
+        Returns:
+            float: Kd value used for damping gain
+        """
+        
+        return 8.0
 
     @property
     def default_joint_positions(self):
