@@ -243,9 +243,9 @@ class BaseRLLocomotionController(ControllerBase, Node):
         """
         super().compute_torques(state, desired_goal)
         
-        oliver_paper_01_log = {}
+        loc_from_vid_paper_01_log = {}
         
-        oliver_paper_01_log["state"] = state
+        loc_from_vid_paper_01_log["state"] = state
 
         start_time = time.perf_counter()
 
@@ -274,13 +274,13 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 )
                 
                 
-            oliver_paper_01_log["joint_pos_targets"] = joint_pos_targets
+            loc_from_vid_paper_01_log["joint_pos_targets"] = joint_pos_targets
 
 
             # Clip the joint pos targets for safety
             joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
 
-            oliver_paper_01_log["joint_pos_targets_clipped"] = joint_pos_targets
+            loc_from_vid_paper_01_log["joint_pos_targets_clipped"] = joint_pos_targets
 
 
             # self.command_manager.logger.debug(f"joint_pos_targets: {joint_pos_targets}")
@@ -300,11 +300,11 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 }
                 for i in range(12)
             }
-            oliver_paper_01_log["cmd"] = self.cmd
+            loc_from_vid_paper_01_log["cmd"] = self.cmd
             
             self.command_manager.logger.debug(
-                f"OLIVER-PAPER-EXP-01: %s",
-                json.dumps(oliver_paper_01_log, default=to_serializable, separators=(",", ":"))
+                f"LOC-FROM-VID-PAPER-EXP-01: %s",
+                json.dumps(loc_from_vid_paper_01_log, default=to_serializable, separators=(",", ":"))
             )
 
             # Track command preparation time
@@ -355,7 +355,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
             if self.command_manager and self.command_manager.logger:
                 self.command_manager.logger.debug(f"Command Updated: {new_commands}")
                 self.command_manager.logger.debug(
-                    f"OLIVER-PAPER-EXP-01 Command Updated: %s",
+                    f"LOC-FROM-VID-PAPER-EXP-01 Command Updated: %s",
                 json.dumps(new_commands, default=to_serializable, separators=(",", ":"))
                 )
         except ValueError as e:
