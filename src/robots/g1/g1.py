@@ -36,9 +36,6 @@ class G1(RobotBase):
         super().__init__(task=task, logger=logger)
         self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
 
-        self.low_cmd_msg = unitree_hg_msg_dds__LowCmd_
-        self.low_cmd_msg_type = G1LowCmd_
-
         self.joints_unitree2isaac = create_joint_mapping(self.isaaclab_joint_names(), self.joint_names)
         self.joints_isaac2unitree = create_joint_mapping(self.joint_names, self.isaaclab_joint_names())
 
@@ -216,6 +213,16 @@ class G1(RobotBase):
             str: The path to the XML file of the robot.
         """
         return "/home/atari/workspace/DOOM/src/robots/g1/g1_29dof.xml"
+    
+    @property
+    def low_cmd_msg(self):
+        """Return the low command message class."""
+        return unitree_hg_msg_dds__LowCmd_
+
+    @property
+    def low_cmd_msg_type(self):
+        """Return the low command message type."""
+        return G1LowCmd_
 
     @property
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":

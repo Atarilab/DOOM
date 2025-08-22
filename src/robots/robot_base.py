@@ -59,6 +59,18 @@ class RobotBase(ABC):
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":
         pass
 
+    @property
+    @abstractmethod
+    def low_cmd_msg(self):
+        """Return the low command message class."""
+        pass
+
+    @property
+    @abstractmethod
+    def low_cmd_msg_type(self):
+        """Return the low command message type."""
+        pass
+
     def get_joint_names(self) -> List[str]:
         return self.joint_names
 

@@ -36,8 +36,6 @@ class Go2(RobotBase):
         """
         super().__init__(task=task, logger=logger)
         self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
-        self.low_cmd_msg = unitree_go_msg_dds__LowCmd_
-        self.low_cmd_msg_type = Go2LowCmd_
 
         self.joint_mapper = JointMappingInterface("go2")
 
@@ -175,6 +173,16 @@ class Go2(RobotBase):
             str: The path to the XML file of the robot.
         """
         return "/home/atari/workspace/DOOM/src/robots/go2/go2.xml"
+    
+    @property
+    def low_cmd_msg(self):
+        """Return the low command message class."""
+        return unitree_go_msg_dds__LowCmd_
+
+    @property
+    def low_cmd_msg_type(self):
+        """Return the low command message type."""
+        return Go2LowCmd_
 
     @property
     def available_controllers(self) -> "Dict[str, Dict[str, Type[ControllerBase]]]":
