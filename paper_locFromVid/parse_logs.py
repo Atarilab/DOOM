@@ -114,7 +114,7 @@ def plot(data, metric, output_dir, target=None, x_values_for_vlines=None):
 if __name__ == "__main__":
     base_folder = "src/logs/"
     experiment_string = "locFromVid"
-    target_file_name = "rl-velocity-sim-go2_robot_controller.log"
+    target_file_name = "rl-velocity-real-go2_robot_controller.log"
     data_key = "LOC-FROM-VID-PAPER-EXP-01"
 
     pattern = re.compile(r"locFromVid_x(-?\d+\.?\d*)y(-?\d+\.?\d*)yaw(-?\d+\.?\d*)")
@@ -165,9 +165,9 @@ if __name__ == "__main__":
                     if "x_velocity" in command_updated:
                         current_target_x = command_updated["x_velocity"]
                     if "y_velocity" in command_updated:
-                        current_target_x = command_updated["y_velocity"]
+                        current_target_y = command_updated["y_velocity"]
                     if "yaw_rate" in command_updated:
-                        current_target_x = command_updated["yaw_rate"]
+                        current_target_yaw = command_updated["yaw_rate"]
 
                     # Check if all target commands are set as expected
                     if (
@@ -184,8 +184,8 @@ if __name__ == "__main__":
             start_time = datetime.strptime(logs[start_index]["time"], time_format)
 
             # find end and offset indexes
-            trajectory_offset_metrics = 2  # seconds
-            trajectory_length_metrics = 5  # seconds
+            trajectory_offset_metrics = 1  # seconds; relative to start_time
+            trajectory_length_metrics = 2  # seconds; relative to start_time
             offset_index = 0
             end_index = 0
             for i, log in enumerate(logs[start_index:]):

@@ -449,6 +449,9 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
             # Lateral Position 
             "left": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1] + 0.1}),
             "right": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1] - 0.1}),
+            "B": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1], "yaw_rate": self.velocity_commands[2] - 0.1}),
+            "X": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1], "yaw_rate": self.velocity_commands[2] + 0.1}),
+            "A": lambda: self.change_commands({"x_velocity": 0.0, "y_velocity": 0.0, "yaw_rate": 0.0}),
         }
 
     def set_mode(self):
