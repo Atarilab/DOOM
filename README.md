@@ -1,4 +1,3 @@
-
 <div align="center">
 
 ![ATARI DOOM Banner](assets/banner.jpg)
@@ -29,7 +28,7 @@
 
 🧩 [DOOM Elements](#-doom-elements)
 
-📝 [TODO](#-todo) • 📚 [Resources](#-resources) 
+📝 [TODO](#-todo) • 🤝 [Contributing](#-contributing) • 📚 [Resources](#-resources) 
 
 ## ⚙️ Requirements 
 - docker (ros2 container with unitree_sdk)
@@ -253,6 +252,17 @@ The joystick interface is used to switch between different modes/controllers and
 ### 🖥️ [RobotControlUI](src/utils/ui_interface.py)
 This is an optional UI Interface that allows you to choose different modes and send commands to the robot from Terminal UI. In DOOM, we recommend using the joystick instead, since the UI contributes to additional CPU overhead.
 
+Note: This is a research prototype. Use at your own risk.
+
+### 👥 Contributors
+
+<a href="https://github.com/shafeef901">
+  <img src="https://avatars.githubusercontent.com/u/24255993?v=4" width="60px;" alt="Shafeef Omar"/>
+</a>
+<a href="https://github.com/OliEfr">
+  <img src="https://avatars.githubusercontent.com/u/31124624?v=4" width="60px;" alt="Oliver Hausdörfer"/>
+</a>
+
 ## 📝 TODO
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
@@ -272,9 +282,6 @@ This is an optional UI Interface that allows you to choose different modes and s
 - [x] Get vicon frame from Vicon SDK and transform to robot base (directly using base position from vicon after [**@victorDD1**](https://github.com/victorDD1)'s update)
 - [x] Add mechanism for real-time state logger and plotter (debug logger in console and file, plotjuggler for ros topics)
 - [x] Test Velocity-conditioned policy
-
-## 🐞 Known Issues
-- When using torque control for low-level control, there is a delay (latency), which causes the robot to behave unexpectedly. This could be resolved by training with delayed actuation of joints. However, position control generally seems to be a more stable and recommended approach to sending low-level commands to the robot.
 
 
 ## 📚 Resources
