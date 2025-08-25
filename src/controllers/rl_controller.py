@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+import math
 import time
 from typing import Any, Callable, Dict
 
@@ -458,3 +459,104 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         """Runs when the mode is changed in the UI."""
         super().set_mode()
         self.velocity_commands = torch.zeros_like(self.velocity_commands)
+        
+        
+class RLLocomotionVelocitySineController(RLLocomotionVelocityController):
+    
+    def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]):
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+    
+    def _run_policy_inference(self):
+        """Continuously run policy inference in a separate thread at a fixed dt of 0.02 seconds"""
+        dt = self.control_dt * self.decimation  # Fixed time step in seconds (0.02)
+        last_time = time.time()
+
+        while True:
+            try:
+                if not self.active:
+                    time.sleep(0.01)
+                    continue
+
+                # Calculate time since last iteration
+                current_time = time.time()
+                elapsed = current_time - last_time
+
+                # Sleep if we're ahead of schedule
+                if elapsed < dt:
+                    time.sleep(dt - elapsed)
+                    current_time = time.time()  # Update current time after sleep
+
+                # Update last time for next iteration
+                last_time = current_time
+                
+                try:
+                    duration = 10.0  # s
+                    amplitude_x = 0.0
+                    amplitude_y = 0.0
+                    amplitude_yaw = 0.5
+                    mean_x = 0.3
+                    mean_y = 0.0
+                    mean_yaw = 0.0
+
+                    self.velocity_commands[0] = (
+                        amplitude_x
+                        * torch.sin(
+                            torch.tensor(
+                                2 * math.pi * 1 / duration * (current_time % duration)
+                            )
+                        )
+                        + mean_x
+                    )
+                    self.velocity_commands[1] = (
+                        amplitude_y
+                        * torch.sin(
+                            torch.tensor(
+                                2 * math.pi * 1 / duration * (current_time % duration)
+                            )
+                        )
+                        + mean_y
+                    )
+                    self.velocity_commands[2] = (
+                        amplitude_yaw
+                        * torch.sin(
+                            torch.tensor(
+                                2 * math.pi * 1 / duration * (current_time % duration)
+                            )
+                        )
+                        + mean_yaw
+                    )
+                    self.command_manager.logger.debug(
+                        f"LOC-FROM-VID-PAPER-EXP-01 Command Updated: %s",
+                        json.dumps(
+                            {
+                                "x_velocity": self.velocity_commands[0].item(),
+                                "y_velocity": self.velocity_commands[1].item(),
+                                "yaw_rate": self.velocity_commands[2].item(),
+                            },
+                            default=to_serializable,
+                            separators=(",", ":"),
+                        ),
+                    )
+                
+                except Exception as e:
+                    self.command_manager.logger.debug(f"Set sine vel target error: {e}")
+
+                try:
+                    obs = self.obs_buffer.get()
+
+                    # Policy inference
+                    with torch.no_grad():
+                        raw_action = self.policy(obs.unsqueeze(0))
+                        raw_action = torch.clamp(raw_action, min=-3.5, max=3.5)
+                        #self.command_manager.logger.debug(f"Raw actions: {raw_action}")
+
+                    self.raw_action.copy_(raw_action[0][0])
+                except Exception as e:
+                    print(f"Policy inference error: {e}")
+                    time.sleep(0.1)  # Prevent rapid error loops
+                    continue
+
+            except Exception as e:
+                print(f"Policy inference thread error: {e}")
+                time.sleep(0.1)  # Prevent rapid error loops
+    

@@ -114,7 +114,7 @@ def plot(data, metric, output_dir, target=None, x_values_for_vlines=None):
 if __name__ == "__main__":
     base_folder = "src/logs/"
     experiment_string = "locFromVid"
-    target_file_name = "rl-velocity-real-go2_robot_controller.log"
+    target_file_name = "rl-velocity-sim-go2_robot_controller.log"
     data_key = "LOC-FROM-VID-PAPER-EXP-01"
 
     pattern = re.compile(r"locFromVid_x(-?\d+\.?\d*)y(-?\d+\.?\d*)yaw(-?\d+\.?\d*)")
@@ -138,11 +138,13 @@ if __name__ == "__main__":
             ###################### METRICS
             # Experiment target values are contained in folder name
             match = pattern.search(os.path.basename(root))
+            known_target = False  # whether a specific target command is encoded in the file name
             if match:
                 target_x = float(match.group(1))
                 target_y = float(match.group(2))
                 target_yaw = float(match.group(3))
-
+                
+                known_target = True
                 print(
                     f"Processing experiment with: x={target_x}, y={target_y}, yaw={target_yaw}"
                 )
@@ -170,16 +172,18 @@ if __name__ == "__main__":
                         current_target_yaw = command_updated["yaw_rate"]
 
                     # Check if all target commands are set as expected
-                    if (
-                        current_target_x == target_x
-                        and current_target_y == target_y
-                        and current_target_yaw == target_yaw
-                    ):
-                        start_index = i + 1
-                        break
-            assert not start_index == 0, (
-                "Correct target command most likely not found. Check log folder naming and target commands."
-            )
+                    if known_target:
+                        if (
+                            current_target_x == target_x
+                            and current_target_y == target_y
+                            and current_target_yaw == target_yaw
+                        ):
+                            start_index = i + 1
+                            break
+            if known_target:
+                assert not start_index == 0, (
+                    "Correct target command most likely not found. Check log folder naming and target commands."
+                )
 
             start_time = datetime.strptime(logs[start_index]["time"], time_format)
 
@@ -208,9 +212,10 @@ if __name__ == "__main__":
                     break
 
                 # check that command does not get updated
-                assert "LOC-FROM-VID-PAPER-EXP-01 Command Updated" not in log, (
-                    "Target command has been changed during metric evaluation."
-                )
+                if known_target: 
+                    assert "LOC-FROM-VID-PAPER-EXP-01 Command Updated" not in log, (
+                        "Target command has been changed during metric evaluation."
+                    )
 
             offset_time = datetime.strptime(logs[offset_index]["time"], time_format)
             end_time = datetime.strptime(logs[end_index]["time"], time_format)
