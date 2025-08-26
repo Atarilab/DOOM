@@ -465,11 +465,16 @@ class RLLocomotionVelocitySineController(RLLocomotionVelocityController):
     
     def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]):
         super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+        
+        self.start_time = None
     
     def _run_policy_inference(self):
         """Continuously run policy inference in a separate thread at a fixed dt of 0.02 seconds"""
         dt = self.control_dt * self.decimation  # Fixed time step in seconds (0.02)
         last_time = time.time()
+        
+        if self.start_time == None:
+            self.start_time = time.time()
 
         while True:
             try:
@@ -502,7 +507,7 @@ class RLLocomotionVelocitySineController(RLLocomotionVelocityController):
                         amplitude_x
                         * torch.sin(
                             torch.tensor(
-                                2 * math.pi * 1 / duration * (current_time % duration)
+                                2 * math.pi * 1 / duration * ((current_time - self.start_time + duration / 2) % duration)
                             )
                         )
                         + mean_x
@@ -511,7 +516,7 @@ class RLLocomotionVelocitySineController(RLLocomotionVelocityController):
                         amplitude_y
                         * torch.sin(
                             torch.tensor(
-                                2 * math.pi * 1 / duration * (current_time % duration)
+                                2 * math.pi * 1 / duration * ((current_time - self.start_time + duration / 2) % duration)
                             )
                         )
                         + mean_y
@@ -520,7 +525,7 @@ class RLLocomotionVelocitySineController(RLLocomotionVelocityController):
                         amplitude_yaw
                         * torch.sin(
                             torch.tensor(
-                                2 * math.pi * 1 / duration * (current_time % duration)
+                                2 * math.pi * 1 / duration * ((current_time - self.start_time + duration / 2) % duration)
                             )
                         )
                         + mean_yaw
