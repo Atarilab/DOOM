@@ -10,3 +10,5 @@ __# Python
 **/log/
 **/logs/
 **/system.log
+**/*.pdf
+**/*.yaml

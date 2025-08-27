@@ -78,7 +78,16 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
         # Set up observation and action processing
         self._configure_processing_infrastructure(configs)
+        
+        self.configs = configs
 
+        
+        self.logged_params = False
+        
+    def log_params(self):
+        self.command_manager.logger.debug(f"Model: {self.configs['controller_config']['policy_path']}")
+        self.command_manager.logger.debug(f"Parameters: Kp={self.Kp} Kd={self.Kd} action_dim={self.action_dim} control_dt={self.control_dt} decimation={self.decimation}, action_scale={self.action_scale}")
+   
     def _load_policy_model(self, configs: Dict[str, Any]):
         """
         Load and prepare the neural network policy model.
@@ -89,7 +98,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
             os.path.dirname(os.path.abspath(__file__)),
             configs["controller_config"]["policy_path"],
         )
-
+        
         # Use TorchScript for optimized inference
         self.policy = torch.jit.load(model_path).to("cpu")
         self.policy.eval()
@@ -119,6 +128,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.action_dim = controller_config["action_dim"]
         self.control_dt = controller_config["control_dt"]
         self.decimation = controller_config["decimation"]
+        
 
         # Filter coefficient (0 < alpha < 1), lower values = more smoothing
         self.action_filter_alpha = (
@@ -196,7 +206,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         """Continuously run policy inference in a separate thread at a fixed dt of 0.02 seconds"""
         dt = self.control_dt * self.decimation  # Fixed time step in seconds (0.02)
         last_time = time.time()
-
+        
         while True:
             try:
                 if not self.active:
@@ -288,7 +298,12 @@ class BaseRLLocomotionController(ControllerBase, Node):
 
             # efforts = [joint_pos_targets[i] * self.Kp for i in range(12)]
 
-            # self.command_manager.logger.debug(f"efforts calculated only kp: {efforts}")
+            try:
+                if self.logged_params == False: 
+                    self.log_params()
+                    self.logged_params = True
+            except Exception as e:
+                self.command_manager.logger.debug(f"Error logging params: {e}")
 
             # Prepare motor commands
             self.cmd = {
