@@ -107,6 +107,41 @@ def velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> to
     """
     return velocity_commands()
 
+def global_velocity_commands(states: Dict[str, Any], velocity_commands: Callable) -> torch.Tensor:
+    """
+    The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
+
+    :param states: State dictionary
+    :return: Velocity commands (Vx, Vy, Wz)
+    """
+    
+    dtype = torch.float64
+    
+    cmd_b = torch.tensor(velocity_commands()[:3], dtype=dtype)
+    quat = torch.tensor(states["base_quat"], dtype=dtype)
+    rotated = quat_rotate_inverse(quat, cmd_b)
+    wz = torch.tensor([velocity_commands()[3]], dtype=dtype)
+    cmd_w = torch.cat((rotated, wz))
+    return cmd_w
+
+
+def relative_distance_to_box(states: Dict[str, Any]) -> torch.Tensor:
+    """
+    The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
+
+    :param states: State dictionary
+    :return: Velocity commands (Vx, Vy, Wz)
+    """
+    return torch.tensor([0.0])
+
+def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
+    """
+    The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
+
+    :param states: State dictionary
+    :return: Velocity commands (Vx, Vy, Wz)
+    """
+    return torch.tensor([0.0])
 
 def starting_time(states: Dict[str, Any]):
     return time.time()

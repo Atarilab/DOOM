@@ -22,6 +22,9 @@ from state_manager.observations import (
     lin_vel_b,
     projected_gravity_b,
     velocity_commands,
+    global_velocity_commands,
+    relative_distance_to_box,
+    box_parameters,
 )
 from utils.helpers import ObservationHistoryStorage
 
@@ -95,7 +98,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
         :param configs: Configuration dictionary
         """
         model_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
             configs["controller_config"]["policy_path"],
         )
         
@@ -448,6 +450,141 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         self.obs_manager.register(
             "last_action",
             ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
+        )
+        
+    def get_joystick_mappings(self):
+        """
+        Define joystick button mappings for gait changes and heading control.
+        
+        Returns:
+            Dict mapping button names to callback functions.
+        """
+        return {
+
+            # Step Size
+            "up": lambda: self.change_commands({"x_velocity": self.velocity_commands[0] + 0.1, "y_velocity": self.velocity_commands[1]}),
+            "down": lambda: self.change_commands({"x_velocity": self.velocity_commands[0] - 0.1, "y_velocity": self.velocity_commands[1]}),
+            # Lateral Position 
+            "left": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1] + 0.1}),
+            "right": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1] - 0.1}),
+            "B": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1], "yaw_rate": self.velocity_commands[2] - 0.1}),
+            "X": lambda: self.change_commands({"x_velocity": self.velocity_commands[0], "y_velocity": self.velocity_commands[1], "yaw_rate": self.velocity_commands[2] + 0.1}),
+            "A": lambda: self.change_commands({"x_velocity": 0.0, "y_velocity": 0.0, "yaw_rate": 0.0}),
+        }
+
+    def set_mode(self):
+        """Runs when the mode is changed in the UI."""
+        super().set_mode()
+        self.velocity_commands = torch.zeros_like(self.velocity_commands)
+        
+class GlobalRLLocomotionVelocityController(BaseRLLocomotionController):
+    """
+    Velocity-conditioned RL Locomotion Controller
+    Uses contact-implicit reinforcement learning policy
+    """
+
+    def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]):
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+
+        # Default velocity commands
+        self.velocity_commands = torch.tensor([0.0, 0.0, 0.0, 0.0]) #x,y,z,yaw
+        
+    def change_commands(self, new_commands: Dict[str, Any]):
+        """
+        Change velocity commands with validation.
+
+        :param new_commands: Dictionary of new command values
+        """
+
+        try:
+            # Create a new tensor with the updated values
+            new_velocity_commands = self.velocity_commands.clone()
+            
+            if "x_velocity" in new_commands:
+                new_velocity_commands[0] = new_commands["x_velocity"]
+            if "y_velocity" in new_commands:
+                new_velocity_commands[1] = new_commands["y_velocity"]
+                
+            self.velocity_commands = new_velocity_commands
+            
+            if self.command_manager and self.command_manager.logger:
+                self.command_manager.logger.debug(f"Command Updated: {new_commands}")
+                self.command_manager.logger.debug(
+                    f"LOC-FROM-VID-PAPER-EXP-01 Command Updated: %s",
+                json.dumps(new_commands, default=to_serializable, separators=(",", ":"))
+                )
+        except ValueError as e:
+            # Log error or handle validation failure
+            if self.command_manager and self.command_manager.logger:
+                self.command_manager.logger.error(f"Command update failed: {e}")
+
+    def register_commands(self):
+        self.command_manager.register(
+            "x_velocity",
+            CommandTerm(
+                type=float,
+                name="x_velocity",
+                description="X Velocity (m/s)",
+                min_value=-1.0,
+                max_value=1.0,
+                default_value=0.0,
+            ),
+        )
+
+        self.command_manager.register(
+            "y_velocity",
+            CommandTerm(
+                type=float,
+                name="y_velocity",
+                description="Y Velocity (m/s)",
+                min_value=-1.0,
+                max_value=1.0,
+                default_value=0.0,
+            ),
+        )
+        
+
+
+    def register_observations(self):
+        """
+        Register observations for velocity-conditioned locomotion. Maintains a specific order for direct policy input.
+        Lambda is used to get the latest value from the class variables.
+        """
+        self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b))
+        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b))
+        self.obs_manager.register(
+            "velocity_commands",
+            ObsTerm(
+                global_velocity_commands,
+                params={"velocity_commands": lambda: self.velocity_commands},
+            ),
+        )
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b))
+        self.obs_manager.register(
+            "joint_pos",
+            ObsTerm(
+                joint_pos_rel,
+                params={
+                    "default_joint_pos": self.default_joint_pos.numpy(),
+                    "mapping": self.joint_obs_unitree_to_isaac_mapping,
+                },
+            ),
+        )
+        self.obs_manager.register(
+            "joint_vel",
+            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}),
+        )
+        self.obs_manager.register(
+            "last_action",
+            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
+        )
+        self.obs_manager.register(
+            "relative_distance_to_box",
+            ObsTerm(relative_distance_to_box)
+        )
+        self.obs_manager.register(
+            "box_parameters",
+            ObsTerm(box_parameters)
         )
         
     def get_joystick_mappings(self):

@@ -1,18 +1,10 @@
-policy_path: "policies/IsaacLab policies/flatAmpVision/2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_SEED_3/policy.pt"
-# Taping the feet is necessary for good sim2real
-# This policy is the best: "policies/IsaacLab policies/flatAmpVision/2025-08-08_09-24-48_flat_test_DR5_improved_minimal_motion_files_SEED_1/policy.pt" --> on yaw the hind-legs are still too far in --> robot tends to fall over. Got best results with PD 30, 1.5
-# This one works better than the above in the precense of yaw target, and is generally also a good policy: policies/IsaacLab policies/flatAmpVision/2025-08-09_21-28-55_flat_test_DR5_improved_minimal_motion_files_SEED_1/policy.pt
-# src/controllers/policies/IsaacLab policies/flatAmpVision/2025-08-10_19-29-43_flat_test_DR5_mocap_AMP_for_hardware_SEED_1/policy.pt: way better on flat walking than form Vision, but not better in yaw movements. it also suffers from "tippelschritte", especially for low target speeds.
-# src/controllers/policies/IsaacLab policies/flatAmpVision/2025-08-07_16-41-10_flat_test_DR5_improved_minimal_motion_files_SEED_1/policy.pt: this one is worse. Main problem I think are that the feet are not placed forward enough.
-# some older policies form a few days before now actually also work better. This means key problems are: accurate vicon state, tape on feet, tune PD gains. But placing front feet more forward definetely also helps!
-# 2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_MinimalReward1_SEED_*: tippelschritte in simulation; doesnt look good; not deployed on hardware
-# 2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_MinimalReward2_SEED_*: weird movement; doenst look like demo; not deployed on harware
-# 2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_SEED_*: seed 1 shit, seed 2 and 3 good.
-control_dt: 0.002
+policy_path: "src/controllers/policies/IsaacLab policies/boxAmpVision/2025-08-27_11-04-15_DR5_SEED_1/policy.pt"
+# For flat use src/controllers/policies/IsaacLab policies/flatAmpVision/2025-08-25_11-09-21_flat_DR5_improved_minimal_motion_files_lessTaskRewardLerp_SEED_1 and src/controllers/policies/IsaacLab policies/flatAmpVision/2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_SEED_3
+obs_dim: 51 # 51 for box, 48 for flat w/ vicon
+control_dt: 0.01
 decimation: 1
-SIMULATION_DT: 0.005
+SIMULATION_DT: 0.001
 action_dim: 12
-obs_dim: 48
 action_scale: 0.27
 stiffness: 27.0 # 25
 damping: 1.5 # 1.5

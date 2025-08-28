@@ -6,7 +6,7 @@ import time
 from typing import Optional
 
 import rclpy
-from controllers.rl_controller import RLLocomotionVelocityController,RLLocomotionVelocitySineController
+from controllers.rl_controller import RLLocomotionVelocityController,RLLocomotionVelocitySineController, GlobalRLLocomotionVelocityController
 from controllers.rl_contact_controller import RLLocomotionContactController
 from controllers.stand_controller import (
     IdleController,
@@ -322,6 +322,7 @@ async def main_async(args=None):
                     "STANCE": StanceController(mj_model_wrapper, configs),
                     "RL-VELOCITY": RLLocomotionVelocityController(mj_model_wrapper=mj_model_wrapper, configs=configs),
                     "RL-SINE-VELOCITY": RLLocomotionVelocitySineController(mj_model_wrapper=mj_model_wrapper, configs=configs),
+                    "RL-GLOBAL-VELOCITY": GlobalRLLocomotionVelocityController(mj_model_wrapper=mj_model_wrapper, configs=configs),
                 },
             )
         mode_manager.set_mode("IDLE")
