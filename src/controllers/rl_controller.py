@@ -184,6 +184,8 @@ class BaseRLLocomotionController(ControllerBase, Node):
                         obs = self.obs_manager.compute(current_state)
                         obs_tensor = torch.cat([v.reshape(-1) for v in obs.values()])
                         self.obs_buffer.add(obs_tensor.unsqueeze(0))
+                        # self.command_manager.logger.debug(f"Obs: {obs}")
+                        
                     except Exception as e:
                         print(f"Error converting observations to tensor: {e}")
                         print("Observations that caused the error:")
@@ -650,8 +652,8 @@ class RLLocomotionVelocitySineController(RLLocomotionVelocityController):
                     duration = 10.0  # s
                     amplitude_x = 0.0
                     amplitude_y = 0.0
-                    amplitude_yaw = 0.5
-                    mean_x = 0.3
+                    amplitude_yaw = 0.4
+                    mean_x = 0.4
                     mean_y = 0.0
                     mean_yaw = 0.0
 

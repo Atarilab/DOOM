@@ -127,21 +127,19 @@ def global_velocity_commands(states: Dict[str, Any], velocity_commands: Callable
 
 def relative_distance_to_box(states: Dict[str, Any]) -> torch.Tensor:
     """
-    The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
-
-    :param states: State dictionary
-    :return: Velocity commands (Vx, Vy, Wz)
+    Distance between robot base and start of the box.
     """
-    return torch.tensor([0.0])
+    
+    
+    return torch.tensor(states["base_pos_w"][0] - states["object_pos_w"][0])
+
 
 def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
     """
-    The velocity commands. We use a callable (lambda) to fetch the latest value from the controller class.
-
-    :param states: State dictionary
-    :return: Velocity commands (Vx, Vy, Wz)
+    This is just the height of the box.
     """
-    return torch.tensor([0.0])
+    
+    return torch.tensor([0.1])
 
 def starting_time(states: Dict[str, Any]):
     return time.time()

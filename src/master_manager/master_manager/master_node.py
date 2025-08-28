@@ -280,6 +280,15 @@ async def main_async(args=None):
                 logger=logger,
             )
             state_manager.add_subscriber("sports_mode_state", dds_sportsmode_state_sub)
+            
+            from state_manager.msg_handlers import object_state_handler
+            dds_object_state_sub = DDSStateSubscriber(
+                    topic="rt/objectstate",
+                    msg_type=SportModeState_,
+                    handler_func=object_state_handler,
+                    logger=logger,
+            )
+            state_manager.add_subscriber("object_state", dds_object_state_sub)
         else:
             ros2_vicon_sub = ROS2StateSubscriber(
                 # topic="/vicon/Go2with6markers/Go2with6markers",
@@ -290,6 +299,8 @@ async def main_async(args=None):
                 logger=logger,
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
+            
+            # TODO add for subscriber to box
 
         mj_model_wrapper = MjQuadRobotWrapper(configs["robot_config"]["xml_path"])  # Using same URDF for now
 

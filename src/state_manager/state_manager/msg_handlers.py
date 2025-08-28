@@ -224,3 +224,24 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
     }
 
     return states
+
+
+def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+    """Extracts the object state, and returns the object position, object velocity, object orientation, and object angular velocity."""
+    
+    base_pos_w = msg["position"]
+    base_quat = msg["imu_state"].quaternion
+    #lin_vel_w = msg["velocity"]
+    #ang_vel = msg["imu_state"].gyroscope
+    #
+    #lin_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, lin_vel_w)
+    #ang_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, ang_vel)
+    
+    return {
+        "object_pos_w": list(np.array(base_pos_w) - np.array([0.5, 0.0, 0.0] )), # substract the size of the box to get the position where the box starts
+        "object_quat": base_quat,
+        #"object_lin_vel_w": lin_vel_w,
+        #"object_ang_vel": ang_vel,
+        #"object_lin_vel_b": lin_vel_b,
+        #"object_ang_vel_b": ang_vel_b,
+        }

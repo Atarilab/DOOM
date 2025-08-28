@@ -15,12 +15,13 @@ class SimRobotInterface(RobotInterfaceBase):
     def __init__(self, config):
 
         self.robot_name = config["ROBOT"]
-        self.robot_scene = os.getcwd() + "/robots/" + self.robot_name + "/scene.xml"
+        self.robot_scene = os.getcwd() + "/robots/" + self.robot_name + "/scene_box.xml"
 
         # Initialize Mujoco model and data
         self.mj_model = mujoco.MjModel.from_xml_path(self.robot_scene)
         self.mj_data = mujoco.MjData(self.mj_model)
-
+        
+        self.object_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "object")
         # Set the timestep for the simulation
         self.mj_model.opt.timestep = config["SIMULATION_DT"]
 
@@ -50,7 +51,7 @@ class SimRobotInterface(RobotInterfaceBase):
 
     def _simulation_thread(self):
         ChannelFactoryInitialize(self.domain_id, self.interface)
-        unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data)
+        unitree = UnitreeSdk2Bridge(self.mj_model, self.mj_data, robot=self.robot_name, object_=self.object_id)
 
         if self.print_scene_info:
             unitree.PrintSceneInformation()
@@ -79,11 +80,11 @@ class SimRobotInterface(RobotInterfaceBase):
                 robot_pos = self.mj_data.xpos[robot_body_id]
 
                 # Set camera lookat point
-                self.viewer.cam.lookat[:] = robot_pos
+                #self.viewer.cam.lookat[:] = robot_pos
 
                 # Optional: soft zoom and angle
-                self.viewer.cam.distance = 3.0
-                self.viewer.cam.elevation = -20
+                #self.viewer.cam.distance = 3.0
+                #self.viewer.cam.elevation = -20
 
             self.viewer.sync()
             self.locker.release()
