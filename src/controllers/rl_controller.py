@@ -479,7 +479,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         super().set_mode()
         self.velocity_commands = torch.zeros_like(self.velocity_commands)
         
-class GlobalRLLocomotionVelocityController(BaseRLLocomotionController):
+class GlobalRLLocomotionVelocityControllerBox(BaseRLLocomotionController):
     """
     Velocity-conditioned RL Locomotion Controller
     Uses contact-implicit reinforcement learning policy
