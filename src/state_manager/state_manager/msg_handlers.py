@@ -238,7 +238,7 @@ def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
     #ang_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, ang_vel)
     
     return {
-        "object_pos_w": list(np.array(base_pos_w) - np.array([0.5, 0.0, 0.0] )), # substract the size of the box to get the position where the box starts
+        "object_pos_w": list(np.array(base_pos_w) - np.array([0.7, 0.0, 0.0] )), # I dont really know what value needs to be substracted here. I basically do try-and-error with the box size.
         "object_quat": base_quat,
         #"object_lin_vel_w": lin_vel_w,
         #"object_ang_vel": ang_vel,

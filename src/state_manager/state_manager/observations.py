@@ -139,7 +139,7 @@ def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
     This is just the height of the box.
     """
     
-    return torch.tensor([0.1])
+    return torch.tensor([0.3])
 
 def starting_time(states: Dict[str, Any]):
     return time.time()
