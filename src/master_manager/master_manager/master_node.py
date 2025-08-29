@@ -18,7 +18,7 @@ from controllers.stand_controller import (
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler
+from state_manager.msg_handlers import low_state_handler, sport_mode_state_handler, vicon_handler, vicon_object_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber, StateManager
 from tf2_ros import TransformBroadcaster
 
@@ -300,7 +300,14 @@ async def main_async(args=None):
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
             
-            # TODO add for subscriber to box
+            ros2_vicon_sub_obj = ROS2StateSubscriber(
+                topic="/vicon/Step/Step",
+                node_name="vicon_state_obj",
+                msg_type=Position,
+                handler_func=vicon_object_handler,
+                logger=logger,
+            )
+            state_manager.add_subscriber("vicon_state_obj", ros2_vicon_sub_obj)
 
         mj_model_wrapper = MjQuadRobotWrapper(configs["robot_config"]["xml_path"])  # Using same URDF for now
 

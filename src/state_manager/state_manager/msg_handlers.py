@@ -200,6 +200,37 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
 
     return states
 
+def vicon_object_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None):
+    """
+    Vicon msg handler with velocity estimation.
+
+    Args:
+        msg (Dict): Vicon Position Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Base states from the Vicon Receiver including velocities
+    """
+
+    x_offset = 0.0
+    y_offset = 0.0
+    z_offset = 0.0
+
+    # Base Position (in m)
+    pos = np.array(
+        [   
+            (msg["x_trans"] + x_offset) * 0.001,
+            (msg["y_trans"] + y_offset) * 0.001,
+            (msg["z_trans"] + z_offset) * 0.001,
+        ]
+    )
+
+    states = {
+        "object_pos_w": pos,
+    }
+
+    return states
+
 
 def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
