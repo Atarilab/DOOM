@@ -108,22 +108,10 @@ async def main_async(args=None):
                 else None
             )
 
-            # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
-                spin_dt = 0.00025  # you could increase this value to reduce the frequency of the callbacks (less CPU utilization)
-                last_spin_time = time.time()
-
                 while rclpy.ok():
-                    current_time = time.time()
-                    elapsed = current_time - last_spin_time
-
-                    if elapsed >= spin_dt:
-                        rclpy.spin_once(node)
-                        state_manager.spin_subscribers()
-                        last_spin_time = current_time
-                    else:
-                        # Sleep for a short time to avoid busy waiting
-                        time.sleep(max(0, spin_dt - elapsed))
+                    rclpy.spin_once(node, timeout_sec=0.0)
+                    state_manager.spin_subscribers()
 
             node_task = asyncio.create_task(asyncio.to_thread(spin_node))
             try:
