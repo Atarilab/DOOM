@@ -10,7 +10,6 @@ from tf2_ros import TransformBroadcaster
 # Unitree DDS
 from unitree_sdk2py.core.channel import ChannelPublisher
 from unitree_sdk2py.utils.crc import CRC
-from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
 from unitree_sdk2py.utils.thread import RecurrentThread
 
 
@@ -49,17 +48,11 @@ class LowLevelCmdPublisher(Node):
         self.dds_cmd = self.robot.low_cmd_msg()
         self.crc = CRC()
 
-        # G1-specific initialization
-        if self.robot.name == "UnitreeG1":
-            self.motor_mode = MotorMode.pr
-            self.mode_machine_ = 0
-            self.update_mode_machine_ = False
-            self.msc = None
-            self._init_g1_motion_switcher()
-            self._init_cmd_g1(self.mode_machine_, self.motor_mode)
-
-        elif self.robot.name == "UnitreeGo2":
-            self._init_cmd_go2()
+        # Initialize command message with robot-specific defaults
+        self.robot.init_low_cmd(self.dds_cmd)
+        
+        # Mode initialization tracking
+        self.mode_initialization_complete = False
             
         # DDS Publisher setup
         self.dds_pub = ChannelPublisher("rt/lowcmd", self.robot.low_cmd_msg_type)
@@ -81,58 +74,9 @@ class LowLevelCmdPublisher(Node):
 
         self.last_callback_time = self.get_clock().now().nanoseconds / 1e9
 
-    def _init_g1_motion_switcher(self):
-        """Initialize motion switcher client for G1 robot."""
-        try:
-            self.msc = MotionSwitcherClient()
-            self.msc.SetTimeout(5.0)
-            self.msc.Init()
-
-            # Check and release any existing mode
-            status, result = self.msc.CheckMode()
-            while result['name']:
-                self.logger.info(f"Releasing existing mode: {result['name']}")
-                self.msc.ReleaseMode()
-                status, result = self.msc.CheckMode()
-                time.sleep(1)
-                
-            self.logger.info("G1 motion switcher initialized successfully")
-        except Exception as e:
-            raise RuntimeError(
-                "Unable to read from robot. Please ensure the robot is powered on, "
-                "or restart it to initialize correctly."
-            )
-
-    def _init_cmd_go2(self):
-        """Initialize command message with default values for go2."""
-        self.dds_cmd.head[0] = 0xFE
-        self.dds_cmd.head[1] = 0xEF
-        self.dds_cmd.level_flag = 0xFF
-        self.dds_cmd.gpio = 0
-
-        for i in range(len(self.dds_cmd.motor_cmd)):
-            self.dds_cmd.motor_cmd[i].mode = 0x01  # PMSM mode
-            self.dds_cmd.motor_cmd[i].q = self.dds_cmd.motor_cmd[i].kp = self.dds_cmd.motor_cmd[i].dq = (
-                self.dds_cmd.motor_cmd[i].kd
-            ) = self.dds_cmd.motor_cmd[i].tau = 0.0
-
-    def _init_cmd_g1(self, mode_machine, mode_pr):
-        """Initialize command message with default values for g1."""
-        # Set mode machine and mode_pr
-        self.dds_cmd.mode_machine = mode_machine
-        self.dds_cmd.mode_pr = mode_pr
-
-        # Initialize all motor commands
-        for i in range(len(self.dds_cmd.motor_cmd)):
-            self.dds_cmd.motor_cmd[i].mode = 1  # Enable motor
-            self.dds_cmd.motor_cmd[i].q = 0.0
-            self.dds_cmd.motor_cmd[i].kp = 0.0
-            self.dds_cmd.motor_cmd[i].dq = 0.0
-            self.dds_cmd.motor_cmd[i].kd = 0.0
-            self.dds_cmd.motor_cmd[i].tau = 0.0
-
     def low_level_cmd_callback(self):
         """Periodic callback to compute and send motor commands."""
+        start_time = time.time()
         self.running_time += self.dt
 
         # Get active controller and compute torques
@@ -142,36 +86,23 @@ class LowLevelCmdPublisher(Node):
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
 
-            # For G1 robot, wait for mode_machine from low state
-            if self.robot.name == "UnitreeG1" and not self.update_mode_machine_:
-                try:
-                    combined_state = self.state_manager.get_combined_state()
-                    if combined_state.get("mode_machine") is not None:
-                        self.mode_machine_ = combined_state["mode_machine"]
-                        self.update_mode_machine_ = True
-                        self.logger.info(f"G1 mode_machine initialized: {self.mode_machine_}")
-                    else:
-                        # Still waiting for mode_machine, don't send commands yet
-                        return
-                except Exception as e:
-                    self.logger.debug(f"Waiting for mode_machine: {e}")
-                    return
-
             # Update joystick state and handle mode switching
             self.joystick_manager.update()
 
             # Retrieve states from state manager
-            try:
-                combined_state = self.state_manager.get_combined_state()
-            except Exception as e:
-                self.logger.error(f"Error getting combined state: {e}")
-                return
-
-            try:
-                active_controller.update_state(combined_state)
-            except Exception as e:
-                self.logger.error(f"Error updating controller state: {e}")
-                return
+            combined_state = self.state_manager.get_combined_state()
+            
+            # Check mode initialization only if not already complete
+            if not self.mode_initialization_complete:
+                self.mode_initialization_complete = self.robot.get_mode_initialization_state(combined_state)
+                if self.mode_initialization_complete:
+                    self.logger.info(f"{self.robot.name}: Receiving robot states, initialization complete")
+                else:
+                    self.logger.info(f"{self.robot.name}: Waiting for robot states")
+                    return
+            
+            # Update controller state
+            active_controller.update_state(combined_state)
 
             # Compute motor commands
             try:
@@ -181,44 +112,34 @@ class LowLevelCmdPublisher(Node):
                 return
 
             try:
-                # Update low-level command to the robot
-                num_joints = self.robot.get_num_joints()
-                
-                # Update motor commands
-                for i in range(num_joints):
+                # Update low-level motor command to the robot
+                for i in range(self.robot.num_joints):
                     motor = motor_commands[f"motor_{i}"]
-                    for attr in ["q", "kp", "dq", "kd", "tau"]:
-                        setattr(self.dds_cmd.motor_cmd[i], attr, motor[attr])
-                        if self.robot.name == "UnitreeG1":
-                            self.dds_cmd.motor_cmd[i].mode = 1                            
+                    self.robot.update_motor_command(self.dds_cmd, i, motor)
                 
-                # Update mode settings for G1
-                if self.robot.name == "UnitreeG1":
-                    if motor_commands.get("mode_pr", None) is not None:
-                        self.dds_cmd.mode_pr = motor_commands["mode_pr"]
-                    if motor_commands.get("mode_machine", None) is not None:
-                        self.dds_cmd.mode_machine = motor_commands["mode_machine"]
-                    else:
-                        # Always set the current mode_machine
-                        self.dds_cmd.mode_machine = self.mode_machine_
+                self.robot.update_command_modes(self.dds_cmd, motor_commands)
 
             except Exception as e:
                 self.logger.error(f"Error updating motor commands: {e}")
                 return
 
-            if combined_state.get("base_pos_w", None) is not None:
-                # Publish robot state for visualization
-                self.publish_robot_state()
-
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
             self.dds_pub.Write(self.dds_cmd)
 
+            if combined_state.get("robot/base_pos_w", None) is not None:
+                # Publish robot state for visualization
+                self.publish_robot_state()
+                
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Error in low level callback computation: {e}")
 
         self.last_callback_time = current_time
+        
+        # Log execution time
+        # execution_time = time.time() - start_time
+        # self.logger.debug(f"low_level_cmd_callback execution time: {execution_time:.6f} seconds")
 
     def publish_robot_state(self):
         """Publish robot state for visualization in RViz."""
@@ -228,11 +149,11 @@ class LowLevelCmdPublisher(Node):
         # Publish joint states
         joint_state_msg = JointState()
         joint_state_msg.header.stamp = current_time.to_msg()
-        joint_state_msg.name = self.robot.get_joint_names()
+        joint_state_msg.name = self.robot.get_joint_names
 
         # Convert numpy arrays to Python lists of floats
-        joint_pos = combined_state.get("joint_pos", [0.0] * self.robot.get_num_joints())
-        joint_vel = combined_state.get("joint_vel", [0.0] * self.robot.get_num_joints())
+        joint_pos = combined_state.get("robot/joint_pos", [0.0] * self.robot.num_joints)
+        joint_vel = combined_state.get("robot/joint_vel", [0.0] * self.robot.num_joints)
 
         joint_state_msg.position = [float(x) for x in joint_pos]
         joint_state_msg.velocity = [float(x) for x in joint_vel]
@@ -243,18 +164,18 @@ class LowLevelCmdPublisher(Node):
         transform = TransformStamped()
         transform.header.stamp = current_time.to_msg()
         transform.header.frame_id = "world"
-        transform.child_frame_id = "base_link"
+        transform.child_frame_id = self.robot.base_link
 
         # Set translation from base_pos_w
-        transform.transform.translation.x = float(combined_state["base_pos_w"][0])
-        transform.transform.translation.y = float(combined_state["base_pos_w"][1])
-        transform.transform.translation.z = float(combined_state["base_pos_w"][2])
+        transform.transform.translation.x = float(combined_state["robot/base_pos_w"][0])
+        transform.transform.translation.y = float(combined_state["robot/base_pos_w"][1])
+        transform.transform.translation.z = float(combined_state["robot/base_pos_w"][2])
 
         # Set rotation from base_quat
-        transform.transform.rotation.x = float(combined_state["base_quat"][1])
-        transform.transform.rotation.y = float(combined_state["base_quat"][2])
-        transform.transform.rotation.z = float(combined_state["base_quat"][3])
-        transform.transform.rotation.w = float(combined_state["base_quat"][0])
+        transform.transform.rotation.x = float(combined_state["robot/base_quat"][1])
+        transform.transform.rotation.y = float(combined_state["robot/base_quat"][2])
+        transform.transform.rotation.z = float(combined_state["robot/base_quat"][3])
+        transform.transform.rotation.w = float(combined_state["robot/base_quat"][0])
 
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
@@ -263,8 +184,4 @@ class LowLevelCmdPublisher(Node):
         """Clean up resources."""
         if hasattr(self, "joystick_manager"):
             self.joystick_manager.cleanup()
-
-
-class MotorMode:
-    pr = 0  # Series Control for Pitch/Roll Joints
-    ab = 1  # Parallel Control for A/B Joints
+            
