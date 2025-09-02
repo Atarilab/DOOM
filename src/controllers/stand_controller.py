@@ -64,14 +64,32 @@ class DampingController(ControllerBase):
     def compute_lowlevelcmd(self, state):
         super().compute_lowlevelcmd(state)
         cmd = {}
-        for i in range(self.robot.num_joints):
-            cmd[f"motor_{i}"] = {
-                "q": 0.0,
-                "kp": 0.0,
-                "dq": 0.0,
-                "kd": self.robot.damping_gain,
-                "tau": 0.0,
-            }
+        if self.robot.actuated_joint_indices is not None:
+            for i, motor_idx in enumerate(self.robot.actuated_joint_indices):
+                cmd[f"motor_{motor_idx}"] = {
+                    "q": 0.0,
+                    "kp": 0.0,
+                    "dq": 0.0,
+                    "kd": self.robot.damping_gain,
+                    "tau": 0.0,
+                }
+            for i, motor_idx in enumerate(self.robot.non_actuated_joint_indices):
+                cmd[f"motor_{motor_idx}"] = {
+                    "q": 0.0,
+                    "kp": 0.0,
+                    "dq": 0.0,
+                    "kd": 0.0,
+                    "tau": 0.0,
+                }
+        else:
+            for i in range(self.robot.num_joints):
+                cmd[f"motor_{i}"] = {
+                    "q": 0.0,
+                    "kp": 0.0,
+                    "dq": 0.0,
+                    "kd": self.robot.damping_gain,
+                    "tau": 0.0,
+                }
         return cmd
 
 
@@ -278,18 +296,18 @@ class G1PhasePDController(ControllerBase):
         self.leg_joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         self.leg_kps = [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
         self.leg_kds = [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
-        self.default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
+        self.leg_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
         
         self.arm_waist_joint2motor_idx = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
         self.arm_waist_kps = [300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20]
         self.arm_waist_kds = [3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1]
 
-        self.dof_idx = self.leg_joint2motor_idx + self.arm_waist_joint2motor_idx
+        # self.dof_idx = self.leg_joint2motor_idx + self.arm_waist_joint2motor_idx
         self.kps = np.array(self.leg_kps + self.arm_waist_kps)
         self.kds = np.array(self.leg_kds + self.arm_waist_kds)
 
-        self.final_pos = np.zeros(len(self.dof_idx), dtype=np.float32)
-        self.dof_size = len(self.dof_idx)
+        self.final_pos = np.zeros(len(self.robot.actuated_joint_indices), dtype=np.float32)
+        self.dof_size = len(self.robot.actuated_joint_indices)
         self.init_dof_pos = np.zeros(self.dof_size, dtype=np.float32)
         
         self.step_counter = 0
@@ -318,23 +336,116 @@ class G1PhasePDController(ControllerBase):
         super().compute_lowlevelcmd(state)
         self.obs_manager.compute(state)
         # record the current pos
-        for i in range(self.dof_size):
-            self.init_dof_pos[i] = state["robot/joint_pos"][self.dof_idx[i]]
+        for i, motor_idx in enumerate(self.robot.actuated_joint_indices):
+            self.init_dof_pos[i] = state["robot/joint_pos"][motor_idx]
 
         alpha = self.step_counter / self.num_steps
-            
+        
         cmd = {}
-        for i in range(self.dof_size):
-            cmd[f"motor_{self.dof_idx[i]}"] = {
+        for i, motor_idx in enumerate(self.robot.actuated_joint_indices):
+            cmd[f"motor_{motor_idx}"] = {
                 "q": alpha * self.final_pos[i] + (1 - alpha) * self.init_dof_pos[i],
                 "kp": self.kps[i],
                 "dq": 0.0,
                 "kd": self.kds[i],
                 "tau": 0.0,
             }
+        for i, motor_idx in enumerate(self.robot.non_actuated_joint_indices):
+            cmd[f"motor_{motor_idx}"] = {
+                "q": 0.0,
+                "kp": 0.0,
+                "dq": 0.0,
+                "kd": 0.0,
+                "tau": 0.0,
+            }
             
         self.step_counter = min(self.step_counter + 1, self.num_steps)
         return cmd
+    
+class G1LateralHandsController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1LateralHandsController"
+        self.waist_default_targets = np.array([0.0, 0.0, 0.0])
+        self.arm_default_targets = np.array([0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
+                                     0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000])
+        self.final_pos = np.concatenate((self.leg_default_angles, self.waist_default_targets, self.arm_default_targets), axis=0)
+        
+class G1DefaultHandsController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1DefaultHandsController"
+        self.waist_default_targets = np.array([0.0, 0.0, 0.0])
+        self.arm_default_targets = np.array([
+                                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
+                                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000
+                                     ])
+        self.final_pos = np.concatenate((self.leg_default_angles, self.waist_default_targets, self.arm_default_targets), axis=0)
+        
+class G1ManipulationInitHandsController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1ManipulationInitHandsController"
+        self.waist_default_targets = np.array([0.0, 0.0, 0.0])
+        self.arm_default_targets = np.array([
+                    -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
+                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000])
+        self.final_pos = np.concatenate((self.leg_default_angles, self.waist_default_targets, self.arm_default_targets), axis=0)
+    
+class G1UpperPhasePDController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1UpperPhasePDController"
+        # self.dof_idx = range(self.robot.num_joints)
+        # self.dof_idx = self.robot.actuated_joint_indices
+        # self.dof_size = len(self.dof_idx)
+        # self.init_dof_pos = np.zeros(self.dof_size, dtype=np.float32)
+        # self.final_pos = np.zeros(self.dof_size, dtype=np.float32)
+        self.step_counter = 0
+        # self.kps = np.array([300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
+        # self.kds = np.array([3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
+        self.kps = np.array([300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
+        self.kds = np.array([3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
+        
+class G1LowerPhasePDController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1UpperPhasePDController"
+        # self.dof_idx = range(self.robot.num_joints)
+        # self.dof_idx = self.robot.actuated_joint_indices
+        # self.dof_size = len(self.dof_idx)
+        # self.init_dof_pos = np.zeros(self.dof_size, dtype=np.float32)
+        # self.final_pos = np.zeros(self.dof_size, dtype=np.float32)
+        self.step_counter = 0
+        # self.kps = np.array([300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
+        # self.kds = np.array([3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
+        self.kps = np.array([100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
+        self.kds = np.array([2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
 
 class G1LocoStandUpController(G1PhasePDController):
     """
@@ -356,13 +467,28 @@ class G1ManiStandUpController(G1PhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1ManiStandUpController"
-        self.arm_waist_target = [0.0000,  0.0000,  0.0000,
-                    -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
-                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000]
-        self.final_pos = np.concatenate((self.default_angles, self.arm_waist_target), axis=0)
-    
+        self.arm_waist_target = [0.0000, 0.0000, 0.0000, 
+                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
+                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000]
+        self.final_pos = np.concatenate((self.leg_default_angles, self.arm_waist_target), axis=0)
+        
 
-class G1UpperExtendLateralController(G1PhasePDController):
+class G1UpperDefaultPosController(G1UpperPhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1UpperDefaultPosController"
+        self.final_pos = np.array([
+                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
+                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000])
+            
+
+class G1UpperExtendLateralController(G1UpperPhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
@@ -372,15 +498,13 @@ class G1UpperExtendLateralController(G1PhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1UpperExtendLateralController"
-        self.arm_waist_target = np.array([0.0000,  0.0000,  0.0000,
+        self.final_pos = np.array([
                     0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
                     0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000])
-        self.final_pos = np.concatenate((self.default_angles, self.arm_waist_target), axis=0)
-        self.kps[self.leg_joint2motor_idx] = 0
-        self.kds[self.leg_joint2motor_idx] = 0
 
 
-class G1UpperHomePosController(G1PhasePDController):
+
+class G1UpperHomePosController(G1UpperPhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
@@ -390,12 +514,23 @@ class G1UpperHomePosController(G1PhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1UpperHomePosController"
-        self.arm_waist_target = np.array([0.0000,  0.0000,  0.0000,
+        self.final_pos =np.array([
                     -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
                     -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000])
-        self.final_pos = np.concatenate((self.default_angles, self.arm_waist_target), axis=0)
-        self.kps[self.leg_joint2motor_idx] = 0
-        self.kds[self.leg_joint2motor_idx] = 0
+        
+class G1LowerStandUpController(G1LowerPhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+        super().__init__(robot=robot, configs=configs)
+
+        self.name = "G1LowerStandUpController"
+        self.final_pos = np.array([
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        ])
+
 
 class G1StayUpController(ControllerBase):
     """
@@ -410,7 +545,7 @@ class G1StayUpController(ControllerBase):
         self.leg_joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         self.leg_kps = [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
         self.leg_kds = [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
-        self.default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
+        self.leg_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
         
         self.arm_waist_joint2motor_idx = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
         self.arm_waist_kps = [300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20]
@@ -443,7 +578,7 @@ class G1StayUpController(ControllerBase):
         for i in range(len(self.leg_joint2motor_idx)):
             motor_idx = self.leg_joint2motor_idx[i]
             cmd[f"motor_{motor_idx}"] = {
-                "q": self.default_angles[i],
+                "q": self.leg_default_angles[i],
                 "kp": self.leg_kps[i],
                 "dq": 0.0,
                 "kd": self.leg_kds[i],
@@ -477,7 +612,7 @@ class G1LowLevelController(ControllerBase):
         self.leg_joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         self.leg_kps = [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
         self.leg_kds = [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
-        self.default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
+        self.leg_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
         self.arm_waist_joint2motor_idx = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
 
         self.arm_waist_kps = [300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20]
@@ -488,7 +623,7 @@ class G1LowLevelController(ControllerBase):
         self.kps = self.leg_kps + self.arm_waist_kps
         self.kds = self.leg_kds + self.arm_waist_kds
 
-        self.default_pos = np.concatenate((self.default_angles, self.arm_waist_target), axis=0)
+        self.default_pos = np.concatenate((self.leg_default_angles, self.arm_waist_target), axis=0)
         self.dof_size = len(self.dof_idx)
         self.init_dof_pos = np.zeros(self.dof_size, dtype=np.float32)
 
