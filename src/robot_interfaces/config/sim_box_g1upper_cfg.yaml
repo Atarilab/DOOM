@@ -1,0 +1,12 @@
+ROBOT: "g1"
+SCENE: "scene_upper17dof_box.xml"
+ELASTIC_BAND: True
+# BASE_LINK: "torso_link"
+BASE_LINK: "waist_yaw_link"
+FIXED_BASE_POS: [0.0, 0.0, 0.793]
+
+SIMULATION_DT: 0.001
+VIEWER_DT: 0.02  # 50 fps for viewer
+PRINT_SCENE_INFORMATION: True
+INTERFACE: "lo"
+DOMAIN_ID: 1
