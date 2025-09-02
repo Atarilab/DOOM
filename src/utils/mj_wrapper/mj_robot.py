@@ -9,12 +9,14 @@ from utils.math import quat_to_rotmatrix
 class MjRobotWrapper:
     """MuJoCo wrapper for quadruped robot simulation and computation."""
 
-    def __init__(self, xml_path: str, feet_names: List[str]):
+    def __init__(self, xml_path: str, ee_names: List[str], base_link: str):
         """
         Initialize MuJoCo model from XML.
 
         Args:
             xml_path: Path to the robot's XML file
+            ee_names: Names of the end effectors of the robot
+            base_link: Name of the base link of the robot
         """
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
@@ -31,14 +33,16 @@ class MjRobotWrapper:
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, i)
             if name and name != "floating_base_joint":
                 self.joint_names[name] = i
-
+                
         self.num_joints = len(self.joint_names)
 
         # Debug print to see what bodies are available
         print(f"Available bodies: {list(self.body_names.keys())}")
         print(f"Available joints: {list(self.joint_names.keys())}")
 
-        self.feet_indices = [self.body_names.get(name, -1) for name in feet_names]
+        self.base_link = base_link
+        self.ee_indices = [self.body_names.get(name, -1) for name in ee_names]
+        self.base_idx = self.body_names.get(self.base_link, -1)
 
         # Initialize world frame transform
         self._init_world_frame = False
@@ -105,10 +109,10 @@ class MjRobotWrapper:
 
         mujoco.mj_forward(self.model, self.data)
 
-    def get_feet_positions_world(self) -> np.ndarray:
-        """Get feet positions in world frame."""
+    def get_ee_positions_w(self) -> np.ndarray:
+        """Get end effector positions in world frame."""
         positions = []
-        for idx in self.feet_indices:
+        for idx in self.ee_indices:
             if idx >= 0:  # Check if the index is valid
                 pos = self.data.xpos[idx]
                 positions.append(pos)
@@ -117,15 +121,14 @@ class MjRobotWrapper:
                 positions.append(np.zeros(3))
         return np.array(positions)
 
-    def get_feet_positions_base(self) -> np.ndarray:
-        """Get feet positions in base frame."""
-        world_positions = self.get_feet_positions_world()
-        base_idx = self.body_names.get("base", -1)
-        if base_idx < 0:
+    def get_ee_positions_b(self) -> np.ndarray:
+        """Get end effector positions in base frame."""
+        world_positions = self.get_ee_positions_w()
+        if self.base_idx < 0:
             return world_positions  # Return world positions if base not found
 
-        base_pos = self.data.xpos[base_idx]
-        base_rot = self.data.xmat[base_idx].reshape(3, 3)
+        base_pos = self.data.xpos[self.base_idx]
+        base_rot = self.data.xmat[self.base_idx].reshape(3, 3)
 
         positions = []
         for pos in world_positions:
@@ -138,7 +141,7 @@ class MjRobotWrapper:
         """Get the base position in the init frame."""
         if not self._init_world_frame:
             raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
-        return self.get_body_position_init_frame("base_link")
+        return self.get_body_position_init_frame(self.base_link)
 
     def transform_init_to_base(self, pos: np.ndarray) -> np.ndarray:
         """Transform quantities from the init frame to the base frame.
@@ -150,12 +153,11 @@ class MjRobotWrapper:
             Array of the same shape as pos but with positions transformed to the base frame
         """
         # Get the base position and orientation
-        base_idx = self.body_names.get("base_link", -1)
-        if base_idx < 0:
+        if self.base_idx < 0:
             raise ValueError("Base body not found in model")
 
-        base_pos = self.data.xpos[base_idx]
-        base_rot = self.data.xmat[base_idx].reshape(3, 3)
+        base_pos = self.data.xpos[self.base_idx]
+        base_rot = self.data.xmat[self.base_idx].reshape(3, 3)
 
         # Get the original shape
         original_shape = pos.shape
@@ -192,12 +194,11 @@ class MjRobotWrapper:
             Array of the same shape as pos but with positions transformed to the base frame
         """
         # Get the base position and orientation
-        base_idx = self.body_names.get("base_link", -1)
-        if base_idx < 0:
+        if self.base_idx < 0:
             raise ValueError("Base body not found in model")
 
-        base_pos = self.data.xpos[base_idx]
-        base_rot = self.data.xmat[base_idx].reshape(3, 3)
+        base_pos = self.data.xpos[self.base_idx]
+        base_rot = self.data.xmat[self.base_idx].reshape(3, 3)
 
         # Get the original shape
         original_shape = pos.shape
@@ -266,7 +267,7 @@ class MjRobotWrapper:
         if not self._init_world_frame:
             raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
 
-        world_positions = self.get_feet_positions_world()
+        world_positions = self.get_ee_positions_w()
         positions = []
         for pos in world_positions:
             # Transform from current world to init frame
@@ -368,11 +369,10 @@ class MjRobotWrapper:
             Array of the same shape as pos but with positions transformed to the base frame
         """
         # Get the base position
-        base_idx = self.body_names.get("base_link", -1)
-        if base_idx < 0:
+        if self.base_idx < 0:
             raise ValueError("Base body not found in model")
 
-        base_pos = self.data.xpos[base_idx]
+        base_pos = self.data.xpos[self.base_idx]
 
         # Convert quaternion to rotation matrix
         from scipy.spatial.transform import Rotation as R
@@ -422,11 +422,10 @@ class MjRobotWrapper:
             Array of the same shape as pos but with positions transformed to the base frame
         """
         # Get the base position
-        base_idx = self.body_names.get("base_link", -1)
-        if base_idx < 0:
+        if self.base_idx < 0:
             raise ValueError("Base body not found in model")
 
-        base_pos = self.data.xpos[base_idx]
+        base_pos = self.data.xpos[self.base_idx]
 
         # Convert quaternion to rotation matrix
         from scipy.spatial.transform import Rotation as R
