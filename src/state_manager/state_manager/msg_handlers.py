@@ -246,3 +246,87 @@ def g1_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] =
     }
 
     return states
+
+def g1_upper_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
+    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
+
+    Args:
+        msg (Dict): Low Level State Unitree Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Low level states directly from the robot
+    """
+    # # Wait for the first message
+    # while msg["tick"] == 0:
+    #     time.sleep(0.01)
+
+    joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+    # Extract motor states
+    motor_states = msg["motor_state"]
+
+    # Extract IMU states
+    imu_state = msg["imu_state"]
+
+    states = {
+        "mode_machine": msg["mode_machine"],
+        "robot/joint_pos": np.array(
+            [motor_states[i].q for i in joint2motor_idx]
+        ),
+        "robot/joint_vel": np.array(
+            [motor_states[i].dq for i in joint2motor_idx]
+        ),
+        "robot/joint_tau_est": np.array(
+            [motor_states[i].tau_est for i in joint2motor_idx]
+        ),
+        "robot/gyroscope": imu_state.gyroscope,
+        "robot/accelerometer": imu_state.accelerometer,
+        "robot/base_quat": imu_state.quaternion,
+        "robot/base_rpy": imu_state.rpy,
+    }
+
+    return states
+
+def g1_lower_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
+    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
+
+    Args:
+        msg (Dict): Low Level State Unitree Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Low level states directly from the robot
+    """
+    # # Wait for the first message
+    # while msg["tick"] == 0:
+    #     time.sleep(0.01)
+
+    joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] + [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+
+    # Extract motor states
+    motor_states = msg["motor_state"]
+
+    # Extract IMU states
+    imu_state = msg["imu_state"]
+
+    states = {
+        "mode_machine": msg["mode_machine"],
+        "robot/joint_pos": np.array(
+            [motor_states[i].q for i in joint2motor_idx]
+        ),
+        "robot/joint_vel": np.array(
+            [motor_states[i].dq for i in joint2motor_idx]
+        ),
+        "robot/joint_tau_est": np.array(
+            [motor_states[i].tau_est for i in joint2motor_idx]
+        ),
+        "robot/gyroscope": imu_state.gyroscope,
+        "robot/accelerometer": imu_state.accelerometer,
+        "robot/base_quat": imu_state.quaternion,
+        "robot/base_rpy": imu_state.rpy,
+    }
+
+    return states
