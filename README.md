@@ -263,9 +263,9 @@ Note: This is a research prototype. Use at your own risk.
 </a>
 
 ## 📝 TODO
-- [ ] Add RViz visualization for G1
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
+- [x] Add RViz visualization for G1
 - [x] Add g1 velocity locomotion Policy from unitree example (rl-unitree-sim-g1) and IsaacLab (rl-velocity-sim-g1)
 - [x] Create table with box env for G1
 - [x] Implement simple stand up, stand down controllers for G1
