@@ -32,7 +32,6 @@
 
 ## ⚙️ Requirements 
 - docker (ros2 container with unitree_sdk)
-- unitree Go2
 - nvidia Graphics card and [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   
 ## 📦 Installation Instructions
@@ -264,6 +263,7 @@ Note: This is a research prototype. Use at your own risk.
 </a>
 
 ## 📝 TODO
+- [ ] Add RViz visualization for G1
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
 - [x] Add g1 velocity locomotion Policy from unitree example (rl-unitree-sim-g1) and IsaacLab (rl-velocity-sim-g1)
