@@ -41,7 +41,6 @@ class ControllerBase(ABC):
         self.control_dt = configs["controller_config"]["control_dt"]
         self.debug = configs["controller_config"].get("debug", False)
         self.device = configs["controller_config"].get("device", "cpu")
-        self.floating_base = self.robot.mj_model.floating_base
         
         self.name = None
         self.logger = None
@@ -66,7 +65,7 @@ class ControllerBase(ABC):
         """
         Set up joint position and effort limits with conservative safety margins.
         """
-        if self.floating_base:
+        if self.robot.floating_base:
             # Position limits (excluding first 7 DOFs for floating base)
             lower_limits = self.robot.mj_model.model.jnt_range[1:, 0]
             upper_limits = self.robot.mj_model.model.jnt_range[1:, 1]

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Type
+from typing import TYPE_CHECKING, Dict, List, Type
 
 from unitree_sdk2py.idl.default import unitree_go_msg_dds__LowCmd_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_ as Go2LowCmd_
@@ -10,12 +10,12 @@ from controllers.stand_controller import (
     Go2StandDownController,
     Go2StandUpController,
     Go2StayDownController,
+    Go2StanceController,
 )
 from robots.robot_base import RobotBase
 from state_manager.msg_handlers import go2_low_state_handler, vicon_handler, sport_mode_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 from utils.joint_mapping import JointMappingInterface
-from utils.mj_wrapper import MjRobotWrapper
 
 if TYPE_CHECKING:
     from controllers.controller_base import ControllerBase
@@ -35,8 +35,6 @@ class Go2(RobotBase):
             logger (logging.Logger): The logger to be used for logging.
         """
         super().__init__(task=task, logger=logger)
-        self.mj_model = MjRobotWrapper(self.xml_path, self.feet_names)
-
         self.joint_mapper = JointMappingInterface("go2")
 
         # Keep backward compatibility with existing mapping arrays
@@ -83,7 +81,7 @@ class Go2(RobotBase):
         return "UnitreeGo2"
 
     @property
-    def feet_names(self):
+    def ee_names(self):
         """
         Returns the names of the feet of the robot.
 
@@ -93,7 +91,7 @@ class Go2(RobotBase):
         return ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]
 
     @property
-    def joint_names(self):
+    def actuated_joint_names(self):
         """
         Returns the names of the joints of the robot.
 
@@ -115,7 +113,14 @@ class Go2(RobotBase):
             "RL_calf_joint",
         ]
 
-    def isaaclab_joint_names(self):
+    @property
+    def non_actuated_joint_names(self):
+        """
+        Returns the names of the non-actuated joints of the robot.
+        """
+        return []
+
+    def isaaclab_joint_names(self): 
         """
         Returns the names of the joints as in IsaacLab order.
         """
@@ -134,15 +139,58 @@ class Go2(RobotBase):
             "RR_calf_joint",
         ]
 
-    @property
-    def num_joints(self):
-        """
-        Returns the number of joints of the robot.
 
-        Returns:
-            int: The number of joints of the robot.
-        """
-        return len(self.joint_names)
+    @property
+    def base_link(self):
+        """Return the name of the base link."""
+        return "base_link"
+
+    @property
+    def floating_base(self):
+        """Return if the robot has a floating base."""
+        return True
+    
+
+    def init_low_cmd(self, cmd_msg):
+        """Initialize low-level command message with Go2-specific defaults."""
+        # Set header and flags
+        cmd_msg.head[0] = 0xFE
+        cmd_msg.head[1] = 0xEF
+        cmd_msg.level_flag = 0xFF
+        cmd_msg.gpio = 0
+
+        # Initialize all motor commands
+        for i in range(len(cmd_msg.motor_cmd)):
+            cmd_msg.motor_cmd[i].mode = 0x01  # PMSM mode
+            cmd_msg.motor_cmd[i].q = 0.0
+            cmd_msg.motor_cmd[i].kp = 0.0
+            cmd_msg.motor_cmd[i].dq = 0.0
+            cmd_msg.motor_cmd[i].kd = 0.0
+            cmd_msg.motor_cmd[i].tau = 0.0
+
+    def motor_command_attributes(self) -> List[str]:
+        """Get the list of motor command attributes supported by Go2."""
+        return ["q", "kp", "dq", "kd", "tau"]
+
+    def update_motor_command(self, cmd_msg, motor_idx: int, motor_data: Dict):
+        """Update a specific motor command with Go2-specific logic."""
+        # Update standard attributes
+        for attr in ["q", "kp", "dq", "kd", "tau"]:
+            if attr in motor_data:
+                setattr(cmd_msg.motor_cmd[motor_idx], attr, motor_data[attr])
+
+    def update_command_modes(self, cmd_msg, motor_commands: Dict):
+        """Update Go2-specific command mode settings."""
+        # Go2 doesn't have mode_pr or mode_machine settings
+        return cmd_msg
+
+
+    def get_mode_initialization_state(self, combined_state: Dict) -> bool:
+        """Go2 mode initialization is always complete."""
+        if combined_state.get("robot/joint_pos", None) is not None:
+            return True
+        else:
+            return False
     
     @property
     def damping_gain(self):
@@ -224,6 +272,7 @@ class Go2(RobotBase):
                     "STAY_DOWN": Go2StayDownController,
                     "STAND_UP": Go2StandUpController,
                     "STAND_DOWN": Go2StandDownController,
+                    "STANCE": Go2StanceController,
                 },
                 "LOCOMOTION": {
                     "RL-CONTACT": RLQuadrupedLocomotionContactController,
