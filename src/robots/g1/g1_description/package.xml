@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>g1_description</name>
+  <version>0.0.0</version>
+  <description>G1 robot description package</description>
+  <maintainer email="shafeef901@gmail.com">Shafeef Omar</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>urdf</depend>
+  <depend>xacro</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>rviz2</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
