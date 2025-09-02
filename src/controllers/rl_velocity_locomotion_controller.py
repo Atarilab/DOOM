@@ -473,12 +473,14 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 {
                     "x_velocity": self.velocity_commands[0] + 0.1,
                     "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2],
                 }
             ),
             "down": lambda: self.change_commands(
                 {
                     "x_velocity": self.velocity_commands[0] - 0.1,
                     "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2],
                 }
             ),
             # Y-Velocity
@@ -486,12 +488,28 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 {
                     "x_velocity": self.velocity_commands[0],
                     "y_velocity": self.velocity_commands[1] + 0.1,
+                    "yaw": self.velocity_commands[2],
                 }
             ),
             "right": lambda: self.change_commands(
                 {
                     "x_velocity": self.velocity_commands[0],
                     "y_velocity": self.velocity_commands[1] - 0.1,
+                    "yaw": self.velocity_commands[2],
+                }
+            ),
+            "L2": lambda: self.change_commands(
+                {
+                    "x_velocity": self.velocity_commands[0],
+                    "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2] + 0.1,
+                }
+            ),
+            "R2": lambda: self.change_commands(
+                {
+                    "x_velocity": self.velocity_commands[0],
+                    "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2] - 0.1,
                 }
             ),
         }
