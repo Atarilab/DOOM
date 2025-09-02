@@ -41,6 +41,7 @@ class ControllerBase(ABC):
         self.control_dt = configs["controller_config"]["control_dt"]
         self.debug = configs["controller_config"].get("debug", False)
         self.device = configs["controller_config"].get("device", "cpu")
+        self.floating_base = self.robot.mj_model.floating_base
         
         self.name = None
         self.logger = None
@@ -65,12 +66,19 @@ class ControllerBase(ABC):
         """
         Set up joint position and effort limits with conservative safety margins.
         """
-        # Position limits (excluding first 7 DOFs for floating base)
-        lower_limits = self.robot.mj_model.model.jnt_range[1:, 0]
-        upper_limits = self.robot.mj_model.model.jnt_range[1:, 1]
+        if self.floating_base:
+            # Position limits (excluding first 7 DOFs for floating base)
+            lower_limits = self.robot.mj_model.model.jnt_range[1:, 0]
+            upper_limits = self.robot.mj_model.model.jnt_range[1:, 1]
+        else:
+            lower_limits = self.robot.mj_model.model.jnt_range[:, 0]
+            upper_limits = self.robot.mj_model.model.jnt_range[:, 1]
+            
+        lower_limits = lower_limits[self.robot.actuated_joint_indices]
+        upper_limits = upper_limits[self.robot.actuated_joint_indices]
 
         # Conservative limit settings
-        soft_limit_factor = 0.95
+        soft_dof_limit_factor = self.configs["controller_config"].get("soft_dof_limit_factor", 0.95)
         self.dof_pos_limit = np.array([lower_limits, upper_limits])
 
         # Effort limits
@@ -85,8 +93,8 @@ class ControllerBase(ABC):
         joint_pos_range = upper_limits - lower_limits
 
         self.soft_dof_pos_limit = [
-            joint_pos_mean - 0.5 * joint_pos_range * soft_limit_factor,
-            joint_pos_mean + 0.5 * joint_pos_range * soft_limit_factor,
+            joint_pos_mean - 0.5 * joint_pos_range * soft_dof_limit_factor,
+            joint_pos_mean + 0.5 * joint_pos_range * soft_dof_limit_factor,
         ]
 
     def set_obs_manager(self, obs_manager: "ObservationManager"):
