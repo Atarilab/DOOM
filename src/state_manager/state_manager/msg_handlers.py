@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import numpy as np
 
@@ -108,7 +108,6 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     base_position = np.array(
         [(msg["x_trans"] + x_offset) * 0.001, (msg["y_trans"] + y_offset) * 0.001, (msg["z_trans"] + z_offset) * 0.001]
     )
-
     # Base quaternion in order (w, x, y, z)
     base_quaternion = np.array([msg["w"], msg["x_rot"], msg["y_rot"], msg["z_rot"]])
 
@@ -141,7 +140,7 @@ def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None
     }
 
 
-def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def sport_mode_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:
@@ -155,24 +154,42 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
     if not hasattr(sport_mode_state_handler, "velocity_estimator"):
         sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
-    base_pos_w = msg["position"]
-    base_quat = msg["imu_state"].quaternion
+    base_pos_w = np.array(msg["position"])
+    base_quat = np.array(msg["imu_state"].quaternion)
 
+    # Estimate velocities
+    current_time = time.time()
+    lin_vel_w, ang_vel_w = sport_mode_state_handler.velocity_estimator.update(
+        base_pos_w, base_quat, current_time, logger
+    )
+    
     states = {
         "robot/base_pos_w": base_pos_w,
         "robot/lin_vel_b": msg["velocity"],
+        "robot/lin_vel_w": lin_vel_w,
+        "robot/ang_vel_w": ang_vel_w,
     }
 
     return states
 
 
-def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
-    """Extracts the object state, and returns the object position, object velocity, object orientation, and object angular velocity."""
+def object_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    """Extracts the object state, and returns the object position, object velocity, object orientation, and object angular velocity.
+    This message is published by the Vicon Receiver.
+    
+    Args:
+        msg (Dict): Object state message
+        logger (logging.Logger): Logger for debugging
 
-    base_pos_w = msg["position"]
-    base_quat = msg["imu_state"].quaternion
-    lin_vel_w = msg["velocity"]
-    ang_vel_w = msg["imu_state"].gyroscope
+    Returns:
+        Dict: Object state
+    """
+
+    base_pos_w = np.array(msg["position"])
+    base_quat = np.array(msg["imu_state"].quaternion)
+    lin_vel_w = np.array(msg["velocity"])
+    ang_vel_w = np.array(msg["imu_state"].gyroscope)
+    
 
     lin_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, lin_vel_w)
     ang_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, ang_vel_w)
@@ -187,7 +204,7 @@ def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
     }
 
 
-def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def g1_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
