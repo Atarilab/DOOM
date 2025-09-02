@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from utils.helpers import reorder_robot_states, tensorify
-from utils.math import quat_rotate_inverse, quat_mul, quat_conjugate, combine_frame_transforms
+from utils.math import quat_rotate_inverse, quat_mul, quat_conjugate, combine_frame_transforms, subtract_frame_transforms,  quat_apply
 
 import logging
 
@@ -424,7 +424,7 @@ def ee_pos_rel_b(
         End-effector positions relative to base frame
     """
     # Get current feet positions in world frame
-    feet_positions_w = mj_model.get_feet_positions_world()
+    feet_positions_w = mj_model.get_ee_positions_w()
     # Get future feet positions in init frame
     desired_feet_positions = future_feet_positions_w()[:, current_goal_idx()]
     # Compute the distance between the current feet positions and the desired feet positions
@@ -490,6 +490,21 @@ def contact_locations_b(
     return tensorify(result, dtype=dtype, device=device)
 
 
+def contact_pos_error(states: Dict[str, Any],
+                      mj_model: Any,
+                      contact_pose_w: Callable,
+                      dtype: torch.dtype = torch.float32,
+                      device: Optional[torch.device] = None,
+) -> torch.Tensor:
+    """
+    The contact position error.
+    """
+    current_hand_pos_w = torch.tensor(mj_model.get_ee_positions_w(), dtype=dtype, device=device)[:2]
+    contact_pos_error = (contact_pose_w()[:, :3] - current_hand_pos_w).flatten()
+    return tensorify(contact_pos_error, dtype=dtype, device=device)
+    
+
+    
 def contact_pose_b(
     states: Dict[str, Any],
     contact_pose_b: Callable,
@@ -509,36 +524,79 @@ def contact_pose_b(
     return tensorify(result, dtype=dtype, device=device)
 
 
-def object_pose_command_b(states: Dict[str, Any], dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
-    """
-    The pose command of the object in the base frame.
-    """
-    object_pose_command_b = torch.zeros(7, dtype=dtype, device=device)
-    object_pose_command_b[:3] = torch.tensor([0.25, 0.0, -0.05], dtype=dtype, device=device)
-    object_pose_command_b[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=dtype, device=device)
-    
-    return tensorify(object_pose_command_b, dtype=dtype, device=device)
-
-
-def goal_pose_diff(states: Dict[str, Any], asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+def goal_pose_diff(states: Dict[str, Any], goal_pose_w: Callable, asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
     """
     The difference between the current goal pose and the current pose.
     """
+
     object_pos_w = torch.tensor(states[f"{asset_name}/base_pos_w"], dtype=dtype, device=device)
     object_quat_w = torch.tensor(states[f"{asset_name}/base_quat"], dtype=dtype, device=device)
-    object_pose_command_b = torch.zeros(7, dtype=dtype, device=device)
-    object_pose_command_b[:3] = torch.tensor([0.25, 0.0, -0.05], dtype=dtype, device=device)
-    object_pose_command_b[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=dtype, device=device)
     
-    goal_pos_w, goal_quat_w = combine_frame_transforms(
-        object_pos_w,
-        object_quat_w,
-        object_pose_command_b[:3],
-        object_pose_command_b[3:],
-    )
-
+    goal_pos_w, goal_quat_w = goal_pose_w()[:3], goal_pose_w()[3:]
     quat_diff = quat_mul(object_quat_w, quat_conjugate(goal_quat_w))
     
     pos_diff = goal_pos_w - object_pos_w
     result = torch.cat([pos_diff, quat_diff], dim=-1)
     return tensorify(result, dtype=dtype, device=device)
+
+
+def object_pose_b(states: Dict[str, Any], asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    The pose of the object in the robot base frame.
+    """
+    robot_pos_w = torch.tensor(states["robot/base_pos_w"], dtype=dtype, device=device)
+    robot_quat_w = torch.tensor(states["robot/base_quat"], dtype=dtype, device=device)
+    object_pos_w = torch.tensor(states[f"{asset_name}/base_pos_w"], dtype=dtype, device=device)
+    object_quat_w = torch.tensor(states[f"{asset_name}/base_quat"], dtype=dtype, device=device)
+    
+    object_pos_b, object_quat_b = subtract_frame_transforms(
+        robot_pos_w, robot_quat_w, object_pos_w, object_quat_w
+    )
+    return tensorify(torch.cat([object_pos_b, object_quat_b], dim=-1), dtype=dtype, device=device)
+
+
+def object_lin_vel_b(states: Dict[str, Any], asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    The linear velocity of the object in the robot base frame.
+    """
+    robot_lin_vel_w = torch.tensor(states["robot/lin_vel_w"], dtype=dtype, device=device)
+    object_lin_vel_w = torch.tensor(states[f"{asset_name}/lin_vel_w"], dtype=dtype, device=device)
+    robot_quat_w = torch.tensor(states["robot/base_quat"], dtype=dtype, device=device)
+    relative_lin_vel_w = object_lin_vel_w - robot_lin_vel_w
+    
+    # Then rotate to robot frame using robot's orientation
+    object_lin_vel_b = quat_apply(quat_conjugate(robot_quat_w), relative_lin_vel_w)
+    
+    return tensorify(object_lin_vel_b, dtype=dtype, device=device)
+
+
+def object_ang_vel_b(states: Dict[str, Any], asset_name: str = "object", scale=1.0, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    The angular velocity of the object in the robot base frame.
+    """
+    robot_ang_vel_w = torch.tensor(states["robot/ang_vel_w"], dtype=dtype, device=device)
+    object_ang_vel_w = torch.tensor(states[f"{asset_name}/ang_vel_w"], dtype=dtype, device=device)
+    robot_quat_w = torch.tensor(states["robot/base_quat"], dtype=dtype, device=device)
+    relative_ang_vel_w = object_ang_vel_w - robot_ang_vel_w
+    
+    # Then rotate to robot frame using robot's orientation
+    object_ang_vel_b = quat_apply(quat_conjugate(robot_quat_w), relative_ang_vel_w)
+    
+    return tensorify(object_ang_vel_b, dtype=dtype, device=device) * scale
+
+def object_pos_robot_xy_frame(states: Dict[str, Any], asset_name: str = "object", scale=1.0, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+    """
+    The position of the object with the origin at robot's xy.
+
+    :param states: State dictionary
+    :param asset_name: Name of the asset
+    :param scale: Scale factor
+    :param dtype: Desired tensor dtype
+    :param device: Desired tensor device
+    :return: Position of the object in the robot's xy frame
+    """
+    object_pos_w = states[f"{asset_name}/base_pos_w"]
+    robot_pos_w = states["robot/base_pos_w"]
+    result = object_pos_w - robot_pos_w
+    result[:2] = 0.0
+    return tensorify(result, dtype=dtype, device=device) * scale
