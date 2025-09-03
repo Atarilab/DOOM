@@ -1,10 +1,10 @@
 # POLICY CONFIG
 policy_path: "torqueComplexReward/TORQUE_complex_reward_10_SEED_42/policy.pt"
 
-control_dt: 0.001
+control_dt: 0.0001
 decimation: 1
 action_dim: 12
-action_scale: 7.0
+action_scale: 10.0
 stiffness: 0.0
 damping: 0.0
 
