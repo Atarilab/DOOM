@@ -1,0 +1,33 @@
+# POLICY CONFIG
+policy_path: "torqueComplexReward/TORQUE_complex_reward_10_SEED_42/policy.pt"
+
+control_dt: 0.001
+decimation: 1
+action_dim: 12
+action_scale: 7.0
+stiffness: 0.0
+damping: 0.0
+
+# PROCESSING CONFIG
+device: "cuda:0"
+use_threading: False
+use_buffer: True
+obs_buffer_length: 5
+
+
+
+# MISC CONFIG
+ISAAC_LAB_DEFAULT_JOINT_POS: [
+    0.1000, # 0
+    -0.1000, # 1
+    0.1000, # 2
+    -0.1000, # 3
+    0.8000, # 4
+    0.8000, # 5
+    1.0000, # 6
+    1.0000, # 7
+    -1.5000, # 8
+    -1.5000, # 9
+    -1.5000, # 10
+    -1.5000, # 11
+  ] # from asset.data.default_joint_pos; corresponds to ISAACLAB_JOINT_ORDER; is used as action offset

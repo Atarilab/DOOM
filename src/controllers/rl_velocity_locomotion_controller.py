@@ -230,6 +230,67 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
             }
 
         return self.cmd
+    
+
+class RLQuadrupedLocomotionVelocityControllerTorque(RLQuadrupedLocomotionVelocityController):
+    """
+    Velocity-conditioned quadruped RL Locomotion Controller
+    Uses contact-implicit reinforcement learning policy
+    """
+
+    def compute_lowlevelcmd(self, state):
+        """
+        Compute motor commands using the learned policy.
+
+        :param state: Current robot state
+        :return: Motor commands dictionary
+        """
+        if self.robot.mj_model is not None:
+            self.robot.mj_model.update(state)
+
+        start_time = time.perf_counter()
+
+        try:
+            if not self.use_threading:
+                obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
+                obs = self.obs_manager.get_from_buffer().squeeze()
+                
+                                    
+                torques = self.compute_joint_pos_targets_from_policy(obs)
+            else:
+                raise ValueError("Should be run w/o threading for faster inference.")
+                
+            torques = np.clip(torques, -23.5, 23.5)
+
+            # Prepare motor commands
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": 0,
+                    "kp": 0,
+                    "dq": 0.0,
+                    "kd": 0,
+                    "tau": torques[i],
+                }
+                for i in range(12)
+            }
+
+            # Track command preparation time
+            self.cmd_preparation_time = time.perf_counter() - start_time
+
+        except Exception as e:
+            self.logger.error(f"Error computing torques: {e}")
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": self.default_joint_pos[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
+
+        return self.cmd
 
 
 class RLHumanoidLocomotionVelocityController(RLControllerBase):

@@ -3,6 +3,10 @@ TASK_CONFIG = {
         "controller": "controllers/config/rl_velocity_go2_cfg.yaml",
         "robot_interface": "robot_interfaces/config/sim_go2_cfg.yaml",
     },
+    "rl-velocity-torque-sim-go2": {
+        "controller": "controllers/config/rl_velocity_go2_torque_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/sim_go2_cfg.yaml",
+    },
     "rl-velocity-real-go2": {
         "controller": "controllers/config/rl_velocity_go2_cfg.yaml",
         "robot_interface": "robot_interfaces/config/real_go2_cfg.yaml",
