@@ -154,6 +154,7 @@ class LowLevelCmdPublisher(Node):
 
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
+            self.logger.debug(f"Sending dds_cmd: {motor_commands}")
             self.dds_pub.Write(self.dds_cmd)
 
         except Exception as e:
