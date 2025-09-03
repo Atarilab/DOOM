@@ -1,8 +1,8 @@
 import time
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
-import torch
 import numpy as np
+import torch
 
 from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
@@ -109,7 +109,6 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
 
         self.obs_manager.register("lin_vel_b", ObsTerm(lin_vel_b, obs_dim=3, device=self.device))
         self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, obs_dim=3, device=self.device))
-        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "velocity_commands",
             ObsTerm(
@@ -119,6 +118,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
                 device=self.device,
             ),
         )
+        self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "joint_pos",
             ObsTerm(
@@ -190,7 +190,10 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
         try:
             if not self.use_threading:
                 obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
-                joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
+                obs = self.obs_manager.get_from_buffer().squeeze()
+                
+                                    
+                joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs)
             else:
                 joint_pos_targets = self.compute_joint_pos_targets()
                 
@@ -208,6 +211,67 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
                     "tau": 0.0,
                 }
                 for i in range(self.robot.num_joints)
+            }
+
+            # Track command preparation time
+            self.cmd_preparation_time = time.perf_counter() - start_time
+
+        except Exception as e:
+            self.logger.error(f"Error computing torques: {e}")
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": self.default_joint_pos[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
+
+        return self.cmd
+    
+
+class RLQuadrupedLocomotionVelocityControllerTorque(RLQuadrupedLocomotionVelocityController):
+    """
+    Velocity-conditioned quadruped RL Locomotion Controller
+    Uses contact-implicit reinforcement learning policy
+    """
+
+    def compute_lowlevelcmd(self, state):
+        """
+        Compute motor commands using the learned policy.
+
+        :param state: Current robot state
+        :return: Motor commands dictionary
+        """
+        if self.robot.mj_model is not None:
+            self.robot.mj_model.update(state)
+
+        start_time = time.perf_counter()
+
+        try:
+            if not self.use_threading:
+                obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
+                obs = self.obs_manager.get_from_buffer().squeeze()
+                
+                                    
+                torques = self.compute_joint_pos_targets_from_policy(obs)
+            else:
+                raise ValueError("Should be run w/o threading for faster inference.")
+                
+            torques = np.clip(torques, -23.5, 23.5)
+
+            # Prepare motor commands
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": 0,
+                    "kp": 0,
+                    "dq": 0.0,
+                    "kd": 0,
+                    "tau": torques[i],
+                }
+                for i in range(12)
             }
 
             # Track command preparation time
@@ -618,11 +682,11 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
 
         from state_manager.observations import (
             ang_vel_b,
-            projected_gravity_b,
             joint_pos_rel,
             joint_vel,
             last_action,
             phase_with_timing,
+            projected_gravity_b,
             velocity_commands,
         )
 

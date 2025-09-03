@@ -5,12 +5,11 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowCmd_ as Go2LowCmd_
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as Go2LowState_
 
 from controllers.rl_contact_locomotion_controller import RLQuadrupedLocomotionContactController
-from controllers.rl_velocity_locomotion_controller import RLQuadrupedLocomotionVelocityController
-from controllers.stand_controller import (
-    Go2StandDownController,
-    Go2StandUpController,
-    Go2StayDownController,
+from controllers.rl_velocity_locomotion_controller import (
+    RLQuadrupedLocomotionVelocityController,
+    RLQuadrupedLocomotionVelocityControllerTorque,
 )
+from controllers.stand_controller import Go2StandDownController, Go2StandUpController, Go2StayDownController
 from robots.robot_base import RobotBase
 from state_manager.msg_handlers import go2_low_state_handler, vicon_handler, sport_mode_state_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
@@ -238,6 +237,7 @@ class Go2(RobotBase):
                 },
                 "LOCOMOTION": {
                     "RL-VELOCITY": RLQuadrupedLocomotionVelocityController,
+                    "RL-VELOCITYTORQUE": RLQuadrupedLocomotionVelocityControllerTorque,
                 },
             }
         else:
