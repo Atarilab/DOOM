@@ -1,109 +1,47 @@
-policy_path: "bimanual_g1/policy_meg.pt"
+policy_path: "bimanual_g1/policy.pt"
 control_dt: 0.001
 decimation: 4
-action_dim: 17
+action_dim: 14
 use_threading: False
 use_buffer: False
-device: "cuda:0"  
+device: "cuda:0"
 horizon_length: 200
 action_filter_alpha: 0.5
-action_scale: 0.2 # 0.25
+action_scale: 0.25 # 0.25
+soft_dof_limit_factor: 0.9
 stiffness: 
   - 40
   - 40
   - 40
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
-  - 35
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+  - 40
+
 
 damping: 
-  - 8
-  - 8
-  - 8
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
-  - 12
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
 
-default_joint_pos: [0.0000,  0.0000,  0.0000,
+default_joint_pos: [
                     -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
                     -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000]
-
-leg_joint2motor_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]  # total 12 motors
-arm_waist_joint2motor_idx:  # total 17 motors
-  - 12
-  - 13
-  - 14
-  - 15
-  - 16
-  - 17
-  - 18
-  - 19
-  - 20
-  - 21
-  - 22
-  - 23
-  - 24
-  - 25
-  - 26
-  - 27
-  - 28
-
-arm_waist_kps: 
-  - 300
-  - 300
-  - 300
-  - 100
-  - 100
-  - 50
-  - 50
-  - 20
-  - 20
-  - 20
-  - 100
-  - 100
-  - 50
-  - 50
-  - 20
-  - 20
-  - 20
-
-arm_waist_kds: 
-  - 3
-  - 3
-  - 3
-  - 2
-  - 2
-  - 2
-  - 2
-  - 1
-  - 1
-  - 1
-  - 2
-  - 2
-  - 2
-  - 2
-  - 1
-  - 1
-  - 1

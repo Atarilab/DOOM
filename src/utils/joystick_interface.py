@@ -45,10 +45,10 @@ class JoystickManager:
         """Initialize joystick and set up button/axis mappings."""
         pygame.init()
         pygame.joystick.init()
-        joystick_count = pygame.joystick.get_count()
+        self.joystick_count = pygame.joystick.get_count()
 
-        if joystick_count <= 0:
-            self.logger.warning("No gamepad detected")
+        if self.joystick_count <= 0:
+            self.logger.warning("No joystick detected")
             return
         self.joystick = pygame.joystick.Joystick(device_id)
         self.joystick.init()
@@ -309,7 +309,9 @@ class JoystickManager:
         """Start the joystick processing thread."""
         if not self._running:
             self._running = True
-
+            if self.joystick_count <= 0:
+                return
+            
             self._thread = threading.Thread(target=self._joystick_thread_func, daemon=not self.debug)
             self._thread.start()
             

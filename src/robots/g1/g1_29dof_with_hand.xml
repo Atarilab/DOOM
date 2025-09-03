@@ -1,5 +1,5 @@
 <mujoco model="g1_29dof_with_hand">
-  <compiler angle="radian" meshdir="meshes" />
+  <compiler angle="radian" meshdir="g1_description/meshes" />
 
   <default>
     <default class="torso_motor">

@@ -108,7 +108,6 @@ async def main_async(args=None):
                 else None
             )
 
-            # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
                 spin_dt = 0.00025  # you could increase this value to reduce the frequency of the callbacks (less CPU utilization)
                 last_spin_time = time.time()
