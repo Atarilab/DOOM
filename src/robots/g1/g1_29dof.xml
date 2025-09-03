@@ -12,10 +12,10 @@
       <joint damping="2" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="arm_motor">
-      <joint damping="0.2" armature="0.01" frictionloss="0.1"/>
+      <joint damping="5" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="wrist_motor">
-      <joint damping="0.2" armature="0.001" frictionloss="0.1"/>
+      <joint damping="5" armature="0.001" frictionloss="0.1"/>
     </default>
     
   </default>

@@ -30,7 +30,7 @@
     <!-- Dynamic cube -->
     <body name="object" pos="0.25 0.0 0.8">
       <joint type="free"/>
-      <geom name="cube_geom" type="box" size="0.12 0.175 0.13" mass="5.0" rgba="0.2 0.6 0.8 1"/>
+      <geom name="cube_geom" type="box" size="0.175 0.12 0.13" mass="5.0" rgba="0.2 0.6 0.8 1"/>
     </body>
   </worldbody>
 </mujoco>
