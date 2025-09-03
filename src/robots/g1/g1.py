@@ -11,6 +11,7 @@ from controllers.rl_velocity_locomotion_controller import (
     RLHumanoidUnitreeLocomotionVelocityController,
 )
 from controllers.stand_controller import G1DefaultHandsController, G1LateralHandsController, G1LocoStandUpController, G1ManiStandUpController, G1ManipulationInitHandsController, G1StayUpController, G1UpperDefaultPosController, G1UpperExtendLateralController, G1UpperHomePosController, G1LowerStandUpController
+from controllers.g1_gain_tuning_controller import G1GainTuningController
 from robots.robot_base import RobotBase
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
 from state_manager.msg_handlers import g1_low_state_handler, g1_upper_low_state_handler, g1_lower_low_state_handler, vicon_handler
@@ -250,6 +251,11 @@ class G1(RobotBase):
         elif "unitree" in self.task:
             controllers["LOCOMOTION"] = {
                     "RL-UNITREE": RLHumanoidUnitreeLocomotionVelocityController,
+                }
+        
+        elif "gain-tuning" in self.task:
+            controllers["TUNING"] = {
+                    "GAIN-TUNING": G1GainTuningController,
                 }
         else:
             raise ValueError(f"Invalid task: {self.task}")
