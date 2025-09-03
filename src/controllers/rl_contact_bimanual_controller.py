@@ -9,6 +9,10 @@ from controllers.rl_controller_base import RLControllerBase
 from state_manager.obs_manager import ObsTerm
 from utils.math import combine_frame_transforms, subtract_frame_transforms
 
+# ROS2 imports for visualization
+from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import ColorRGBA
+
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
 
@@ -22,6 +26,9 @@ class RLHumanoidBimanualContactController(RLControllerBase):
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
 
         super().__init__(robot=robot, configs=configs)
+        
+        # Initialize publishers for visualization
+        self._init_publishers(configs)
 
         self.policy_joint_names = [
             "left_shoulder_pitch_joint",
@@ -67,7 +74,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.non_policy_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0, 0.0, 0.0, 0.0]
         # Contact command parameters
         self.command_duration = 1.3  # Duration of each contact plan in seconds
-        self.object_size = torch.tensor([0.105, 0.14, 0.14], dtype=torch.float32, device=self.device) * 2.0
+        self.object_size = torch.tensor([0.14, 0.105, 0.14], dtype=torch.float32, device=self.device) * 2.0 
 
         # self.repose_contact_plan_ = torch.tensor(
         #     [
@@ -283,6 +290,9 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
         # Compute contact poses
         self._update_contact_poses()
+        
+        # Publish visualizations to RViz
+        self.pub_all_visualizations()
 
         try:
             # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
@@ -361,7 +371,6 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             # Get object pose from state
             object_pos_w = torch.tensor(self.latest_state["object/base_pos_w"], dtype=torch.float32, device=self.device)
             object_quat_w = torch.tensor(self.latest_state["object/base_quat"], dtype=torch.float32, device=self.device)
-            
             # self.logger.debug(f"Object pose: {object_pos_w}, {object_quat_w}")
             
             # Get robot base pose
@@ -526,3 +535,194 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
             if self.logger is not None:
                 self.logger.debug("Reset command duration to default")
+
+
+    """
+    Helper functions to initialize publishers for visualization.
+    """
+
+    def _init_publishers(self, configs):
+        """
+        Initialize publishers for visualization.
+        """
+        # Initialize visualization flags from configs
+        self.visualize = {
+            key: configs["controller_config"]["visualize"][key] for key in configs["controller_config"]["visualize"]
+        }
+
+        if self.visualize.get("object_pose", False):
+            # Add marker publisher for cuboid visualization
+            self.object_marker_pub = self.create_publisher(Marker, "object_marker", 10)
+        if self.visualize.get("contact_positions", False):
+            # Add marker publisher for contact positions
+            self.contact_markers_pub = self.create_publisher(MarkerArray, "contact_markers", 10)
+        if self.visualize.get("desired_object_pose", False):
+            # Add marker publisher for desired object pose
+            self.desired_object_marker_pub = self.create_publisher(Marker, "desired_object_marker", 10)
+
+    def pub_object_pose(self):
+        """
+        Publish the current object pose as a cuboid marker in RViz.
+        """
+        try:
+            if not hasattr(self, 'latest_state') or "object/base_pos_w" not in self.latest_state:
+
+                return
+                
+            # Check if publisher is initialized
+            if not hasattr(self, 'object_marker_pub'):
+                return
+                
+            # Get object pose from state
+            object_pos_w = torch.tensor(self.latest_state["object/base_pos_w"], dtype=torch.float32, device=self.device)
+            object_quat_w = torch.tensor(self.latest_state["object/base_quat"], dtype=torch.float32, device=self.device)
+            
+
+            # Create cuboid marker
+            marker = Marker()
+            marker.header.frame_id = "world"
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = "object"
+            marker.id = 0
+            marker.type = Marker.CUBE
+            marker.action = Marker.ADD
+            
+            # Set position and orientation
+            marker.pose.position.x = float(object_pos_w[0])
+            marker.pose.position.y = float(object_pos_w[1])
+            marker.pose.position.z = float(object_pos_w[2])
+            marker.pose.orientation.w = float(obcjet_quat_w[0])
+            marker.pose.orientation.x = float(object_quat_w[1])
+            marker.pose.orientation.y = float(object_quat_w[2])
+            marker.pose.orientation.z = float(object_quat_w[3])
+            
+            # Set scale (cuboid size) - ensure minimum size for visibility
+            marker.scale.x = max(float(self.object_size[0]), 0.1)  # Minimum 10cm
+            marker.scale.y = max(float(self.object_size[1]), 0.1)  # Minimum 10cm
+            marker.scale.z = max(float(self.object_size[2]), 0.1)  # Minimum 10cm
+            
+            # Set color (blue with transparency)
+            marker.color = ColorRGBA(r=0.0, g=0.5, b=1.0, a=1.0)  # Increased alpha to 1.0 for better visibility
+            
+            # Publish marker
+            self.object_marker_pub.publish(marker)
+            
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Failed to publish object pose: {e}")
+
+    def pub_contact_positions(self):
+        """
+        Publish the contact positions as sphere markers in RViz.
+        """
+        try:
+            # Check if publisher is initialized
+            if not hasattr(self, 'contact_markers_pub'):
+                return
+                
+            # Create marker array for contact positions
+            marker_array = MarkerArray()
+            
+            # Colors for each contact point
+            colors = [
+                ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Red for first contact
+                ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Green for second contact
+            ]
+            
+            for i in range(2):
+                marker = Marker()
+                marker.header.frame_id = "world"
+                marker.header.stamp = self.get_clock().now().to_msg()
+                marker.ns = "contact_positions"
+                marker.id = i
+                marker.type = Marker.SPHERE
+                marker.action = Marker.ADD
+                
+                # Set position from contact_pose_w
+                marker.pose.position.x = float(self.contact_pose_w[i, 0])
+                marker.pose.position.y = float(self.contact_pose_w[i, 1])
+                marker.pose.position.z = float(self.contact_pose_w[i, 2])
+                
+                # Set orientation (identity quaternion)
+                marker.pose.orientation.w = 1.0
+                marker.pose.orientation.x = 0.0
+                marker.pose.orientation.y = 0.0
+                marker.pose.orientation.z = 0.0
+                
+                # Set scale (sphere radius)
+                marker.scale.x = 0.03
+                marker.scale.y = 0.03
+                marker.scale.z = 0.03
+                
+                # Set color
+                marker.color = colors[i]
+                
+                marker_array.markers.append(marker)
+            
+            # Publish marker array
+            self.contact_markers_pub.publish(marker_array)
+            
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Failed to publish contact positions: {e}")
+
+    def pub_desired_object_pose(self):
+        """
+        Publish the desired object pose as a wireframe cuboid marker in RViz.
+        """
+        try:
+            # Check if publisher is initialized
+            if not hasattr(self, 'desired_object_marker_pub'):
+                return
+                
+            # Create wireframe cuboid marker
+            marker = Marker()
+            marker.header.frame_id = "world"
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = "desired_object"
+            marker.id = 0
+            marker.type = Marker.CUBE
+            marker.action = Marker.ADD
+            
+            # Set position and orientation from object_goal_pose_w
+            marker.pose.position.x = float(self.object_goal_pose_w[0])
+            marker.pose.position.y = float(self.object_goal_pose_w[1])
+            marker.pose.position.z = float(self.object_goal_pose_w[2])
+            marker.pose.orientation.w = float(self.object_goal_pose_w[3])
+            marker.pose.orientation.x = float(self.object_goal_pose_w[4])
+            marker.pose.orientation.y = float(self.object_goal_pose_w[5])
+            marker.pose.orientation.z = float(self.object_goal_pose_w[6])
+            
+            # Set scale (cuboid size)
+            marker.scale.x = float(self.object_size[0])
+            marker.scale.y = float(self.object_size[1])
+            marker.scale.z = float(self.object_size[2])
+            
+            # Set color (green wireframe for desired pose)
+            marker.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.3)
+            
+            # Publish marker
+            self.desired_object_marker_pub.publish(marker)
+
+            
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Failed to publish desired object pose: {e}")
+
+    def pub_all_visualizations(self):
+        """
+        Publish all visualization data to RViz.
+        """
+        try:
+            if hasattr(self, 'visualize'):
+                if self.visualize.get("object_pose", False):
+                    self.pub_object_pose()
+                if self.visualize.get("contact_positions", False):
+                    self.pub_contact_positions()
+                if self.visualize.get("desired_object_pose", False):
+
+                    self.pub_desired_object_pose()
+
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Failed to publish visualizations: {e}")
