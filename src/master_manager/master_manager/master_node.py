@@ -6,7 +6,7 @@ import time
 from typing import Optional
 
 import rclpy
-from controllers.rl_controller import RLLocomotionVelocityController,RLLocomotionVelocitySineController, GlobalRLLocomotionVelocityControllerBox
+from controllers.rl_controller import RLLocomotionVelocityController,RLLocomotionVelocitySineController, GlobalRLLocomotionVelocityControllerBox, RLLocomotionVelocityControllerTorque
 from controllers.rl_contact_controller import RLLocomotionContactController
 from controllers.stand_controller import (
     IdleController,
@@ -122,6 +122,8 @@ class LowLevelCmdPublisher(Node):
 
             # Calculate actual time since last callback
             time_since_last_callback = current_time - self.last_callback_time
+            self.logger.debug(f"Time since last low_level_cmd_callback: {time_since_last_callback}")
+            
 
             # Update joystick state and handle mode switching
             joystick_state = self.joystick_manager.update()
@@ -142,6 +144,8 @@ class LowLevelCmdPublisher(Node):
             # Compute motor commands
             try:
                 motor_commands = active_controller.compute_torques(combined_state, {})
+                self.logger.debug(f"motor_commands after calling active_controller.compute_torques: {motor_commands}")
+                
             except Exception as e:
                 self.logger.error(f"Error computing motor commands: {e}")
                 return
@@ -339,6 +343,7 @@ async def main_async(args=None):
                 {
                     "STANCE": StanceController(mj_model_wrapper, configs),
                     "RL-VELOCITY": RLLocomotionVelocityController(mj_model_wrapper=mj_model_wrapper, configs=configs),
+                    "RL-VELOCITYTORQUE": RLLocomotionVelocityControllerTorque(mj_model_wrapper=mj_model_wrapper, configs=configs),
                     "RL-SINE-VELOCITY": RLLocomotionVelocitySineController(mj_model_wrapper=mj_model_wrapper, configs=configs),
                     "RL-GLOBAL-VELOCITY-BOX": GlobalRLLocomotionVelocityControllerBox(mj_model_wrapper=mj_model_wrapper, configs=configs),
                 },
@@ -359,7 +364,7 @@ async def main_async(args=None):
 
             # Use rclpy.spin_once() in a loop to ensure callbacks are processed
             def spin_node():
-                spin_dt = 0.0001
+                spin_dt = 0.005
                 last_spin_time = time.time()
 
                 while rclpy.ok():

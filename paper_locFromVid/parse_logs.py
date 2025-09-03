@@ -114,7 +114,7 @@ def plot(data, metric, output_dir, target=None, x_values_for_vlines=None):
 if __name__ == "__main__":
     base_folder = "src/logs/"
     experiment_string = "locFromVid"
-    target_file_name = "rl-velocity-sim-go2_robot_controller.log"
+    target_file_name = "rl-velocity-real-go2_robot_controller.log"
     data_key = "LOC-FROM-VID-PAPER-EXP-01"
 
     pattern = re.compile(r"locFromVid_x(-?\d+\.?\d*)y(-?\d+\.?\d*)yaw(-?\d+\.?\d*)")

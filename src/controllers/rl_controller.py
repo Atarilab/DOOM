@@ -184,7 +184,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                         obs = self.obs_manager.compute(current_state)
                         obs_tensor = torch.cat([v.reshape(-1) for v in obs.values()])
                         self.obs_buffer.add(obs_tensor.unsqueeze(0))
-                        # self.command_manager.logger.debug(f"Obs: {obs}")
+                        self.command_manager.logger.debug(f"New obs in _process_observations: {obs}")
                         
                     except Exception as e:
                         print(f"Error converting observations to tensor: {e}")
@@ -214,7 +214,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         while True:
             try:
                 if not self.active:
-                    time.sleep(0.01)
+                    time.sleep(0.1)
                     continue
 
                 # Calculate time since last iteration
@@ -262,7 +262,6 @@ class BaseRLLocomotionController(ControllerBase, Node):
         
         loc_from_vid_paper_01_log["state"] = state
 
-        start_time = time.perf_counter()
 
         try:
             # Ensure we have processed observations and have a valid action
@@ -478,6 +477,90 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         """Runs when the mode is changed in the UI."""
         super().set_mode()
         self.velocity_commands = torch.zeros_like(self.velocity_commands)
+        
+
+class RLLocomotionVelocityControllerTorque(RLLocomotionVelocityController):
+    """
+    Velocity-conditioned RL Locomotion Controller
+    Uses contact-implicit reinforcement learning policy
+    """
+
+    def __init__(self, mj_model_wrapper: "MjQuadRobotWrapper", configs: Dict[str, Any]):
+        super().__init__(mj_model_wrapper=mj_model_wrapper, configs=configs)
+        
+    def compute_torques(self, state, desired_goal):
+        """
+        Compute motor commands using the learned policy.
+
+        :param state: Current robot state
+        :param desired_goal: Desired goal state (not used in this implementation)
+        :return: Motor commands dictionary
+        """
+        
+        # only call grandparents class
+        if self.mj_model_wrapper is not None:
+            self.mj_model_wrapper.update(state)
+        
+        # latent_torque_paper_01_log = {}
+        
+        # latent_torque_paper_01_log["state"] = state
+
+        start_time = time.perf_counter()
+
+        try:
+            # Ensure we have processed observations and have a valid action
+            if self.obs_buffer.get().numel() == 0 or self.obs_buffer.get().sum() == 0:
+                # TODO compute torques based on default standing position
+                torques = torch.zeros(12).cpu().numpy()[self.actions_isaac_to_unitree_mapping]
+            else:
+                # Apply exponential moving average filter to smooth actions
+                if self.is_first_action:
+                    self.filtered_action = self.raw_action
+                    self.is_first_action = False
+                else:
+                    # EMA filter: filtered = alpha * new + (1 - alpha) * previous
+                    self.filtered_action = (
+                        self.action_filter_alpha * self.raw_action
+                        + (1 - self.action_filter_alpha) * self.filtered_action
+                    )
+                    
+                torques = (self.filtered_action * self.action_scale).cpu().numpy()[self.actions_isaac_to_unitree_mapping]
+                
+
+            torques = np.clip(torques, -23, 23)
+
+            try:
+                if self.logged_params == False: 
+                    self.log_params()
+                    self.logged_params = True
+            except Exception as e:
+                self.command_manager.logger.debug(f"Error logging params: {e}")
+
+            # Prepare motor commands
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": 0,
+                    "kp": 0,
+                    "dq": 0.0,
+                    "kd": 0,
+                    "tau": torques[i],
+                }
+                for i in range(12)
+            }
+            
+            # Track command preparation time
+            self.cmd_preparation_time = time.perf_counter() - start_time
+
+            return self.cmd
+
+        except Exception as e:
+            print(f"Command preparation error: {e}")
+            self.command_manager.logger.debug(
+                f"Command preparation error: {e}"
+            )
+            return self.cmd
+
+      
         
 class GlobalRLLocomotionVelocityControllerBox(BaseRLLocomotionController):
     """

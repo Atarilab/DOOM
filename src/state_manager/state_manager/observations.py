@@ -130,8 +130,8 @@ def relative_distance_to_box(states: Dict[str, Any]) -> torch.Tensor:
     Distance between robot base and start of the box.
     """
     
-    
-    return torch.tensor(states["base_pos_w"][0] - states["object_pos_w"][0]- 0.3)
+    # TODO clip
+    return torch.tensor(states["base_pos_w"][0] - states["object_pos_w"][0] - 0.02)
 
 
 def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
@@ -139,7 +139,7 @@ def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
     This is just the height of the box.
     """
     
-    return torch.tensor([0.30])
+    return torch.tensor([0.32])
 
 def starting_time(states: Dict[str, Any]):
     return time.time()
