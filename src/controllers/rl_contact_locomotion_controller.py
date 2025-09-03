@@ -57,7 +57,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.future_feet_positions_init_frame = None
         self.horizon_length = configs["controller_config"]["horizon_length"]
         self.feet_step_size = configs["controller_config"]["feet_step_size"]
-        self.base_link = "base_link"
+        self.base_link = self.robot.base_link
         self.lateral_pos = 0.0
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3, device=self.device)
@@ -907,7 +907,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         try:
             # Publish feet locations
             feet_errors_msg = MarkerArray()
-            feet_names = ["FL", "FR", "RL", "RR"]
+            ee_names = ["FL", "FR", "RL", "RR"]
             colors = [
                 ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Red for FL
                 ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Green for FR
@@ -917,11 +917,11 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
             # Get feet positions from the state manager
             feet_errors = (
-                self.robot.mj_model.get_feet_positions_world()
+                self.robot.mj_model.get_ee_positions_w()
                 - self.future_feet_positions_w[:, self.current_goal_idx].numpy()
             )
             if feet_errors is not None:
-                for i, (name, color) in enumerate(zip(feet_names, colors)):
+                for i, (name, color) in enumerate(zip(ee_names, colors)):
                     marker = Marker()
                     marker.header.frame_id = "world"
                     marker.header.stamp = self.get_clock().now().to_msg()
@@ -1080,7 +1080,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         try:
             # Calculate error norms directly
             feet_errors = np.linalg.norm(
-                self.robot.mj_model.get_feet_positions_world()
+                self.robot.mj_model.get_ee_positions_w()
                 - self.future_feet_positions_w[:, self.current_goal_idx].numpy(),
                 axis=-1,
             )
@@ -1168,7 +1168,7 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
         super().__init__(robot, configs)
         
         self.default_offset = torch.tensor([[0.35, 0.15, 0.0], [0.35, -0.15, 0.0], [-0.8, 0.15, 0.0], [-0.8, -0.15, 0.0]])
-        self.base_link = "torso_link"
+        self.base_link = self.robot.base_link
         
     def register_observations(self):
         """

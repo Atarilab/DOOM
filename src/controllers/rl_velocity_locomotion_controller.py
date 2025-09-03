@@ -307,7 +307,8 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
         # Pre-allocate motor command dictionary
         self.G1_NUM_MOTOR = 29
         self.cmd = {f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(self.G1_NUM_MOTOR)}
-        self.cmd["mode_pr"] = 0  # Mode.PR
+        # self.cmd["mode_pr"] = self.robot.MotorMode.PR
+        # self.cmd["mode_machine"] = 0
         self.default_joint_pos_np = self.default_joint_pos.cpu().numpy()
         self.Kp = configs["controller_config"]["stiffness"]
         self.Kd = configs["controller_config"]["damping"]
@@ -315,6 +316,8 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
         self.control_dt = configs["controller_config"]["control_dt"]
         self.counter = 0
         self.joint_pos_targets = self.default_joint_pos.clone()
+        self.num_actuated_joints = len(self.robot.actuated_joint_names)
+        self.actions_mapping = np.arange(self.num_actuated_joints)
 
 
     def set_mode(self):
@@ -422,19 +425,19 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 joint_pos_rel,
                 params={
                     "default_joint_pos": self.default_joint_pos_np,
-                    "mapping": self.robot.joints_isaac2unitree,
+                    "mapping": self.robot.actuated_joint_indices,
                 },
-                obs_dim=29,
+                obs_dim=self.num_actuated_joints,
                 device=self.device,
             ),
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.robot.joints_isaac2unitree}, obs_dim=29, device=self.device),
+            ObsTerm(joint_vel, obs_dim=self.num_actuated_joints, params={"mapping": self.robot.actuated_joint_indices}, device=self.device),
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=29, device=self.device),
+            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=self.num_actuated_joints, device=self.device),
         )
         
     def compute_lowlevelcmd(self, state):
@@ -462,33 +465,38 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 #     self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
 
                 # Prepare motor commands
-                self.cmd = {
-                    f"motor_{i}": {
+                for i, motor_idx in enumerate(self.robot.actuated_joint_indices):
+                    self.cmd[f"motor_{motor_idx}"] = {
                         "q": self.joint_pos_targets[i],
                         "kp": self.Kp[i],
                         "dq": 0.0,
                         "kd": self.Kd[i],
                         "tau": 0.0,
                     }
-                    for i in range(self.robot.num_joints)
-                }
+                for i, motor_idx in enumerate(self.robot.non_actuated_joint_indices):
+                    self.cmd[f"motor_{motor_idx}"] = {
+                        "q": 0.0,
+                        "kp": 0.0,
+                        "dq": 0.0,
+                        "kd": 0.0,
+                        "tau": 0.0,
+                    }
 
-                self.logger.debug(f"Joint pos targets: {self.joint_pos_targets}")
                 # Track command preparation time
                 self.cmd_preparation_time = time.perf_counter() - start_time
 
             except Exception as e:
                 self.logger.error(f"Error computing torques: {e}")
-                self.cmd = {
-                    f"motor_{i}": {
-                        "q": self.default_joint_pos[i],
-                        "kp": self.Kp[i],
+                self.cmd = {}
+
+                for i in range(self.robot.num_joints):
+                    self.cmd[f"motor_{i}"] = {
+                        "q": 0.0,
+                        "kp": 0.0,
                         "dq": 0.0,
-                        "kd": self.Kd[i],
+                        "kd": 0.0,
                         "tau": 0.0,
                     }
-                    for i in range(self.robot.num_joints)
-                }
 
         return self.cmd
         
@@ -537,12 +545,14 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 {
                     "x_velocity": self.velocity_commands[0] + 0.1,
                     "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2],
                 }
             ),
             "down": lambda: self.change_commands(
                 {
                     "x_velocity": self.velocity_commands[0] - 0.1,
                     "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2],
                 }
             ),
             # Y-Velocity
@@ -550,12 +560,28 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 {
                     "x_velocity": self.velocity_commands[0],
                     "y_velocity": self.velocity_commands[1] + 0.1,
+                    "yaw": self.velocity_commands[2],
                 }
             ),
             "right": lambda: self.change_commands(
                 {
                     "x_velocity": self.velocity_commands[0],
                     "y_velocity": self.velocity_commands[1] - 0.1,
+                    "yaw": self.velocity_commands[2],
+                }
+            ),
+            "L2": lambda: self.change_commands(
+                {
+                    "x_velocity": self.velocity_commands[0],
+                    "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2] + 0.1,
+                }
+            ),
+            "R2": lambda: self.change_commands(
+                {
+                    "x_velocity": self.velocity_commands[0],
+                    "y_velocity": self.velocity_commands[1],
+                    "yaw": self.velocity_commands[2] - 0.1,
                 }
             ),
         }

@@ -23,41 +23,64 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
         super().__init__(robot=robot, configs=configs)
 
+        self.policy_joint_names = [
+            "left_shoulder_pitch_joint",
+            "left_shoulder_roll_joint",
+            "left_shoulder_yaw_joint",
+            "left_elbow_joint",
+            "left_wrist_roll_joint",
+            "left_wrist_pitch_joint",
+            "left_wrist_yaw_joint",
+            
+            "right_shoulder_pitch_joint",
+            "right_shoulder_roll_joint",
+            "right_shoulder_yaw_joint",
+            "right_elbow_joint",
+            "right_wrist_roll_joint",
+            "right_wrist_pitch_joint",
+            "right_wrist_yaw_joint",
+        ]
         
+        self.policy_joint_indices = [self.robot.actuated_joint_names.index(joint_name) for joint_name in self.policy_joint_names]
+        self.non_policy_joint_names = [
+            "left_hip_pitch_joint",
+            "left_hip_roll_joint",
+            "left_hip_yaw_joint",
+            "left_knee_joint",
+            "left_ankle_pitch_joint",
+            "left_ankle_roll_joint",
+            
+            "right_hip_pitch_joint",
+            "right_hip_roll_joint",
+            "right_hip_yaw_joint",
+            "right_knee_joint",
+            "right_ankle_pitch_joint",
+            "right_ankle_roll_joint",
+            
+            "waist_yaw_joint",
+            "waist_roll_joint",
+            "waist_pitch_joint",
+        ]
+        self.non_policy_joint_indices = [self.robot.actuated_joint_names.index(joint_name) for joint_name in self.non_policy_joint_names if joint_name in self.robot.actuated_joint_names + self.robot.non_actuated_joint_names]
+        self.non_policy_joint_Kps = [50, 50, 50, 75, 20, 20, 50, 50, 50, 75, 20, 20, 150, 150, 150, 150]
+        self.non_policy_joint_Kds = [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2, 3, 3, 3]
+        self.non_policy_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0, 0.0, 0.0, 0.0]
         # Contact command parameters
-        self.command_duration = 1.0  # Duration of each contact plan in seconds
-        self.object_size = torch.tensor([0.25, 0.25, 0.25], dtype=torch.float32, device=self.device)
+        self.command_duration = 1.3  # Duration of each contact plan in seconds
+        self.object_size = torch.tensor([0.105, 0.14, 0.14], dtype=torch.float32, device=self.device) * 2.0
 
+        # self.repose_contact_plan_ = torch.tensor(
+        #     [
+        #         [False, False, True, True, True, True, True, True, True, True, True, True],
+        #         [False, False, True, True, True, True, True, True, True, True, True, True],
+        #     ], 
+        #     dtype=torch.bool, device=self.device
+        # )
+        
         self.repose_contact_plan_ = torch.tensor(
             [
-                [
-                    False,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                ],
-                [
-                    False,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                    True,
-                ],
+                [False, False, False, False, False, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, False, False, False, False, False, False],
             ], 
             dtype=torch.bool, device=self.device
         )
@@ -69,73 +92,6 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.current_goal_idx = 0
         self.current_contact_plan = self.repose_contact_plan_[:, self.current_goal_idx : 2]
         self.goal_completion_counter = 0
-
-        self.leg_joint2motor_idx = configs["controller_config"]["leg_joint2motor_idx"]
-        self.arm_waist_joint2motor_idx = configs["controller_config"]["arm_waist_joint2motor_idx"]
-        
-        self.default_leg_pos = [-0.1,  0.0,  0.0,  0.3, -0.2, 0.0, 
-                  -0.1,  0.0,  0.0,  0.3, -0.2, 0.0]
-        
-        self.leg_kps = [
-            60,
-            60,
-            60,
-            100,
-            40,
-            40,  # legs
-            60,
-            60,
-            60,
-            100,
-            40,
-            40,  # legs
-            
-        ]
-        
-        self.leg_kds = [
-            1,
-            1,
-            1,
-            2,
-            1,
-            1,  # legs
-            1,
-            1,
-            1,
-            2,
-            1,
-            1,  # legs
-            
-        ]
-
-        self.actuated_joint_names = [
-            "waist_yaw_joint",
-            "waist_roll_joint",
-            "waist_pitch_joint",
-            "left_shoulder_pitch_joint",
-            "left_shoulder_roll_joint",
-            "left_shoulder_yaw_joint",
-            "left_elbow_joint",
-            "left_wrist_roll_joint",
-            "left_wrist_pitch_joint",
-            "left_wrist_yaw_joint",
-            "right_shoulder_pitch_joint",
-            "right_shoulder_roll_joint",
-            "right_shoulder_yaw_joint",
-            "right_elbow_joint",
-            "right_wrist_roll_joint",
-            "right_wrist_pitch_joint",
-            "right_wrist_yaw_joint",
-        ]
-
-        self.motor_joint_indices = [i-1 for i in self.robot.mj_model.joint_names.values()]
-
-
-        self.actuated_joint_indices = [
-            self.robot.mj_model.joint_names[joint_name] - 1 for joint_name in self.actuated_joint_names
-        ]
-        self.non_actuated_joint_indices = [i for i in self.motor_joint_indices if i not in self.actuated_joint_indices]
-
         
         self.repose_contact_pos_o = torch.tensor([
                 [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],
@@ -167,7 +123,12 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.contact_pose_b = torch.zeros_like(self.contact_pose_o)
         self.contact_pose_w = torch.zeros_like(self.contact_pose_o)
         
-        self.actions_mapping = torch.arange(len(self.actuated_joint_indices), dtype=torch.int32, device=self.device)
+        self.actions_mapping = torch.arange(len(self.policy_joint_indices), dtype=torch.int32, device=self.device)
+        
+        self.object_goal_pose_w = torch.zeros(7, dtype=torch.float32, device=self.device)
+        self.object_goal_pose_w[:3] = torch.tensor([0.25, 0.0, 0.7], dtype=torch.float32, device=self.device)
+        self.object_goal_pose_w[2] += self.object_size[2] / 2
+        self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
 
     def register_observations(self):
         """
@@ -175,33 +136,29 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         Includes contact pattern and timing information.
         """
         from state_manager.observations import (
-            ang_vel_w,
-            contact_locations_b,
             contact_plan,
             contact_time_left,
-            contact_pose_b,
-            dummy_contact_status,
-            ee_pos_rel_b,
-            joint_pos_limit_normalized,
+            object_pos_robot_xy_frame,
+            root_quat_w,
+            contact_pos_error,
+            lin_vel_w,
+            ang_vel_w,
+            joint_pos_rel,
             joint_vel,
             last_action,
-            lin_vel_w,
-            object_size,
-            object_pose_command_b,
             goal_pose_diff,
-            root_pos_w,
-            root_quat_w,
         )
 
+        # - Joint observations
         self.obs_manager.register(
             "joint_pos",
             ObsTerm(
-                joint_pos_limit_normalized,
+                joint_pos_rel,
                 params={
-                    "soft_dof_limits": self.soft_dof_pos_limit,
-                    "mapping": self.actuated_joint_indices,
+                    "default_joint_pos": self.default_joint_pos_np,
+                    "mapping": self.policy_joint_indices,
                 },
-                obs_dim=len(self.actuated_joint_indices),
+                obs_dim=len(self.policy_joint_names),
                 device=self.device,
             ),
         )
@@ -210,25 +167,26 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             ObsTerm(
                 joint_vel,
                 params={
-                    "mapping": self.actuated_joint_indices,
+                    "mapping": self.policy_joint_indices,
+                    # "scale": 0.2,
                 },
-                obs_dim=len(self.actuated_joint_indices),
+                obs_dim=len(self.policy_joint_names),
                 device=self.device,
             ),
         )
-
+        
+        # - Object observations
         self.obs_manager.register(
-            "object_pos_w",
+            "object_pos_robot_xy_frame",
             ObsTerm(
-                root_pos_w,
+                object_pos_robot_xy_frame,
                 params={"asset_name": "object"},
                 obs_dim=3,
                 device=self.device,
             ),
         )
-
         self.obs_manager.register(
-            "object_quat",
+            "object_quat_w",
             ObsTerm(
                 root_quat_w,
                 params={"asset_name": "object"},
@@ -236,22 +194,10 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 device=self.device,
             ),
         )
-
         self.obs_manager.register("object_lin_vel_w", ObsTerm(lin_vel_w, params={"asset_name": "object"}, obs_dim=3, device=self.device))
         self.obs_manager.register("object_ang_vel_w", ObsTerm(ang_vel_w, params={"asset_name": "object"}, obs_dim=3, device=self.device))
 
-        # Register contact pose observation
-        self.obs_manager.register(
-            "contact_pose_b",
-            ObsTerm(
-                contact_pose_b,
-                params={"contact_pose_b": lambda: self.contact_pose_b},
-                obs_dim=14,  # 2 end-effectors * 7 (3 pos + 4 quat)
-                device=self.device,
-            ),
-        )
-
-
+        # - Contact observations
         self.obs_manager.register(
             "contact_time_left",
             ObsTerm(contact_time_left, params={"contact_time_left": lambda: self.time_left}, obs_dim=1, device=self.device),
@@ -265,14 +211,23 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 device=self.device,
             ),
         )
+        self.obs_manager.register(
+            "contact_pos_error",
+            ObsTerm(
+                contact_pos_error,
+                params={"contact_pose_w": lambda: self.contact_pose_w, "mj_model": self.robot.mj_model},
+                obs_dim=6,
+                device=self.device,
+            ),
+        )
         
-        self.obs_manager.register("object_pose_command_b", ObsTerm(object_pose_command_b, obs_dim=7, device=self.device))
-        self.obs_manager.register("goal_pose_diff", ObsTerm(goal_pose_diff, params={"asset_name": "object"}, obs_dim=7, device=self.device))
-
-        #########################################
+        # - Object command observations
+        self.obs_manager.register("goal_pose_diff", ObsTerm(goal_pose_diff, params={"asset_name": "object", "goal_pose_w": lambda: self.object_goal_pose_w}, obs_dim=7, device=self.device))
+        
+        # - Action observation
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=len(self.actuated_joint_indices), device=self.device),
+            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=len(self.policy_joint_indices), device=self.device),
         )
 
     def register_commands(self):
@@ -296,9 +251,10 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
         # Set default gait to stance when switching back to RL controller
         with self._command_lock:
+            self.current_goal_idx = 0
             self.current_contact_plan = self.repose_contact_plan_[:, 0:2]
 
-            self.command_duration = 1.0
+            self.command_duration = 1.3
 
     def compute_lowlevelcmd(self, state):
         """
@@ -334,35 +290,37 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             if self.counter % self.decimation == 0:
                 if not self.use_threading:
                     obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
-                    self.joint_pos_targets[self.actuated_joint_indices] = self.compute_joint_pos_targets_from_policy(obs_tensor)
+                    self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets_from_policy(obs_tensor)
                 else:
-                    self.joint_pos_targets[self.actuated_joint_indices] = self.compute_joint_pos_targets()
+                    self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets()
                     
-            self.joint_pos_targets[self.non_actuated_joint_indices] = 0.0
+            # self.joint_pos_targets[self.non_actuated_joint_indices] = 0.0
                 
             # # Clip the joint pos targets for safety
-            # if hasattr(self, "soft_dof_pos_limit"):
-            #     self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
-                
-            # First, set commands for actuated joints as before
+            if hasattr(self, "soft_dof_pos_limit"):
+                self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
             
-            for idx, joint_idx in enumerate(self.actuated_joint_indices):
+
+            # # Log each observation with key and value from 
+            # for name, obs_term in self.obs_manager.obs_terms.items():
+            #     self.logger.debug(f"{name}: {obs_term(self.latest_state, 0)}")
+            # self.logger.debug(f"Joint pos targets: {self.joint_pos_targets[self.robot.actuated_joint_indices]}")
+        
+            for idx, joint_idx in enumerate(self.policy_joint_indices):
                 self.cmd[f"motor_{joint_idx}"] = {
-                    "q": self.joint_pos_targets[joint_idx],
+                    "q": self.joint_pos_targets[idx],
                     # "q": self.default_joint_pos_np[idx],
                     "kp": self.Kp[idx],
                     "dq": 0.0,
                     "kd": self.Kd[idx],
                     "tau": 0.0,
                 }
-            for idx, joint_idx in enumerate(self.non_actuated_joint_indices):
+            for idx, joint_idx in enumerate(self.non_policy_joint_indices):
                 self.cmd[f"motor_{joint_idx}"] = {
-                    "q": self.default_leg_pos[idx],
-                    # "kp": self.leg_kps[idx],
-                    "kp": 0.0,
+                    "q": self.non_policy_default_angles[idx],
+                    "kp": self.non_policy_joint_Kps[idx],
                     "dq": 0.0,
-                    # "kd": self.leg_kds[idx],
-                    "kd": 0.0,
+                    "kd": self.non_policy_joint_Kds[idx],
                     "tau": 0.0,
                 }
 
@@ -371,22 +329,18 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
         except Exception as e:
             self.logger.error(f"Error computing torques: {e}")
-            for i, joint_idx in enumerate(self.actuated_joint_indices):
+            for i, joint_idx in enumerate(self.robot.actuated_joint_indices):
                 self.cmd[f"motor_{joint_idx}"] = {
-                    "q": self.default_joint_pos_np[i],
+                    "q": 0.0,
                     "kp": 0.0,
                     "dq": 0.0,
                     "kd": 0.0,
                     "tau": 0.0,
                 }
-            for idx, joint_idx in enumerate(self.non_actuated_joint_indices):
-                self.cmd[f"motor_{joint_idx}"] = {
-                    "q": self.default_leg_pos[idx],
-                    "kp": self.leg_kps[idx],
-                    "dq": 0.0,
-                    "kd": self.leg_kds[idx],
-                    "tau": 0.0,
-                }
+
+                
+        self.cmd["mode_pr"] = self.robot.MotorMode.PR
+        self.cmd["mode_machine"] = state["mode_machine"]
 
         return self.cmd
 
@@ -407,6 +361,8 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             # Get object pose from state
             object_pos_w = torch.tensor(self.latest_state["object/base_pos_w"], dtype=torch.float32, device=self.device)
             object_quat_w = torch.tensor(self.latest_state["object/base_quat"], dtype=torch.float32, device=self.device)
+            
+            # self.logger.debug(f"Object pose: {object_pos_w}, {object_quat_w}")
             
             # Get robot base pose
             robot_pos_w = torch.tensor(self.latest_state["robot/base_pos_w"], dtype=torch.float32, device=self.device)
@@ -458,7 +414,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 self._update_contact_pose_o()
 
                 if self.current_goal_idx >= self.repose_contact_pos_o.shape[0]-1:
-                    self.current_goal_idx = 0
+                    self.current_goal_idx = 2
                     
                 self.logger.info(f"Current goal index: {self.current_goal_idx}")
 
@@ -548,10 +504,10 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         with self._command_lock:
             if direction == "increase":
                 # Increase command duration
-                self.pending_command_duration = min(1.0, self.command_duration + duration_change)
+                self.pending_command_duration = min(1.5, self.command_duration + duration_change)
             elif direction == "decrease":
                 # Decrease command duration (with a minimum value)
-                self.pending_command_duration = max(0.1, self.command_duration - duration_change)
+                self.pending_command_duration = max(1.0, self.command_duration - duration_change)
             elif direction == "default":
                 self.pending_command_duration = 1.0
 
@@ -565,7 +521,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         """Reset command duration and offset values to default."""
         with self._command_lock:
             # Reset command duration
-            self.pending_command_duration = 1.0
+            self.pending_command_duration = 1.3
             self.command_duration_change_pending = True
 
             if self.logger is not None:

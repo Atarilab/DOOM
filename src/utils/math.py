@@ -82,8 +82,17 @@ def quat_to_rotmatrix(q: np.ndarray, order="wxyz") -> np.ndarray:
 
     :return : The corresponding rotation matrix. Shape is (3,3)
     """
+    q = np.array(q)
+    
+    # Normalize quaternion to handle zero norm cases
+    norm = np.linalg.norm(q)
+    if norm < 1e-8:
+        # If quaternion is zero or very small, return identity matrix
+        return np.eye(3)
+    
+    q = q / norm
+    
     if order == "wxyz":
-        q = np.array(q)
         q = q[[1, 2, 3, 0]]
 
     rot_matrix = R.from_quat(q).as_matrix()

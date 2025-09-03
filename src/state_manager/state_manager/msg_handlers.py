@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import numpy as np
 
@@ -85,7 +85,7 @@ def go2_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger]
     return states
 
 
-def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None) -> Dict[str, np.ndarray]:
+def vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = None) -> Dict[str, np.ndarray]:
     """
     Handles Vicon messages to extract base states and estimate velocities.
 
@@ -101,47 +101,46 @@ def go2_vicon_handler(msg: Dict[str, float], logger: Optional[logging.Logger] = 
     x_offset, y_offset, z_offset = 0.0, 0.0, 0.0
 
     # Initialize velocity estimator once using a singleton pattern
-    if not hasattr(go2_vicon_handler, "velocity_estimator"):
-        go2_vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
+    if not hasattr(vicon_handler, "velocity_estimator"):
+        vicon_handler.velocity_estimator = VelocityEstimator(method="finite_diff", alpha=0.5)
 
     # Calculate base position in meters
     base_position = np.array(
         [(msg["x_trans"] + x_offset) * 0.001, (msg["y_trans"] + y_offset) * 0.001, (msg["z_trans"] + z_offset) * 0.001]
     )
-
     # Base quaternion in order (w, x, y, z)
     base_quaternion = np.array([msg["w"], msg["x_rot"], msg["y_rot"], msg["z_rot"]])
 
     # Initialize or update filtered quaternion using spherical linear interpolation (slerp)
-    if not hasattr(go2_vicon_handler, "filtered_quaternion"):
-        go2_vicon_handler.filtered_quaternion = base_quaternion
+    if not hasattr(vicon_handler, "filtered_quaternion"):
+        vicon_handler.filtered_quaternion = base_quaternion
     else:
-        # TODO: Check if this is required (is this about makeing quat unique?)
-        dot_product = np.dot(go2_vicon_handler.filtered_quaternion, base_quaternion)
+        # TODO: Check if this is necessary (is this about makeing quat unique?)
+        dot_product = np.dot(vicon_handler.filtered_quaternion, base_quaternion)
         if dot_product < 0:
             base_quaternion = -base_quaternion  # Ensure shortest path
-        go2_vicon_handler.filtered_quaternion = 0.5 * base_quaternion + 0.5 * go2_vicon_handler.filtered_quaternion
-        go2_vicon_handler.filtered_quaternion /= np.linalg.norm(go2_vicon_handler.filtered_quaternion)  # Normalize
+        vicon_handler.filtered_quaternion = 0.5 * base_quaternion + 0.5 * vicon_handler.filtered_quaternion
+        vicon_handler.filtered_quaternion /= np.linalg.norm(vicon_handler.filtered_quaternion)  # Normalize
 
     # Estimate velocities
     current_time = time.time()
-    lin_vel_w, ang_vel_w = go2_vicon_handler.velocity_estimator.update(
-        base_position, go2_vicon_handler.filtered_quaternion, current_time, logger
+    lin_vel_w, ang_vel_w = vicon_handler.velocity_estimator.update(
+        base_position, vicon_handler.filtered_quaternion, current_time, logger
     )
 
     # Transform linear velocity to base frame
-    rotation_matrix = quat_to_rotmatrix(go2_vicon_handler.filtered_quaternion, order="wxyz")
+    rotation_matrix = quat_to_rotmatrix(vicon_handler.filtered_quaternion, order="wxyz")
     lin_vel_b = np.dot(rotation_matrix.T, lin_vel_w)
 
     return {
         "robot/base_pos_w": base_position,
-        "robot/base_quat": go2_vicon_handler.filtered_quaternion,
+        "robot/base_quat": vicon_handler.filtered_quaternion,
         "robot/lin_vel_w": lin_vel_w.tolist(),
         "robot/lin_vel_b": lin_vel_b,
     }
 
 
-def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def sport_mode_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:
@@ -155,24 +154,42 @@ def sport_mode_state_handler(msg: Dict[str, List], logger: Optional[logging.Logg
     if not hasattr(sport_mode_state_handler, "velocity_estimator"):
         sport_mode_state_handler.velocity_estimator = VelocityEstimator(method="finite_diff")
 
-    base_pos_w = msg["position"]
-    base_quat = msg["imu_state"].quaternion
+    base_pos_w = np.array(msg["position"])
+    base_quat = np.array(msg["imu_state"].quaternion)
 
+    # Estimate velocities
+    current_time = time.time()
+    lin_vel_w, ang_vel_w = sport_mode_state_handler.velocity_estimator.update(
+        base_pos_w, base_quat, current_time, logger
+    )
+    
     states = {
         "robot/base_pos_w": base_pos_w,
         "robot/lin_vel_b": msg["velocity"],
+        "robot/lin_vel_w": lin_vel_w,
+        "robot/ang_vel_w": ang_vel_w,
     }
 
     return states
 
 
-def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
-    """Extracts the object state, and returns the object position, object velocity, object orientation, and object angular velocity."""
+def object_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    """Extracts the object state, and returns the object position, object velocity, object orientation, and object angular velocity.
+    This message is published by the Vicon Receiver.
+    
+    Args:
+        msg (Dict): Object state message
+        logger (logging.Logger): Logger for debugging
 
-    base_pos_w = msg["position"]
-    base_quat = msg["imu_state"].quaternion
-    lin_vel_w = msg["velocity"]
-    ang_vel_w = msg["imu_state"].gyroscope
+    Returns:
+        Dict: Object state
+    """
+
+    base_pos_w = np.array(msg["position"])
+    base_quat = np.array(msg["imu_state"].quaternion)
+    lin_vel_w = np.array(msg["velocity"])
+    ang_vel_w = np.array(msg["imu_state"].gyroscope)
+    
 
     lin_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, lin_vel_w)
     ang_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, ang_vel_w)
@@ -187,7 +204,7 @@ def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
     }
 
 
-def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] = None):
+def g1_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
@@ -221,6 +238,90 @@ def g1_low_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
         ),
         "robot/joint_tau_est": np.array(
             [motor_states[i].tau_est for i in leg_joint2motor_idx + arm_waist_joint2motor_idx]
+        ),
+        "robot/gyroscope": imu_state.gyroscope,
+        "robot/accelerometer": imu_state.accelerometer,
+        "robot/base_quat": imu_state.quaternion,
+        "robot/base_rpy": imu_state.rpy,
+    }
+
+    return states
+
+def g1_upper_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
+    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
+
+    Args:
+        msg (Dict): Low Level State Unitree Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Low level states directly from the robot
+    """
+    # # Wait for the first message
+    # while msg["tick"] == 0:
+    #     time.sleep(0.01)
+
+    joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+    # Extract motor states
+    motor_states = msg["motor_state"]
+
+    # Extract IMU states
+    imu_state = msg["imu_state"]
+
+    states = {
+        "mode_machine": msg["mode_machine"],
+        "robot/joint_pos": np.array(
+            [motor_states[i].q for i in joint2motor_idx]
+        ),
+        "robot/joint_vel": np.array(
+            [motor_states[i].dq for i in joint2motor_idx]
+        ),
+        "robot/joint_tau_est": np.array(
+            [motor_states[i].tau_est for i in joint2motor_idx]
+        ),
+        "robot/gyroscope": imu_state.gyroscope,
+        "robot/accelerometer": imu_state.accelerometer,
+        "robot/base_quat": imu_state.quaternion,
+        "robot/base_rpy": imu_state.rpy,
+    }
+
+    return states
+
+def g1_lower_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None):
+    """Extracts the joint and feet states, and returns the joint positions, joint velocities,
+    feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
+
+    Args:
+        msg (Dict): Low Level State Unitree Message
+        logger (logging.Logger): Logger for debugging
+
+    Returns:
+        Dict: Low level states directly from the robot
+    """
+    # # Wait for the first message
+    # while msg["tick"] == 0:
+    #     time.sleep(0.01)
+
+    joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] + [13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+
+    # Extract motor states
+    motor_states = msg["motor_state"]
+
+    # Extract IMU states
+    imu_state = msg["imu_state"]
+
+    states = {
+        "mode_machine": msg["mode_machine"],
+        "robot/joint_pos": np.array(
+            [motor_states[i].q for i in joint2motor_idx]
+        ),
+        "robot/joint_vel": np.array(
+            [motor_states[i].dq for i in joint2motor_idx]
+        ),
+        "robot/joint_tau_est": np.array(
+            [motor_states[i].tau_est for i in joint2motor_idx]
         ),
         "robot/gyroscope": imu_state.gyroscope,
         "robot/accelerometer": imu_state.accelerometer,

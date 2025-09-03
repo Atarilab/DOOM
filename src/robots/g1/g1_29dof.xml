@@ -1,21 +1,21 @@
 <mujoco model="g1_29dof">
-  <compiler angle="radian" meshdir="meshes" />
+  <compiler angle="radian" meshdir="g1_description/meshes" />
 
   <default>
     <default class="torso_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
+      <joint damping="5" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="leg_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
+      <joint damping="10" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="ankle_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
+      <joint damping="2" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="arm_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.2"/>
+      <joint damping="0.2" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="wrist_motor">
-      <joint damping="0.05" armature="0.01" frictionloss="0.1"/>
+      <joint damping="0.2" armature="0.001" frictionloss="0.1"/>
     </default>
     
   </default>

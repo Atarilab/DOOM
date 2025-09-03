@@ -216,8 +216,8 @@ class UnitreeSdk2Bridge:
         # MuJoCo quaternion: (w, x, y, z), scipy expects (x, y, z, w)
         rot = R.from_quat([quat[1], quat[2], quat[3], quat[0]])
         # Get linear and angular velocity in local frame
-        lin_vel_b = self.mj_data.cvel[self.object_id][:3].copy()
-        ang_vel_b = self.mj_data.cvel[self.object_id][3:].copy()
+        ang_vel_b = self.mj_data.cvel[self.object_id][:3].copy()
+        lin_vel_b = self.mj_data.cvel[self.object_id][3:].copy()
         # Convert to world frame
         lin_vel_w = rot.apply(lin_vel_b)
         ang_vel_w = rot.apply(ang_vel_b)
