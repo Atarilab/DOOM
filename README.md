@@ -265,6 +265,7 @@ Note: This is a research prototype. Use at your own risk.
 ## 📝 TODO
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
+- [x] Add controller for tuning the PD gains of G1
 - [x] Add RViz visualization for G1
 - [x] Add g1 velocity locomotion Policy from unitree example (rl-unitree-sim-g1) and IsaacLab (rl-velocity-sim-g1)
 - [x] Create table with box env for G1
