@@ -1,16 +1,16 @@
 # POLICY CONFIG
-policy_path: "locomotion_go2/oliver/flatAmpVision/2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_SEED_3/policy.pt"
+policy_path: "torqueComplexReward/TORQUE_complex_reward_10_SEED_42/policy.pt"
 
-control_dt: 0.002
+control_dt: 0.0001
 decimation: 1
 action_dim: 12
-action_scale: 0.25
-stiffness: 27.0
-damping: 1.5
+action_scale: 10.0
+stiffness: 0.0
+damping: 0.0
 
 # PROCESSING CONFIG
 device: "cuda:0"
-use_threading: True
+use_threading: False
 use_buffer: True
 obs_buffer_length: 5
 
