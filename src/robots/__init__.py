@@ -9,8 +9,8 @@ ROBOT_CLASS_MAP = {
 }
 
 
-def resolve_robot(task: str, logger):
+def resolve_robot(task: str, logger, device="cuda:0"):
     for key in ROBOT_CLASS_MAP:
         if key == task.split('-')[-1].lower():
-            return ROBOT_CLASS_MAP[key](task=task, logger=logger)
+            return ROBOT_CLASS_MAP[key](task=task, logger=logger, device=device)
     raise ValueError(f"Unknown robot type in task: {task}")

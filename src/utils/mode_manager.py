@@ -11,7 +11,7 @@ class ModeManager:
     Modes are defined as a dictionary of controllers, where the key is the mode name and the value is a dictionary of controllers.
     """
 
-    def __init__(self, logger=None, device=None):
+    def __init__(self, logger=None, device="cuda:0"):
         self._modes: Dict[str, Dict[str, ControllerBase]] = {}
         self._current_mode: Optional[str] = None
         self._current_submode: Optional[str] = None

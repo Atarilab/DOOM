@@ -72,7 +72,6 @@ class DDSStateSubscriber(StateSubscriber):
 
             # Call handler if exists
             if self.handler_func:
-
                 extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
 
             # Save the final state
@@ -174,7 +173,7 @@ class ROS2StateSubscriber(StateSubscriber):
 
     def spin_once(self):
         """Spin the subscriber node once."""
-        rclpy.spin_once(self.node)
+        rclpy.spin_once(self.node, timeout_sec=0.00)
 
 
 class StateManager:

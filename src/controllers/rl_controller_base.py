@@ -1,11 +1,9 @@
 import os
-import threading
 import time
 import traceback
 from typing import TYPE_CHECKING, Any, Dict
 
 from geometry_msgs.msg import TransformStamped
-import numpy as np
 from rclpy.node import Node
 from tf2_ros import StaticTransformBroadcaster
 import torch
@@ -111,12 +109,48 @@ class RLControllerBase(ControllerBase, Node):
         self.policy = torch.jit.load(model_path).to(configs["controller_config"]["device"])
         self.policy.eval()
         
+        # Flatten RNN parameters to avoid memory fragmentation warnings
+        self._flatten_rnn_parameters()
+        
+        # # Suppress the RNN memory warning for TorchScript models
+        # # This warning is common with compiled models and doesn't affect functionality
+        # warnings.filterwarnings("ignore", message="RNN module weights are not part of single contiguous chunk of memory")
+        
         if self.logger:
             self.logger.info(f"Policy loaded from {model_path} on device {self.policy.device}")
 
         # Precompute static configurations
         self.action_scale = configs["controller_config"]["action_scale"]
         self.policy_architecture = configs["controller_config"].get("policy_architecture", "mlp")
+        
+    def _flatten_rnn_parameters(self):
+        """
+        Flatten RNN parameters to avoid memory fragmentation warnings.
+        This is needed when using RNN/LSTM/GRU modules to ensure weights are contiguous in memory.
+        """
+        try:
+            # For TorchScript models, we need to access the underlying modules
+            if hasattr(self.policy, 'graph'):
+                # This is a TorchScript model, we can't directly access RNN modules
+                # Try to access the original module if available
+                if hasattr(self.policy, 'original_module'):
+                    for module in self.policy.original_module.modules():
+                        if hasattr(module, 'flatten_parameters'):
+                            module.flatten_parameters()
+                # For TorchScript models, we can try to access the code object
+                elif hasattr(self.policy, 'code'):
+                    # This is a more advanced approach for TorchScript models
+                    # The flatten_parameters() should ideally be called during model creation
+                    pass
+            else:
+                # For regular PyTorch models, recursively find and flatten RNN parameters
+                for module in self.policy.modules():
+                    if hasattr(module, 'flatten_parameters'):
+                        module.flatten_parameters()
+        except Exception as e:
+            # Silently handle the exception to avoid spamming logs
+            # The warning will still appear but won't be repeated in our logs
+            pass
         
         
     def _initialize_controller_parameters(self, configs: Dict[str, Any]):
@@ -149,12 +183,12 @@ class RLControllerBase(ControllerBase, Node):
         if hasattr(self.robot, "joints_isaac2unitree"):
             self.actions_mapping = torch.tensor(self.robot.joints_isaac2unitree)
         else:
-            self.actions_mapping = torch.tensor(np.arange(self.robot.num_joints))
+            self.actions_mapping = torch.arange(self.robot.num_joints)
 
         if hasattr(self.robot, "joints_unitree2isaac"):
             self.joint_obs_unitree_to_isaac_mapping = torch.tensor(self.robot.joints_unitree2isaac)
         else:
-            self.joint_obs_unitree_to_isaac_mapping = torch.tensor(np.arange(self.robot.num_joints))
+            self.joint_obs_unitree_to_isaac_mapping = torch.arange(self.robot.num_joints)
 
         # Initialize raw_action on GPU if not already done
         self.raw_action = torch.zeros(self.action_dim, dtype=torch.float32, device=self.device)
@@ -163,7 +197,7 @@ class RLControllerBase(ControllerBase, Node):
         
         # Initial state and commands
         self.latest_state = None
-        self.joint_pos_targets = np.zeros(self.robot.num_joints, dtype=np.float32)
+        self.joint_pos_targets = torch.zeros(self.robot.num_joints, dtype=torch.float32, device=self.device)
         self.cmd = {}
 
     def _configure_processing_infrastructure(self, configs: Dict[str, Any]):
@@ -290,6 +324,8 @@ class RLControllerBase(ControllerBase, Node):
                         
                     # Policy inference
                     with torch.no_grad():
+                        # Flatten RNN parameters before forward pass to avoid memory warnings
+                        self._flatten_rnn_parameters()
                         raw_action = self.policy(obs).squeeze(0).squeeze(0)
                     self.raw_action.copy_(raw_action)
 
@@ -346,6 +382,9 @@ class RLControllerBase(ControllerBase, Node):
         """
         try:
             with torch.no_grad():
+                # Flatten RNN parameters before forward pass to avoid memory warnings
+                self._flatten_rnn_parameters()
+                
                 raw_action = self.policy(obs_tensor).detach().squeeze(0)
                 self.raw_action.copy_(raw_action)
                 
@@ -354,12 +393,12 @@ class RLControllerBase(ControllerBase, Node):
                 joint_pos_targets = (
                         (filtered_action * self.action_scale + self.default_joint_pos)[self.actions_mapping]
                     )
-            return joint_pos_targets.cpu().numpy()
+            return joint_pos_targets
         
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Error computing joint pos targets from policy: {e}")
-            return self.default_joint_pos.cpu().numpy()[self.actions_mapping]
+            return self.default_joint_pos[self.actions_mapping]
         
     
     #####################

@@ -14,7 +14,7 @@ from controllers.stand_controller import G1DefaultHandsController, G1LateralHand
 from controllers.g1_gain_tuning_controller import G1GainTuningController
 from robots.robot_base import RobotBase
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
-from state_manager.msg_handlers import g1_low_state_handler, g1_upper_low_state_handler, g1_lower_low_state_handler, vicon_handler
+from state_manager.msg_handlers import g1_low_state_handler, g1_upper_low_state_handler, g1_lower_low_state_handler, vicon_handler, vicon_object_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 from utils.helpers import create_joint_mapping
 
@@ -27,7 +27,7 @@ class G1(RobotBase):
     This class provides robot-specific data and available controllers for the G1 robot based on the desired task.
     """
 
-    def __init__(self, task, logger):
+    def __init__(self, task, logger, device="cuda:0"):
         """
         Initialize the G1 robot.
 
@@ -35,7 +35,7 @@ class G1(RobotBase):
             task (str): The task to be performed by the robot.
             logger (logging.Logger): The logger to be used for logging.
         """
-        super().__init__(task=task, logger=logger)
+        super().__init__(task=task, logger=logger, device=device)
 
         # self.joints_unitree2isaac = create_joint_mapping(self.isaaclab_joint_names(), self.joint_names)
         # self.joints_isaac2unitree = create_joint_mapping(self.joint_names, self.isaaclab_joint_names())
@@ -272,7 +272,7 @@ class G1(RobotBase):
 
         - "low_state": a DDSStateSubscriber for the low-level state of the robot.
         - "sports_mode_state": a DDSStateSubscriber for the sports mode state of the robot in simulation.
-        - "vicon_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
+        - "vicon_robot_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
 
         The subscribers are initialized with the corresponding handler functions and topics.
 
@@ -285,6 +285,7 @@ class G1(RobotBase):
             topic="rt/lowstate",
             msg_type=G1LowState_,
             handler_func=g1_low_state_handler,
+            handler_args={"device": self.device} if self.device else {},
             logger=self.logger,
         )
         _subscribers["low_state"] = dds_low_state_sub
@@ -298,6 +299,7 @@ class G1(RobotBase):
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
                 handler_func=sport_mode_state_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
@@ -307,6 +309,7 @@ class G1(RobotBase):
                     topic="rt/objectstate",
                     msg_type=SportModeState_,
                     handler_func=object_state_handler,
+                    handler_args={"device": self.device} if self.device else {},
                     logger=self.logger,
                 )
                 _subscribers["object_state"] = dds_object_state_sub
@@ -314,14 +317,25 @@ class G1(RobotBase):
         else:
             from vicon_receiver.msg import Position
 
-            ros2_vicon_sub = ROS2StateSubscriber(
+            ros2_vicon_robot_sub = ROS2StateSubscriber(
                 topic="/vicon/G1/G1",
-                node_name="vicon_state",
+                node_name="vicon_robot_state",
                 msg_type=Position,
                 handler_func=vicon_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
-            _subscribers["vicon_state"] = ros2_vicon_sub
+            _subscribers["vicon_robot_state"] = ros2_vicon_robot_sub
+            
+            ros2_vicon_object_sub = ROS2StateSubscriber(
+                topic="/vicon/Box/Box",
+                node_name="vicon_object_state",
+                msg_type=Position,
+                handler_func=vicon_object_handler,
+                handler_args={"device": self.device} if self.device else {},
+                logger=self.logger,
+            )
+            _subscribers["vicon_object_state"] = ros2_vicon_object_sub
 
         return _subscribers
     
@@ -412,8 +426,8 @@ class G1(RobotBase):
 class G1Upper(G1):
     """G1 robot with upper body only."""
     
-    def __init__(self, task, logger):
-        super().__init__(task, logger)
+    def __init__(self, task, logger, device="cuda:0"):
+        super().__init__(task, logger, device=device)
         self.actuated_joint_indices = [self.mj_model.joint_names[joint_name] - 1 for joint_name in self.actuated_joint_names]
         self.non_actuated_joint_indices = [self.mj_model.joint_names[joint_name] - 1 for joint_name in self.non_actuated_joint_names]
         
@@ -570,7 +584,7 @@ class G1Upper(G1):
 
         - "low_state": a DDSStateSubscriber for the low-level state of the robot.
         - "sports_mode_state": a DDSStateSubscriber for the sports mode state of the robot in simulation.
-        - "vicon_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
+        - "vicon_robot_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
 
         The subscribers are initialized with the corresponding handler functions and topics.
 
@@ -583,6 +597,7 @@ class G1Upper(G1):
             topic="rt/lowstate",
             msg_type=G1LowState_,
             handler_func=g1_upper_low_state_handler,
+            handler_args={"device": self.device} if self.device else {},
             logger=self.logger,
         )
         _subscribers["low_state"] = dds_low_state_sub
@@ -596,6 +611,7 @@ class G1Upper(G1):
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
                 handler_func=sport_mode_state_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
@@ -605,6 +621,7 @@ class G1Upper(G1):
                     topic="rt/objectstate",
                     msg_type=SportModeState_,
                     handler_func=object_state_handler,
+                    handler_args={"device": self.device} if self.device else {},
                     logger=self.logger,
                 )
                 _subscribers["object_state"] = dds_object_state_sub
@@ -614,12 +631,13 @@ class G1Upper(G1):
 
             ros2_vicon_sub = ROS2StateSubscriber(
                 topic="/vicon/G1/G1",
-                node_name="vicon_state",
+                node_name="vicon_robot_state",
                 msg_type=Position,
                 handler_func=vicon_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
-            _subscribers["vicon_state"] = ros2_vicon_sub
+            _subscribers["vicon_robot_state"] = ros2_vicon_sub
 
         return _subscribers
     
@@ -627,8 +645,8 @@ class G1Upper(G1):
 class G1Lower(G1):
     """G1 robot with upper body only."""
     
-    def __init__(self, task, logger):
-        super().__init__(task, logger)
+    def __init__(self, task, logger, device="cuda:0"):
+        super().__init__(task, logger, device=device)
         
     
     # TODO: Fetch from mj_model
@@ -766,7 +784,7 @@ class G1Lower(G1):
 
         - "low_state": a DDSStateSubscriber for the low-level state of the robot.
         - "sports_mode_state": a DDSStateSubscriber for the sports mode state of the robot in simulation.
-        - "vicon_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
+        - "vicon_robot_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
 
         The subscribers are initialized with the corresponding handler functions and topics.
 
@@ -779,6 +797,7 @@ class G1Lower(G1):
             topic="rt/lowstate",
             msg_type=G1LowState_,
             handler_func=g1_lower_low_state_handler,
+            handler_args={"device": self.device} if self.device else {},
             logger=self.logger,
         )
         _subscribers["low_state"] = dds_low_state_sub
@@ -792,6 +811,7 @@ class G1Lower(G1):
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
                 handler_func=sport_mode_state_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
@@ -800,11 +820,12 @@ class G1Lower(G1):
 
             ros2_vicon_sub = ROS2StateSubscriber(
                 topic="/vicon/G1/G1",
-                node_name="vicon_state",
+                node_name="vicon_robot_state",
                 msg_type=Position,
                 handler_func=vicon_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
-            _subscribers["vicon_state"] = ros2_vicon_sub
+            _subscribers["vicon_robot_state"] = ros2_vicon_sub
 
         return _subscribers

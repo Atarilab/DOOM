@@ -1,7 +1,7 @@
 import time
 from typing import TYPE_CHECKING, Any, Dict
 
-import numpy as np
+import torch
 
 from controllers.controller_base import ControllerBase
 from state_manager.obs_manager import ObsTerm
@@ -130,7 +130,7 @@ class Go2StandUpController(ControllerBase):
         obs = self.obs_manager.compute(state)
 
         time = obs["time"] - self.start_time
-        phase = np.tanh(time / 1.2)
+        phase = torch.tanh(torch.tensor(time / 1.2, device=self.device))
 
         cmd = {}
         for i in range(self.robot.num_joints):
@@ -181,7 +181,7 @@ class Go2StandDownController(ControllerBase):
         obs = self.obs_manager.compute(state)
 
         time = obs["time"] - self.start_time
-        phase = np.tanh(time / 1.2)
+        phase = torch.tanh(torch.tensor(time / 1.2, device=self.device))
         cmd = {}
         for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
@@ -290,7 +290,7 @@ class G1PhasePDController(ControllerBase):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1PhasePDController"
-        self.total_time = 4.0  # 2 seconds
+        self.total_time = 2  # 2 seconds
         self.num_steps = int(self.total_time / self.control_dt)
 
         self.leg_joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -303,12 +303,12 @@ class G1PhasePDController(ControllerBase):
         self.arm_waist_kds = [3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1]
 
         # self.dof_idx = self.leg_joint2motor_idx + self.arm_waist_joint2motor_idx
-        self.kps = np.array(self.leg_kps + self.arm_waist_kps)
-        self.kds = np.array(self.leg_kds + self.arm_waist_kds)
+        self.kps = torch.tensor(self.leg_kps + self.arm_waist_kps, dtype=torch.float32, device=self.device)
+        self.kds = torch.tensor(self.leg_kds + self.arm_waist_kds, dtype=torch.float32, device=self.device)
 
-        self.final_pos = np.zeros(len(self.robot.actuated_joint_indices), dtype=np.float32)
+        self.final_pos = torch.zeros(len(self.robot.actuated_joint_indices), dtype=torch.float32, device=self.device)
         self.dof_size = len(self.robot.actuated_joint_indices)
-        self.init_dof_pos = np.zeros(self.dof_size, dtype=np.float32)
+        self.init_dof_pos = torch.zeros(self.dof_size, dtype=torch.float32, device=self.device)
         
         self.step_counter = 0
 
@@ -371,10 +371,10 @@ class G1LateralHandsController(G1PhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1LateralHandsController"
-        self.waist_default_targets = np.array([0.0, 0.0, 0.0])
-        self.arm_default_targets = np.array([0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
-                                     0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000])
-        self.final_pos = np.concatenate((self.leg_default_angles, self.waist_default_targets, self.arm_default_targets), axis=0)
+        self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+        self.arm_default_targets = torch.tensor([0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
+                                     0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000], dtype=torch.float32, device=self.device)
+        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), self.waist_default_targets, self.arm_default_targets), dim=0)
         
 class G1DefaultHandsController(G1PhasePDController):
     """
@@ -385,12 +385,12 @@ class G1DefaultHandsController(G1PhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1DefaultHandsController"
-        self.waist_default_targets = np.array([0.0, 0.0, 0.0])
-        self.arm_default_targets = np.array([
+        self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+        self.arm_default_targets = torch.tensor([
                                     0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
                                     0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000
-                                     ])
-        self.final_pos = np.concatenate((self.leg_default_angles, self.waist_default_targets, self.arm_default_targets), axis=0)
+                                     ], dtype=torch.float32, device=self.device)
+        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), self.waist_default_targets, self.arm_default_targets), dim=0)
         
 class G1ManipulationInitHandsController(G1PhasePDController):
     """
@@ -401,11 +401,11 @@ class G1ManipulationInitHandsController(G1PhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1ManipulationInitHandsController"
-        self.waist_default_targets = np.array([0.0, 0.0, 0.0])
-        self.arm_default_targets = np.array([
+        self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+        self.arm_default_targets = torch.tensor([
                     -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
-                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000])
-        self.final_pos = np.concatenate((self.leg_default_angles, self.waist_default_targets, self.arm_default_targets), axis=0)
+                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000], dtype=torch.float32, device=self.device)
+        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), self.waist_default_targets, self.arm_default_targets), dim=0)
     
 class G1UpperPhasePDController(G1PhasePDController):
     """
@@ -424,8 +424,8 @@ class G1UpperPhasePDController(G1PhasePDController):
         self.step_counter = 0
         # self.kps = np.array([300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
         # self.kds = np.array([3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
-        self.kps = np.array([300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
-        self.kds = np.array([3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
+        self.kps = torch.tensor([100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20], dtype=torch.float32, device=self.device)
+        self.kds = torch.tensor([2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1], dtype=torch.float32, device=self.device)
         
 class G1LowerPhasePDController(G1PhasePDController):
     """
@@ -435,7 +435,7 @@ class G1LowerPhasePDController(G1PhasePDController):
     def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
         super().__init__(robot=robot, configs=configs)
 
-        self.name = "G1UpperPhasePDController"
+        self.name = "G1LowerPhasePDController"
         # self.dof_idx = range(self.robot.num_joints)
         # self.dof_idx = self.robot.actuated_joint_indices
         # self.dof_size = len(self.dof_idx)
@@ -444,8 +444,8 @@ class G1LowerPhasePDController(G1PhasePDController):
         self.step_counter = 0
         # self.kps = np.array([300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
         # self.kds = np.array([3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
-        self.kps = np.array([100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
-        self.kds = np.array([2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
+        self.kps = torch.tensor([100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20], dtype=torch.float32, device=self.device)
+        self.kds = torch.tensor([2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1], dtype=torch.float32, device=self.device)
 
 class G1LocoStandUpController(G1PhasePDController):
     """
@@ -470,7 +470,7 @@ class G1ManiStandUpController(G1PhasePDController):
         self.arm_waist_target = [0.0000, 0.0000, 0.0000, 
                     0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
                     0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000]
-        self.final_pos = np.concatenate((self.leg_default_angles, self.arm_waist_target), axis=0)
+        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), torch.tensor(self.arm_waist_target, dtype=torch.float32, device=self.device)), dim=0)
         
 
 class G1UpperDefaultPosController(G1UpperPhasePDController):
@@ -483,9 +483,9 @@ class G1UpperDefaultPosController(G1UpperPhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1UpperDefaultPosController"
-        self.final_pos = np.array([
+        self.final_pos = torch.tensor([
                     0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
-                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000])
+                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000], dtype=torch.float32, device=self.device)
             
 
 class G1UpperExtendLateralController(G1UpperPhasePDController):
@@ -498,9 +498,9 @@ class G1UpperExtendLateralController(G1UpperPhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1UpperExtendLateralController"
-        self.final_pos = np.array([
+        self.final_pos = torch.tensor([
                     0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
-                    0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000])
+                    0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000], dtype=torch.float32, device=self.device)
 
 
 
@@ -514,9 +514,7 @@ class G1UpperHomePosController(G1UpperPhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1UpperHomePosController"
-        self.final_pos =np.array([
-                    -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
-                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000])
+        self.final_pos =self.final_pos = torch.tensor(configs["controller_config"]["default_joint_pos"], dtype=torch.float32, device=self.device)
         
 class G1LowerStandUpController(G1LowerPhasePDController):
     """
@@ -527,9 +525,9 @@ class G1LowerStandUpController(G1LowerPhasePDController):
         super().__init__(robot=robot, configs=configs)
 
         self.name = "G1LowerStandUpController"
-        self.final_pos = np.array([
+        self.final_pos = torch.tensor([
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-        ])
+        ], dtype=torch.float32, device=self.device)
 
 
 class G1StayUpController(ControllerBase):
@@ -623,9 +621,9 @@ class G1LowLevelController(ControllerBase):
         self.kps = self.leg_kps + self.arm_waist_kps
         self.kds = self.leg_kds + self.arm_waist_kds
 
-        self.default_pos = np.concatenate((self.leg_default_angles, self.arm_waist_target), axis=0)
+        self.default_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), torch.tensor(self.arm_waist_target, dtype=torch.float32, device=self.device)), dim=0)
         self.dof_size = len(self.dof_idx)
-        self.init_dof_pos = np.zeros(self.dof_size, dtype=np.float32)
+        self.init_dof_pos = torch.zeros(self.dof_size, dtype=torch.float32, device=self.device)
 
     def set_mode(self):
         self.start_time = time.time()
@@ -762,7 +760,7 @@ class G1LowLevelController(ControllerBase):
         if time < self.total_time:
             # [Stage 1]: set robot to zero posture
             for i in range(G1_NUM_MOTOR):
-                ratio = np.clip(time / self.total_time, 0.0, 1.0)
+                ratio = torch.clamp(torch.tensor(time / self.total_time, device=self.device), 0.0, 1.0)
                 cmd["mode_pr"] = Mode.PR
                 cmd[f"motor_{i}"] = {
                     "q": (1.0 - ratio) * state["robot/joint_pos"][self.dof_idx[i]],
@@ -775,13 +773,13 @@ class G1LowLevelController(ControllerBase):
 
         elif time < self.total_time * 2:
             # [Stage 2]: swing ankle using PR mode
-            max_P = np.pi * 30.0 / 180.0
-            max_R = np.pi * 10.0 / 180.0
+            max_P = torch.pi * 30.0 / 180.0
+            max_R = torch.pi * 10.0 / 180.0
             t = time - self.total_time
-            L_P_des = max_P * np.sin(2.0 * np.pi * t)
-            L_R_des = max_R * np.sin(2.0 * np.pi * t)
-            R_P_des = max_P * np.sin(2.0 * np.pi * t)
-            R_R_des = -max_R * np.sin(2.0 * np.pi * t)
+            L_P_des = max_P * torch.sin(2.0 * torch.pi * t)
+            L_R_des = max_R * torch.sin(2.0 * torch.pi * t)
+            R_P_des = max_P * torch.sin(2.0 * torch.pi * t)
+            R_R_des = -max_R * torch.sin(2.0 * torch.pi * t)
 
             cmd["mode_pr"] = Mode.PR
             cmd[f"motor_{G1JointIndex.LeftAnklePitch}"] = {
@@ -815,13 +813,13 @@ class G1LowLevelController(ControllerBase):
 
         else:
             # [Stage 3]: swing ankle using AB mode
-            max_A = np.pi * 30.0 / 180.0
-            max_B = np.pi * 10.0 / 180.0
+            max_A = torch.pi * 30.0 / 180.0
+            max_B = torch.pi * 10.0 / 180.0
             t = time - self.total_time * 2
-            L_A_des = max_A * np.sin(2.0 * np.pi * t)
-            L_B_des = max_B * np.sin(2.0 * np.pi * t + np.pi)
-            R_A_des = -max_A * np.sin(2.0 * np.pi * t)
-            R_B_des = -max_B * np.sin(2.0 * np.pi * t + np.pi)
+            L_A_des = max_A * torch.sin(2.0 * torch.pi * t)
+            L_B_des = max_B * torch.sin(2.0 * torch.pi * t + torch.pi)
+            R_A_des = -max_A * torch.sin(2.0 * torch.pi * t)
+            R_B_des = -max_B * torch.sin(2.0 * torch.pi * t + torch.pi)
 
             cmd[f"motor_{G1JointIndex.LeftAnkleA}"] = {
                 "q": L_A_des,
@@ -852,9 +850,9 @@ class G1LowLevelController(ControllerBase):
                 "tau": 0.0,
             }
 
-            max_WristYaw = np.pi * 30.0 / 180.0
-            L_WristYaw_des = max_WristYaw * np.sin(2.0 * np.pi * t)
-            R_WristYaw_des = max_WristYaw * np.sin(2.0 * np.pi * t)
+            max_WristYaw = torch.pi * 30.0 / 180.0
+            L_WristYaw_des = max_WristYaw * torch.sin(2.0 * torch.pi * t)
+            R_WristYaw_des = max_WristYaw * torch.sin(2.0 * torch.pi * t)
             cmd[f"motor_{G1JointIndex.LeftWristRoll}"] = {
                 "q": L_WristYaw_des,
                 "kp": Kp[G1JointIndex.LeftWristRoll],

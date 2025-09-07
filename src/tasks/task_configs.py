@@ -55,5 +55,13 @@ TASK_CONFIG = {
         "controller": "controllers/config/rl_unitree_g1_cfg.yaml",
         "robot_interface": "robot_interfaces/config/sim_flat_g1_cfg.yaml",
     },
+    "gain-tuning-sim-g1": {
+        "controller": "controllers/config/g1_gain_tuning_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/sim_flat_g1_cfg.yaml",
+    },
+    "gain-tuning-real-g1": {
+        "controller": "controllers/config/g1_gain_tuning_cfg.yaml",
+        "robot_interface": "robot_interfaces/config/real_g1_cfg.yaml",
+    },
     # Add more tasks here as needed
 }

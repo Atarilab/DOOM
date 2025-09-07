@@ -90,7 +90,7 @@ Once you've chosen the task you want to run, you can run the master node to cont
 ```bash
 ros2 run master_manager master_node --task <insert-task-name>
 ```
-Use the `--enable-ui` argument if you want to use the terminal UI interface. Else, you can also use the joystick to control the robot.
+Use the `--ui` argument if you want to use the terminal UI interface. Else, you can also use the joystick to control the robot.
 
 This repository also has a simulation mode, which allows you to run the same scripts with the `unitree_sdk` to send commands to your robot in MuJoCo. Note that MuJoCo is not used as a visualizer for your real robot interface but rather as a sanity test of the same script that you might run on the real robot. It uses a modified version of MuJoCo to behave real-time. 
 
@@ -113,7 +113,7 @@ python3 simulate.py --task=rl-velocity-sim-go2
 ```bash
 ./doom.sh -a # attach a terminal to the existing DOOM container
 source setup_local.sh
-ros2 run master_manager master_node --task rl-velocity-sim-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
+ros2 run master_manager master_node --task rl-velocity-sim-go2 --ui # use ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
 ```
 ZERO mode is used to send zero torques to the robot. DAMPING mode is a damping mode to gracefully stop commands to the robot.
 STAND modes are used to initialise the robot to its default positions using simple PD controllers. Click on `STAND`, and then `STAY_DOWN`. This makes the robot stay in a crouched position close to the ground. After it stabilises, click on `STAND_UP`, which is a phase-based PD controller that makes the robot stand up to the default joint configuration. `STAND_DOWN` is also a phase-based PD controller that moves from the standing up joint configuration to the crouched joint position, as in `STAY_DOWN`.
@@ -139,7 +139,7 @@ ros2 launch vicon_receiver client.launch.py
 ./doom.sh -a # attach a terminal to the existing DOOM container
 source setup.sh
 ros2 topic list # view available topics, confirm if you can view topics published by the robot and by the vicon
-ros2 run master_manager master_node --task rl-velocity-real-go2 --enable-ui # use enable-ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
+ros2 run master_manager master_node --task rl-velocity-real-go2 --ui # use ui for the terminal UI interface (additionally, we can also manage commands to the robot via joystick with/without UI)
 ```
 
 #### Terminal 3 (optional)
@@ -226,7 +226,7 @@ When running in debug mode, it is also possible to add breakpoints inside thread
 The master manager is the entry point of DOOM. It loads up the necessary configurations based on the arguments you provide to it, the main one being the `task`, used to resolve the task, robot and interface (sim/real). For example, `rl-velocity-sim-go2` is used to resolve the robot: Go2, the interface: simulation, the controller type: rl, and the method: contact. It follows the convention: `<controller-type>-<method>-<interface>-<robot>`
 . The available configs are defined in [`task_configs.py`](src/tasks/task_configs.py) and can be appended with new ones for new tasks. 
 
-[`LowLevelCmdPublisher`](https://github.com/Atarilab/DOOM/blob/main/src/master_manager/master_manager/low_level_cmd_publisher.py) is the ROS2 node inside the `master_manager` that runs the main program loop inside the callback. Essentially, it updates the states and passes them to the controller that is active, which returns low-level commands which could be in the form of PD targets or torques. The low-level commands are then published through the unitree communication channel (which uses DDS), to either the simulation interface or real robot interface (which are automatically resolved from the task name). Optionally, the UI Interface can be run concurrently with the `LowLevelCmdPublisher` inside `master_manager` using the `enable-ui` argument.
+[`LowLevelCmdPublisher`](https://github.com/Atarilab/DOOM/blob/main/src/master_manager/master_manager/low_level_cmd_publisher.py) is the ROS2 node inside the `master_manager` that runs the main program loop inside the callback. Essentially, it updates the states and passes them to the controller that is active, which returns low-level commands which could be in the form of PD targets or torques. The low-level commands are then published through the unitree communication channel (which uses DDS), to either the simulation interface or real robot interface (which are automatically resolved from the task name). Optionally, the UI Interface can be run concurrently with the `LowLevelCmdPublisher` inside `master_manager` using the `ui` argument.
 
 ### 📈 [State Manager](src/state_manager/state_manager/state_manager.py)
 The state manager is responsible for listening to different ROS2/DDS topics. Each subscriber also has callbacks/handlers which are defined in [`state_manager/msg_handlers.py`](src/state_manager/state_manager/msg_handlers.py). The state manager then makes these states available to your controllers in the form of a dictionary.

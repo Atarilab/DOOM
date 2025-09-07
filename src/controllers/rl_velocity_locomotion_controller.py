@@ -124,7 +124,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos_np,
+                    "default_joint_pos": self.default_joint_pos,
                     "mapping": self.joint_obs_unitree_to_isaac_mapping,
                 },
                 obs_dim=12,
@@ -254,6 +254,12 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
         self.joint_pos_targets = self.default_joint_pos.clone()
         self.num_actuated_joints = len(self.robot.actuated_joint_names)
         self.actions_mapping = np.arange(self.num_actuated_joints)
+        # # Frequency tracking (logger will be set later in set_cmd_manager)
+        # self._frequency_tracker = FrequencyTracker(
+        #     name="compute_lowlevelcmd",
+        #     log_interval=2.0,  # Reduced for easier testing
+        #     logger=self.logger  # Will be updated when logger is available
+        # )
 
 
     def set_mode(self):
@@ -360,7 +366,7 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos_np,
+                    "default_joint_pos": self.default_joint_pos,
                     "mapping": self.robot.actuated_joint_indices,
                 },
                 obs_dim=self.num_actuated_joints,
@@ -387,6 +393,10 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
 
         start_time = time.perf_counter()
         self.counter += 1
+        
+        # # Frequency tracking
+        # frequency = self._frequency_tracker.tick()
+        # self.logger.debug(f"compute_lowlevelcmd frequency: {self._frequency_tracker.get_statistics()['current_frequency']:.2f} Hz")
         
         if self.counter % self.decimation == 0:
             try:
@@ -669,7 +679,7 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos_np,
+                    "default_joint_pos": self.default_joint_pos,
                     "mapping": self.leg_joint2motor_idx.cpu().numpy(),
                 },
                 obs_dim=12,

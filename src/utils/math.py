@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import numpy as np
-from scipy.spatial.transform import Rotation as R
 import torch
 
 GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
 
-
-def quaternion_to_euler(q, order="wxyz") -> np.ndarray:
+def quaternion_to_euler(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
     """
     Convert quaternion to Euler angles (roll, pitch, yaw).
 
@@ -20,31 +17,30 @@ def quaternion_to_euler(q, order="wxyz") -> np.ndarray:
         The corresponding euler angles. Shape is (3,)
     """
     if order == "wxyz":
-        w, x, y, z = q
+        w, x, y, z = q[0], q[1], q[2], q[3]
     elif order == "xyzw":
-        x, y, z, w = q
+        x, y, z, w = q[0], q[1], q[2], q[3]
     else:
         raise ValueError(f"Unknown quaternion order: {order}")
 
     # Roll (x-axis rotation)
     sinr_cosp = 2 * (w * x + y * z)
     cosr_cosp = 1 - 2 * (x * x + y * y)
-    roll = np.arctan2(sinr_cosp, cosr_cosp)
+    roll = torch.atan2(sinr_cosp, cosr_cosp)
 
     # Pitch (y-axis rotation)
     sinp = 2 * (w * y - z * x)
-    if np.abs(sinp) >= 1:
-        pitch = np.copysign(np.pi / 2, sinp)  # Use 90 degrees if out of range
+    if torch.abs(sinp) >= 1:
+        pitch = torch.sign(sinp) * torch.pi / 2  # Use 90 degrees if out of range
     else:
-        pitch = np.arcsin(sinp)
+        pitch = torch.asin(sinp)
 
     # Yaw (z-axis rotation)
     siny_cosp = 2 * (w * z + x * y)
     cosy_cosp = 1 - 2 * (y * y + z * z)
-    yaw = np.arctan2(siny_cosp, cosy_cosp)
+    yaw = torch.atan2(siny_cosp, cosy_cosp)
 
-    return np.array([roll, pitch, yaw])
-
+    return torch.stack([roll, pitch, yaw])
 
 def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order="wxyz") -> torch.Tensor:
     """
@@ -73,8 +69,7 @@ def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order="wxyz") -> torch
         c = q_vec * torch.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
     return a - b + c
 
-
-def quat_to_rotmatrix(q: np.ndarray, order="wxyz") -> np.ndarray:
+def quat_to_rotmatrix(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
     """
     Convert quaternion to rotation matrix.
     :param q: The quaternion. Shape is (4,).
@@ -82,24 +77,30 @@ def quat_to_rotmatrix(q: np.ndarray, order="wxyz") -> np.ndarray:
 
     :return : The corresponding rotation matrix. Shape is (3,3)
     """
-    q = np.array(q)
-    
     # Normalize quaternion to handle zero norm cases
-    norm = np.linalg.norm(q)
+    norm = torch.norm(q)
     if norm < 1e-8:
         # If quaternion is zero or very small, return identity matrix
-        return np.eye(3)
+        return torch.eye(3, dtype=q.dtype, device=q.device)
     
     q = q / norm
     
     if order == "wxyz":
-        q = q[[1, 2, 3, 0]]
+        w, x, y, z = q[0], q[1], q[2], q[3]
+    else:  # xyzw
+        x, y, z, w = q[0], q[1], q[2], q[3]
 
-    rot_matrix = R.from_quat(q).as_matrix()
+    # Convert quaternion to rotation matrix
+    # Using the standard formula for quaternion to rotation matrix conversion
+    rot_matrix = torch.stack([
+        torch.stack([1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)]),
+        torch.stack([2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)]),
+        torch.stack([2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)])
+    ])
+    
     return rot_matrix
 
-
-def euler_to_quaternion(roll: float, pitch: float, yaw: float, order="wxyz") -> torch.Tensor:
+def euler_to_quaternion(roll: float, pitch: float, yaw: float, order: str = "wxyz") -> torch.Tensor:
     """
     Convert Euler angles to quaternion.
 
@@ -112,17 +113,30 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float, order="wxyz") -> 
     Returns:
         The corresponding quaternion. Shape is (4,)
     """
-    # Create a rotation object from Euler angles
-    r = R.from_euler("xyz", [roll, pitch, yaw])
+    # Convert Euler angles to quaternion using the standard formula
+    # Roll (x), Pitch (y), Yaw (z) -> Quaternion (w, x, y, z)
+    
+    # Convert floats to tensors for torch operations
+    roll_tensor = torch.tensor(roll, dtype=torch.float32)
+    pitch_tensor = torch.tensor(pitch, dtype=torch.float32)
+    yaw_tensor = torch.tensor(yaw, dtype=torch.float32)
+    
+    cr = torch.cos(roll_tensor * 0.5)
+    sr = torch.sin(roll_tensor * 0.5)
+    cp = torch.cos(pitch_tensor * 0.5)
+    sp = torch.sin(pitch_tensor * 0.5)
+    cy = torch.cos(yaw_tensor * 0.5)
+    sy = torch.sin(yaw_tensor * 0.5)
 
-    # Convert to quaternion
-    quat = r.as_quat()  # Returns in xyzw format
+    w = cr * cp * cy + sr * sp * sy
+    x = sr * cp * cy - cr * sp * sy
+    y = cr * sp * cy + sr * cp * sy
+    z = cr * cp * sy - sr * sp * cy
 
-    # Convert to wxyz format if needed
     if order == "wxyz":
-        quat = np.array([quat[3], quat[0], quat[1], quat[2]])
-
-    return torch.tensor(quat, dtype=torch.float32)
+        return torch.stack([w, x, y, z])
+    else:  # xyzw
+        return torch.stack([x, y, z, w])
 
 @torch.jit.script
 def quat_conjugate(q: torch.Tensor) -> torch.Tensor:
@@ -292,3 +306,89 @@ def subtract_frame_transforms(
     else:
         t12 = quat_apply(q10, -t01)
     return t12, q12
+
+
+@torch.jit.script
+def pose_diff(pos1: torch.Tensor, quat1: torch.Tensor, pos2: torch.Tensor, quat2: torch.Tensor) -> torch.Tensor:
+    """
+    Optimized JIT-compiled version of goal pose difference computation.
+    Uses vectorized operations and avoids intermediate tensor allocations.
+    """
+    # Compute quaternion difference: quat_mul(object_quat_w, quat_conjugate(goal_quat_w))
+    # Optimized quaternion conjugate: negate x, y, z components
+    quat2_conj = torch.cat([quat2[0:1], -quat2[1:]], dim=0)
+    
+    # Vectorized quaternion multiplication using torch operations
+    # Reshape to (1, 4) for batch operations
+    q1 = quat1.unsqueeze(0)  # (1, 4)
+    q2 = quat2_conj.unsqueeze(0)  # (1, 4)
+    
+    # Extract components
+    w1, x1, y1, z1 = q1[:, 0], q1[:, 1], q1[:, 2], q1[:, 3]
+    w2, x2, y2, z2 = q2[:, 0], q2[:, 1], q2[:, 2], q2[:, 3]
+    
+    # Optimized quaternion multiplication
+    ww = (z1 + x1) * (x2 + y2)
+    yy = (w1 - y1) * (w2 + z2)
+    zz = (w1 + y1) * (w2 - z2)
+    xx = ww + yy + zz
+    qq = 0.5 * (xx + (z1 - x1) * (x2 - y2))
+    
+    quat_diff = torch.stack([
+        qq - ww + (z1 - y1) * (y2 - z2),  # w
+        qq - xx + (x1 + w1) * (x2 + w2),  # x
+        qq - yy + (w1 - x1) * (y2 + z2),  # y
+        qq - zz + (z1 + y1) * (w2 - x2)   # z
+    ], dim=1).squeeze(0)  # Remove batch dimension
+    
+    # Compute position difference
+    pos_diff = pos2 - pos1
+    
+    # Concatenate results
+    return torch.cat([pos_diff, quat_diff], dim=0)
+
+
+@torch.jit.script
+def pos_diff(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tensor:
+    """
+    Optimized position difference computation.
+    Computes pos2 - pos1 efficiently.
+    
+    Args:
+        pos1: First position tensor (..., 3)
+        pos2: Second position tensor (..., 3)
+    
+    Returns:
+        Position difference tensor (..., 3)
+    """
+    return pos2 - pos1
+
+
+@torch.jit.script
+def quat_from_euler_xyz(roll: torch.Tensor, pitch: torch.Tensor, yaw: torch.Tensor) -> torch.Tensor:
+    """Convert rotations given as Euler angles in radians to Quaternions.
+
+    Note:
+        The euler angles are assumed in XYZ convention.
+
+    Args:
+        roll: Rotation around x-axis (in radians). Shape is (N,).
+        pitch: Rotation around y-axis (in radians). Shape is (N,).
+        yaw: Rotation around z-axis (in radians). Shape is (N,).
+
+    Returns:
+        The quaternion in (w, x, y, z). Shape is (N, 4).
+    """
+    cy = torch.cos(yaw * 0.5)
+    sy = torch.sin(yaw * 0.5)
+    cr = torch.cos(roll * 0.5)
+    sr = torch.sin(roll * 0.5)
+    cp = torch.cos(pitch * 0.5)
+    sp = torch.sin(pitch * 0.5)
+    # compute quaternion
+    qw = cy * cr * cp + sy * sr * sp
+    qx = cy * sr * cp - sy * cr * sp
+    qy = cy * cr * sp + sy * sr * cp
+    qz = sy * cr * cp - cy * sr * sp
+
+    return torch.stack([qw, qx, qy, qz], dim=-1)

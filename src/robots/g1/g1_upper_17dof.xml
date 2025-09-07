@@ -3,16 +3,16 @@
 
   <default>
     <default class="waist_y_motor">
-      <joint damping="10" armature="0.01" frictionloss="0.05"/>
+      <joint damping="12" armature="0.01" frictionloss="0.05"/>
     </default>
     <!-- <default class="waist_rp_motor">
       <joint damping="5" armature="0.01" frictionloss="0.05"/>
     </default> -->
     <default class="arm_motor">
-      <joint damping="5" armature="0.01" frictionloss="0.05"/>
+      <joint damping="12" armature="0.01" frictionloss="0.1"/>
     </default>
     <default class="wrist_motor">
-      <joint damping="2" armature="0.01" frictionloss="0.05"/>
+      <joint damping="12" armature="0.001" frictionloss="0.1"/>
     </default>
   </default>
 

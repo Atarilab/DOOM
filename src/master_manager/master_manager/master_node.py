@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import os
-import time
 
 import rclpy
 
@@ -17,7 +16,6 @@ from utils.ui_interface import RobotControlUI
 
 node = None
 state_manager = None
-
 
 async def main_async(args=None):
     """
@@ -42,7 +40,7 @@ async def main_async(args=None):
     parser.add_argument("--task", type=str, default="rl-velocity-sim-go2", help="Task name to run")
     parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
-    parser.add_argument("--enable-ui", action="store_true", help="Enable the Robot Control UI")
+    parser.add_argument("--ui", action="store_true", help="Enable the Robot Control UI")
 
     args = parser.parse_args()
 
@@ -66,7 +64,7 @@ async def main_async(args=None):
         state_manager = StateManager(logger=logger)
 
         # Automatically resolve robot class from task name
-        robot = resolve_robot(args.task, logger)
+        robot = resolve_robot(args.task, logger, device=configs["controller_config"]["device"])
 
         # Add subscribers desired for the specified task to state manager from robot model
         for name, subscriber in robot.subscribers.items():
@@ -98,43 +96,37 @@ async def main_async(args=None):
             debug=args.debug,
         )
 
-        async def run():
-            logger.info("Starting concurrent tasks")
+        logger.info("Starting concurrent tasks")
 
-            # Create robot control UI if not disabled
-            app_task = (
-                asyncio.create_task(RobotControlUI(mode_manager, task_name=args.task).run_async())
-                if args.enable_ui
-                else None
-            )
+        # State manager runs at 2x the control frequency (sensor frequency)
+        def spin_node():
+            spin_freq = (1.0 / configs["controller_config"]["control_dt"]) # 2x the control frequency
+            rate = node.create_rate(spin_freq)
+            while rclpy.ok():
+                try:
+                    rclpy.spin_once(node)
+                    state_manager.spin_subscribers()
+                    rate.sleep()
+                except Exception as e:
+                    logger.error(f"Error in spin loop: {e}")
 
-            def spin_node():
-                spin_dt = 0.00025  # you could increase this value to reduce the frequency of the callbacks (less CPU utilization)
-                last_spin_time = time.time()
+        # Run node in separate thread
+        node_task = asyncio.create_task(asyncio.to_thread(spin_node))
+        
+        # Create robot control UI if not disabled (non-blocking)
+        try:
+            if args.ui:
+                app_task = asyncio.create_task(RobotControlUI(mode_manager, task_name=args.task).run_async())
+                app_task.add_done_callback(lambda t: t.result() if not t.cancelled() else None)
+            
+            # Only wait for the node task
+            await node_task
+            
+        except asyncio.CancelledError:
+            mode_manager.set_mode("DAMPING")
+            logger.info("Cancelling all tasks in master node before shutdown..")
+            raise
 
-                while rclpy.ok():
-                    current_time = time.time()
-                    elapsed = current_time - last_spin_time
-
-                    if elapsed >= spin_dt:
-                        rclpy.spin_once(node)
-                        state_manager.spin_subscribers()
-                        last_spin_time = current_time
-                    else:
-                        # Sleep for a short time to avoid busy waiting
-                        time.sleep(max(0, spin_dt - elapsed))
-
-            node_task = asyncio.create_task(asyncio.to_thread(spin_node))
-            try:
-                if app_task is not None:
-                    await asyncio.gather(app_task, node_task)
-                else:
-                    await node_task
-            except asyncio.CancelledError:
-                logger.info("Tasks were cancelled")
-                raise
-
-        await run()
     except KeyboardInterrupt:
         logger.info("Received KeyboardInterrupt. Shutting down...")
 

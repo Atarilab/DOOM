@@ -5,13 +5,11 @@ This file is used to define the functions that process the states to compute ind
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
-import numpy as np
 import torch
 
 from utils.helpers import reorder_robot_states, tensorify
-from utils.math import quat_rotate_inverse, quat_mul, quat_conjugate, combine_frame_transforms, subtract_frame_transforms,  quat_apply
+from utils.math import quat_rotate_inverse, quat_conjugate, subtract_frame_transforms,  quat_apply, pose_diff, pos_diff
 
-import logging
 
 if TYPE_CHECKING:
     pass  # MjRobotWrapper will be imported when needed
@@ -37,10 +35,10 @@ def joint_pos(states: Dict[str, Any], asset_name: str = "robot", dtype: torch.dt
 
 def joint_pos_rel(
     states: Dict[str, Any],
-    default_joint_pos: np.ndarray,
+    default_joint_pos: torch.Tensor,
     asset_name: str = "robot",
     scale=1.0,
-    mapping: Optional[np.ndarray] = None,
+    mapping: Optional[torch.Tensor] = None,
     dtype: torch.dtype = torch.float32,
     device: Optional[torch.device] = None,
 ) -> torch.Tensor:
@@ -56,19 +54,20 @@ def joint_pos_rel(
     :return: Relative joint positions
     """
     if mapping is None:
-        mapping = np.arange(len(states[f"{asset_name}/joint_pos"]))
+        mapping = torch.arange(len(states[f"{asset_name}/joint_pos"]), dtype=torch.long, device=device)
     
-    # Get joint positions and ensure they're numpy arrays for consistent subtraction
+    # Get joint positions and ensure they're tensors for consistent subtraction
     joint_pos_data = states[f"{asset_name}/joint_pos"][mapping]
+    default_joint_pos_tensor = tensorify(default_joint_pos, dtype=dtype, device=device)
 
-    result = joint_pos_data - default_joint_pos
-    return tensorify(result, dtype=dtype, device=device) * scale
+    result = joint_pos_data - default_joint_pos_tensor
+    return result * scale
 
 
 def joint_pos_limit_normalized(
     states: Dict[str, Any],
-    soft_dof_limits: np.ndarray,
-    mapping: Optional[np.ndarray] = None,
+    soft_dof_limits: torch.Tensor,
+    mapping: Optional[torch.Tensor] = None,
     asset_name: str = "robot",
     dtype: torch.dtype = torch.float32,
     device: Optional[torch.device] = None,
@@ -83,25 +82,18 @@ def joint_pos_limit_normalized(
     :return: Normalized joint positions
     """
 
-    joint_pos = states[f"{asset_name}/joint_pos"][mapping]
+    joint_pos = tensorify(states[f"{asset_name}/joint_pos"], dtype=dtype, device=device)[mapping]
+    soft_dof_limits_tensor = tensorify(soft_dof_limits, dtype=dtype, device=device)
     
-    # # Ensure joint_pos is a numpy array for consistent arithmetic operations
-    # if isinstance(joint_pos, torch.Tensor):
-    #     joint_pos = joint_pos.cpu().numpy()
-    
-    # # Ensure soft_dof_limits is a numpy array
-    # if isinstance(soft_dof_limits, torch.Tensor):
-    #     soft_dof_limits = soft_dof_limits.cpu().numpy()
-    
-    lower_limit = soft_dof_limits[0][mapping]
-    upper_limit = soft_dof_limits[1][mapping]
+    lower_limit = soft_dof_limits_tensor[0][mapping]
+    upper_limit = soft_dof_limits_tensor[1][mapping]
 
     offset = (lower_limit + upper_limit) * 0.5
     result = 2 * (joint_pos - offset) / (upper_limit - lower_limit)
-    return tensorify(result, dtype=dtype, device=device)
+    return result
 
 
-def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, mapping: Optional[np.ndarray] = None, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
+def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, mapping: Optional[torch.Tensor] = None, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
     """
     The joint velocities of the asset.
 
@@ -113,9 +105,9 @@ def joint_vel(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, mapp
     :return: Joint velocities
     """
     if mapping is None:
-        mapping = np.arange(len(states[f"{asset_name}/joint_vel"]))
+        mapping = torch.arange(len(states[f"{asset_name}/joint_vel"]), dtype=torch.long, device=device)
     result = states[f"{asset_name}/joint_vel"][mapping]
-    return tensorify(result, dtype=dtype, device=device) * scale
+    return result * scale
 
 
 def lin_vel_w(states: Dict[str, Any], asset_name: str = "robot", scale=1.0, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -268,9 +260,9 @@ def phase(states: Dict[str, Any], counter: Callable, period: float, control_dt: 
     """
     count = counter() * control_dt
     phase_val = count % period / period
-    sin_phase = np.sin(phase_val * np.pi * 2)
-    cos_phase = np.cos(phase_val * np.pi * 2)
-    return tensorify([sin_phase, cos_phase], dtype=dtype, device=device)
+    sin_phase = torch.sin(torch.tensor(phase_val * torch.pi * 2, dtype=dtype, device=device))
+    cos_phase = torch.cos(torch.tensor(phase_val * torch.pi * 2, dtype=dtype, device=device))
+    return torch.stack([sin_phase, cos_phase])
 
 
 def phase_with_timing(states: Dict[str, Any], counter: Callable, period: float, control_dt: float, decimation: int, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -291,9 +283,9 @@ def phase_with_timing(states: Dict[str, Any], counter: Callable, period: float, 
     # Use counter for phase calculation
     count = counter() * control_dt
     phase_val = count % period / period
-    sin_phase = np.sin(phase_val * np.pi * 2)
-    cos_phase = np.cos(phase_val * np.pi * 2)
-    return tensorify([sin_phase, cos_phase], dtype=dtype, device=device)
+    sin_phase = torch.sin(torch.tensor(phase_val * torch.pi * 2, dtype=dtype, device=device))
+    cos_phase = torch.cos(torch.tensor(phase_val * torch.pi * 2, dtype=dtype, device=device))
+    return torch.stack([sin_phase, cos_phase])
 
 
 def current_time(states: Dict[str, Any], dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -319,9 +311,8 @@ def contact_plan(states: Dict[str, Any], contact_plan: Callable, dtype: torch.dt
     :param dtype: Desired tensor dtype
     :param device: Desired tensor device
     :return: Contact plan
-    """
-    result = contact_plan().reshape(-1)
-    return tensorify(result, dtype=dtype, device=device)
+    """ 
+    return contact_plan().reshape(-1)
 
 
 def contact_status(states: Dict[str, Any], asset_name: str = "robot", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -334,18 +325,12 @@ def contact_status(states: Dict[str, Any], asset_name: str = "robot", dtype: tor
     :param device: Desired tensor device
     :return: Contact status tensor
     """
-    contact_status = np.zeros(4)
-    contact_forces = states[f"{asset_name}/foot_forces"]
+    contact_status = torch.zeros(4, dtype=dtype, device=device)
+    contact_forces = tensorify(states[f"{asset_name}/foot_forces"], dtype=dtype, device=device)
     
-    # Ensure contact_forces is a numpy array for consistent operations
-    if isinstance(contact_forces, torch.Tensor):
-        contact_forces = contact_forces.cpu().numpy()
-    elif not isinstance(contact_forces, np.ndarray):
-        contact_forces = np.array(contact_forces)
-    
-    contact_forces_norm = np.linalg.norm(contact_forces)
+    contact_forces_norm = torch.norm(contact_forces, dim=-1)
     contact_status[contact_forces_norm > 1.0] = 1
-    return tensorify(contact_status, dtype=dtype, device=device)
+    return contact_status
 
 
 def contact_time_left(states: Dict[str, Any], contact_time_left: Callable, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -384,7 +369,7 @@ def dummy_contact_status(states: Dict[str, Any], dtype: torch.dtype = torch.floa
     :param device: Desired tensor device
     :return: Zero tensor for contact status
     """
-    return tensorify(np.zeros(4), dtype=dtype, device=device)
+    return torch.zeros(4, dtype=dtype, device=device)
 
 
 def base_height(states: Dict[str, Any], mj_model: Any, dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -498,10 +483,10 @@ def contact_pos_error(states: Dict[str, Any],
 ) -> torch.Tensor:
     """
     The contact position error.
+
     """
-    current_hand_pos_w = torch.tensor(mj_model.get_ee_positions_w(), dtype=dtype, device=device)[:2]
-    contact_pos_error = (contact_pose_w()[:, :3] - current_hand_pos_w).flatten()
-    return tensorify(contact_pos_error, dtype=dtype, device=device)
+    current_hand_pos_w = mj_model.get_ee_positions_w()[:2]
+    return pos_diff(current_hand_pos_w, contact_pose_w()).flatten()
     
 
     
@@ -524,20 +509,21 @@ def contact_pose_b(
     return tensorify(result, dtype=dtype, device=device)
 
 
+
 def goal_pose_diff(states: Dict[str, Any], goal_pose_w: Callable, asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
     """
     The difference between the current goal pose and the current pose.
-    """
 
-    object_pos_w = torch.tensor(states[f"{asset_name}/base_pos_w"], dtype=dtype, device=device)
-    object_quat_w = torch.tensor(states[f"{asset_name}/base_quat"], dtype=dtype, device=device)
+    """
+    # Get data from states - avoid unnecessary tensorify calls if already tensors
+    object_pos_w = states[f"{asset_name}/base_pos_w"]
+    object_quat_w = states[f"{asset_name}/base_quat"]
     
-    goal_pos_w, goal_quat_w = goal_pose_w()[:3], goal_pose_w()[3:]
-    quat_diff = quat_mul(object_quat_w, quat_conjugate(goal_quat_w))
+    # Get goal pose and ensure it's a tensor
+    goal_pose = goal_pose_w()
+    goal_pos_w, goal_quat_w = goal_pose[:3], goal_pose[3:]
     
-    pos_diff = goal_pos_w - object_pos_w
-    result = torch.cat([pos_diff, quat_diff], dim=-1)
-    return tensorify(result, dtype=dtype, device=device)
+    return pose_diff(object_pos_w, object_quat_w, goal_pos_w, goal_quat_w)
 
 
 def object_pose_b(states: Dict[str, Any], asset_name: str = "object", dtype: torch.dtype = torch.float32, device: Optional[torch.device] = None) -> torch.Tensor:
@@ -596,7 +582,8 @@ def object_pos_robot_xy_frame(states: Dict[str, Any], asset_name: str = "object"
     :return: Position of the object in the robot's xy frame
     """
     object_pos_w = states[f"{asset_name}/base_pos_w"]
-    robot_pos_w = states["robot/base_pos_w"]
+    robot_pos_w = states["robot/base_pos_w"].clone()
+    robot_pos_w[2] = 0.0
+    
     result = object_pos_w - robot_pos_w
-    result[:2] = 0.0
-    return tensorify(result, dtype=dtype, device=device) * scale
+    return result * scale

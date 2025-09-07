@@ -26,7 +26,7 @@ class Go2(RobotBase):
     This class provides robot-specific data and available controllers for the Go2 robot based on the desired task.
     """
 
-    def __init__(self, task, logger):
+    def __init__(self, task, logger, device="cuda:0"):
         """
         Initialize the Go2 robot.
 
@@ -34,7 +34,7 @@ class Go2(RobotBase):
             task (str): The task to be performed by the robot.
             logger (logging.Logger): The logger to be used for logging.
         """
-        super().__init__(task=task, logger=logger)
+        super().__init__(task=task, logger=logger, device=device)
         self.joint_mapper = JointMappingInterface("go2")
 
         # Keep backward compatibility with existing mapping arrays
@@ -302,7 +302,7 @@ class Go2(RobotBase):
 
         - "low_state": a DDSStateSubscriber for the low-level state of the robot.
         - "sports_mode_state": a DDSStateSubscriber for the sports mode state of the robot in simulation.
-        - "vicon_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
+        - "vicon_robot_state": a ROS2StateSubscriber for the Vicon state of the robot in the real world.
 
         The subscribers are initialized with the corresponding handler functions and topics.
 
@@ -315,6 +315,7 @@ class Go2(RobotBase):
             topic="rt/lowstate",
             msg_type=Go2LowState_,
             handler_func=go2_low_state_handler,
+            handler_args={"device": self.device} if self.device else {},
             logger=self.logger,
         )
         _subscribers["low_state"] = dds_low_state_sub
@@ -326,6 +327,7 @@ class Go2(RobotBase):
                 topic="rt/sportmodestate",
                 msg_type=SportModeState_,
                 handler_func=sport_mode_state_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
             _subscribers["sports_mode_state"] = dds_sportsmode_state_sub
@@ -334,11 +336,12 @@ class Go2(RobotBase):
 
             ros2_vicon_sub = ROS2StateSubscriber(
                 topic="/vicon/Go2/Go2",
-                node_name="vicon_state",
+                node_name="vicon_robot_state",
                 msg_type=Position,
                 handler_func=vicon_handler,
+                handler_args={"device": self.device} if self.device else {},
                 logger=self.logger,
             )
-            _subscribers["vicon_state"] = ros2_vicon_sub
+            _subscribers["vicon_robot_state"] = ros2_vicon_sub
 
         return _subscribers

@@ -2,7 +2,6 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, Dict
 
-import numpy as np
 from std_msgs.msg import ColorRGBA, Float32MultiArray, MultiArrayDimension
 import torch
 from visualization_msgs.msg import Marker, MarkerArray
@@ -10,6 +9,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
 from state_manager.obs_manager import ObsTerm
+# from utils.frequency_tracker import FrequencyTracker
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
@@ -62,7 +62,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3, device=self.device)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3, device=self.device)
-        self.desired_ee_position_w = np.zeros((4, 3))
+        self.desired_ee_position_w = torch.zeros((4, 3))
 
         # Heading command for feet positions
         self.heading_command = 0.0  # Default heading (in radians)
@@ -204,6 +204,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.current_goal_idx = 0
         self.goal_completion_counter = 0
         self.joint_pos_targets = self.default_joint_pos.clone()
+        # # Frequency tracking (logger will be set later in set_cmd_manager)
+        # self._frequency_tracker = FrequencyTracker(
+        #     name="compute_lowlevelcmd",
+        #     log_interval=2.0,  # Reduced for easier testing
+        #     logger=self.logger  # Will be updated when logger is available
+        # )
 
     def register_observations(self):
         """
@@ -233,7 +239,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 obs_dim=24,
                 params={
                     "mj_model": self.robot.mj_model,
-                    "future_feet_positions_w": lambda: self.future_feet_positions_w.cpu().numpy(),
+                    "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "obs_horizon": 2,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
@@ -258,7 +264,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos_np,
+                    "default_joint_pos": self.default_joint_pos,
                     "mapping": self.joint_obs_unitree_to_isaac_mapping,
                 },
                 obs_dim=12,
@@ -275,7 +281,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 ee_pos_rel_b,
                 params={
                     "mj_model": self.robot.mj_model,
-                    "future_feet_positions_w": lambda: self.future_feet_positions_w.cpu().numpy(),
+                    "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
                 obs_dim=4,
@@ -339,72 +345,92 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         :param state: Current robot state
         :return: Motor commands dictionary
         """
-        self.counter += 1
-        
-        if self.robot.mj_model is not None:
-            self.robot.mj_model.update(state)
-
-        start_time = time.perf_counter()
-
-        # Update the latest state for the observation processing thread
-        with self._lock:
-            self.latest_state = state
-
-        # Update contact plan timing with thread safety
-        with self._gait_lock:
-            current_time = time.time()
-            elapsed = current_time - self.command_start_time
-            self.time_left = max(0, self.command_duration - elapsed)
-            if elapsed >= self.command_duration:
-                self.command_start_time = current_time
-                self._resample_commands()
-                # # self._update_desired_ee_positions()
-                # self._update_action_scale()
-
-                if self.visualize["feet_error"]:
-                    self.pub_feet_error()
-                    self.pub_feet_error_norm()
-
-        if self.visualize["current_contact_locations"]:
-            self.pub_current_contact_locations()
-
-        if self.visualize["foot_forces"]:
-            self.pub_foot_forces(self.latest_state["robot/foot_forces"])
-            self.pub_contact_status(self.latest_state["robot/foot_forces"])
-        if self.visualize["contact_plan"]:
-            self.pub_contact_plan()
-
-        # self.logger.debug(f"Time left: {self.time_left:.2f} seconds")
-        
-        # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
-        # else we can compute the joint pos targets directly from the obs tensor
-        if self.counter % self.decimation == 0:
-            if not self.use_threading:
-                obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
-                self.joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
-            else:
-                self.joint_pos_targets = self.compute_joint_pos_targets()
+        try:
+            self.counter += 1
             
-        # Clip the joint pos targets for safety
-        if hasattr(self, "soft_dof_pos_limit"):
-            self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
+            if self.robot.mj_model is not None:
+                self.robot.mj_model.update(state)
 
-        # Prepare motor commands
-        self.cmd = {
-            f"motor_{i}": {
-                "q": self.joint_pos_targets[i],
-                "kp": self.Kp,
-                "dq": 0.0,
-                "kd": self.Kd,
-                "tau": 0.0,
+            # Frequency tracking
+            frequency = self._frequency_tracker.tick()
+            self.logger.debug(f"compute_lowlevelcmd frequency: {self._frequency_tracker.get_statistics()['current_frequency']:.2f} Hz")
+        
+            start_time = time.perf_counter()
+
+            # Update the latest state for the observation processing thread
+            with self._lock:
+                self.latest_state = state
+
+            # Update contact plan timing with thread safety
+            with self._gait_lock:
+                current_time = time.time()
+                elapsed = current_time - self.command_start_time
+                self.time_left = max(0, self.command_duration - elapsed)
+                if elapsed >= self.command_duration:
+                    self.command_start_time = current_time
+                    self._resample_commands()
+                    # # self._update_desired_ee_positions()
+                    # self._update_action_scale()
+
+                    if self.visualize["feet_error"]:
+                        self.pub_feet_error()
+                        self.pub_feet_error_norm()
+
+            if self.visualize["current_contact_locations"]:
+                self.pub_current_contact_locations()
+
+            if self.visualize["foot_forces"]:
+                self.pub_foot_forces(self.latest_state["robot/foot_forces"])
+                self.pub_contact_status(self.latest_state["robot/foot_forces"])
+            if self.visualize["contact_plan"]:
+                self.pub_contact_plan()
+
+            # self.logger.debug(f"Time left: {self.time_left:.2f} seconds")
+            
+            # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
+            # else we can compute the joint pos targets directly from the obs tensor
+            
+            if self.counter % self.decimation == 0:
+                if not self.use_threading:
+                    obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
+                    self.joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
+                else:
+                    self.joint_pos_targets = self.compute_joint_pos_targets()
+                
+            # Clip the joint pos targets for safety
+            if hasattr(self, "soft_dof_pos_limit"):
+                self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
+
+            # Prepare motor commands
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": self.joint_pos_targets[i],
+                    "kp": self.Kp,
+                    "dq": 0.0,
+                    "kd": self.Kd,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
             }
-            for i in range(self.robot.num_joints)
-        }
 
-        # Track command preparation time
-        self.cmd_preparation_time = time.perf_counter() - start_time
+            # Track command preparation time
+            self.cmd_preparation_time = time.perf_counter() - start_time
 
-        return self.cmd
+            return self.cmd
+        
+        except Exception as e:
+            self.logger.error(f"Error computing low level commands: {e}. Defaulting to default joint positions.")
+            self.cmd = {
+                f"motor_{i}": {
+                    "q": self.default_joint_pos[i],
+                    "kp": 0.0,
+                    "dq": 0.0,
+                    "kd": 0.0,
+                    "tau": 0.0,
+                }
+                for i in range(self.robot.num_joints)
+            }
+            return self.cmd
 
     # def _update_action_scale(self):
     #     """Update the action scale based on the current gait."""
@@ -1079,9 +1105,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         """
         try:
             # Calculate error norms directly
-            feet_errors = np.linalg.norm(
+            feet_errors = torch.linalg.norm(
                 self.robot.mj_model.get_ee_positions_w()
-                - self.future_feet_positions_w[:, self.current_goal_idx].numpy(),
+                - self.future_feet_positions_w[:, self.current_goal_idx],
                 axis=-1,
             )
 
@@ -1198,7 +1224,7 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
                 obs_dim=24,
                 params={
                     "mj_model": self.robot.mj_model,
-                    "future_feet_positions_w": lambda: self.future_feet_positions_w.cpu().numpy(),
+                    "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "obs_horizon": 2,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
@@ -1223,7 +1249,7 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos_np,
+                    "default_joint_pos": self.default_joint_pos,
                     "mapping": self.joint_obs_unitree_to_isaac_mapping,
                 },
                 obs_dim=29,
@@ -1240,7 +1266,7 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
                 ee_pos_rel_b,
                 params={
                     "mj_model": self.robot.mj_model,
-                    "future_feet_positions_w": lambda: self.future_feet_positions_w.cpu().numpy(),
+                    "future_feet_positions_w": lambda: self.future_feet_positions_w,
                     "current_goal_idx": lambda: self.current_goal_idx,
                 },
                 obs_dim=4,

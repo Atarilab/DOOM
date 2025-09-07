@@ -14,10 +14,11 @@ class RobotBase(ABC):
     Subclasses must define all required properties.
     """
 
-    def __init__(self, task, logger):
+    def __init__(self, task, logger, device="cuda:0"):
         self.task = task
         self.logger = logger
-        self.mj_model = MjRobotWrapper(self.xml_path, self.ee_names, self.base_link)
+        self.device = device
+        self.mj_model = MjRobotWrapper(self.xml_path, self.ee_names, self.base_link, device=self.device)
         
         if self.floating_base:
             self.actuated_joint_indices = [self.mj_model.joint_names[joint_name] - 1 for joint_name in self.actuated_joint_names]
