@@ -7,7 +7,8 @@ import torch
 from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
 from state_manager.obs_manager import ObsTerm
-from utils.math import combine_frame_transforms, subtract_frame_transforms
+from utils.math import combine_frame_transforms, subtract_frame_transforms, quat_from_euler_xyz
+from utils.frequency_tracker import FrequencyTracker, MultiFrequencyTracker
 
 # ROS2 imports for visualization
 from visualization_msgs.msg import Marker, MarkerArray
@@ -15,7 +16,6 @@ from std_msgs.msg import ColorRGBA
 
 if TYPE_CHECKING:
     from robots.robot_base import RobotBase
-
 
 class RLHumanoidBimanualContactController(RLControllerBase):
     """
@@ -76,21 +76,21 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.command_duration = 1.3  # Duration of each contact plan in seconds
         self.object_size = torch.tensor([0.14, 0.105, 0.14], dtype=torch.float32, device=self.device) * 2.0 
 
-        # self.repose_contact_plan_ = torch.tensor(
-        #     [
-        #         [False, False, True, True, True, True, True, True, True, True, True, True],
-        #         [False, False, True, True, True, True, True, True, True, True, True, True],
-        #     ], 
-        #     dtype=torch.bool, device=self.device
-        # )
-        
         self.repose_contact_plan_ = torch.tensor(
             [
-                [False, False, False, False, False, False, False, False, False, False, False, False],
-                [False, False, False, False, False, False, False, False, False, False, False, False],
+                [False, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True],
+                [False, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True],
             ], 
             dtype=torch.bool, device=self.device
         )
+        
+        # self.repose_contact_plan_ = torch.tensor(
+        #     [
+        #         [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
+        #         [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
+        #     ], 
+        #     dtype=torch.bool, device=self.device
+        # )
 
         self.command_start_time = time.time()  # When the current plan started
         self._command_lock = threading.RLock()  # Reentrant lock for gait changes
@@ -127,15 +127,23 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.contact_pose_o[:, :3] = self.repose_contact_pos_o[self.current_goal_idx, :, :3]
         self.contact_pose_o[:, 3] = 1.0
         
-        self.contact_pose_b = torch.zeros_like(self.contact_pose_o)
+        # self.contact_pose_b = torch.zeros_like(self.contact_pose_o)
         self.contact_pose_w = torch.zeros_like(self.contact_pose_o)
         
         self.actions_mapping = torch.arange(len(self.policy_joint_indices), dtype=torch.int32, device=self.device)
         
         self.object_goal_pose_w = torch.zeros(7, dtype=torch.float32, device=self.device)
-        self.object_goal_pose_w[:3] = torch.tensor([0.25, 0.0, 0.7], dtype=torch.float32, device=self.device)
+        self.object_goal_pose_w[:3] = torch.tensor([0.3, 0.0, 0.85], dtype=torch.float32, device=self.device)
         self.object_goal_pose_w[2] += self.object_size[2] / 2
         self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+        
+        self.object_rpy_ranges = torch.tensor([[-0.3, 0.3], [-0.3, 0.3], [-0.3, 0.3]], dtype=torch.float32, device=self.device)
+        # Frequency tracking (logger will be set later in set_cmd_manager)
+        self._frequency_tracker = FrequencyTracker(
+            name="compute_lowlevelcmd",
+            log_interval=2.0,  # Reduced for easier testing
+            logger=self.logger  # Will be updated when logger is available
+        )
 
     def register_observations(self):
         """
@@ -162,7 +170,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             ObsTerm(
                 joint_pos_rel,
                 params={
-                    "default_joint_pos": self.default_joint_pos_np,
+                    "default_joint_pos": self.default_joint_pos,
                     "mapping": self.policy_joint_indices,
                 },
                 obs_dim=len(self.policy_joint_names),
@@ -184,7 +192,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         
         # - Object observations
         self.obs_manager.register(
-            "object_pos_robot_xy_frame",
+            "object_pos",
             ObsTerm(
                 object_pos_robot_xy_frame,
                 params={"asset_name": "object"},
@@ -193,7 +201,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             ),
         )
         self.obs_manager.register(
-            "object_quat_w",
+            "object_quat",
             ObsTerm(
                 root_quat_w,
                 params={"asset_name": "object"},
@@ -219,10 +227,10 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             ),
         )
         self.obs_manager.register(
-            "contact_pos_error",
+            "contact_command",
             ObsTerm(
                 contact_pos_error,
-                params={"contact_pose_w": lambda: self.contact_pose_w, "mj_model": self.robot.mj_model},
+                params={"contact_pose_w": lambda: self.contact_pose_w[:, :3], "mj_model": self.robot.mj_model},
                 obs_dim=6,
                 device=self.device,
             ),
@@ -270,6 +278,10 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         :param state: Current robot state
         :return: Motor commands dictionary
         """
+        # # Frequency tracking
+        # frequency = self._frequency_tracker.tick()
+        # self.logger.debug(f"compute_lowlevelcmd frequency: {self._frequency_tracker.get_statistics()['current_frequency']:.2f} Hz")
+
         if self.robot.mj_model is not None:
             self.robot.mj_model.update(state)
 
@@ -294,59 +306,53 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         # Publish visualizations to RViz
         self.pub_all_visualizations()
 
-        try:
-            # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
-            # else we can compute the joint pos targets directly from the obs tensor
-            if self.counter % self.decimation == 0:
-                if not self.use_threading:
-                    obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
-                    self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets_from_policy(obs_tensor)
-                else:
-                    self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets()
+        # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
+        # else we can compute the joint pos targets directly from the obs tensor
+        if self.counter % self.decimation == 0:
+            if not self.use_threading:
+                obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
+                self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets_from_policy(obs_tensor)
+                # # Log each observation with key and value from 
+                # for name, obs_term in self.obs_manager.obs_terms.items():
+                #     self.logger.debug(f"{name}: {obs_term(self.latest_state, 0)}")
                     
-            # self.joint_pos_targets[self.non_actuated_joint_indices] = 0.0
+                # self.logger.debug("--------------------------------")
+            else:
+                self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets()
                 
-            # # Clip the joint pos targets for safety
-            if hasattr(self, "soft_dof_pos_limit"):
-                self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
+        # self.joint_pos_targets[self.non_actuated_joint_indices] = 0.0
             
-
-            # # Log each observation with key and value from 
-            # for name, obs_term in self.obs_manager.obs_terms.items():
-            #     self.logger.debug(f"{name}: {obs_term(self.latest_state, 0)}")
-            # self.logger.debug(f"Joint pos targets: {self.joint_pos_targets[self.robot.actuated_joint_indices]}")
+        # # Clip the joint pos targets for safety
+        if hasattr(self, "soft_dof_pos_limit"):
+            self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
         
-            for idx, joint_idx in enumerate(self.policy_joint_indices):
-                self.cmd[f"motor_{joint_idx}"] = {
-                    "q": self.joint_pos_targets[idx],
-                    # "q": self.default_joint_pos_np[idx],
-                    "kp": self.Kp[idx],
-                    "dq": 0.0,
-                    "kd": self.Kd[idx],
-                    "tau": 0.0,
-                }
-            for idx, joint_idx in enumerate(self.non_policy_joint_indices):
-                self.cmd[f"motor_{joint_idx}"] = {
-                    "q": self.non_policy_default_angles[idx],
-                    "kp": self.non_policy_joint_Kps[idx],
-                    "dq": 0.0,
-                    "kd": self.non_policy_joint_Kds[idx],
-                    "tau": 0.0,
-                }
+        # # Log each observation with key and value from 
+        # for name, obs_term in self.obs_manager.obs_terms.items():
+        #     obs_term_start_time = time.perf_counter()
+        #     self.logger.debug(f"{name}: {obs_term(self.latest_state)}")
+        # self.logger.debug("--------------------------------")
+        # self.logger.debug(f"Joint pos targets: {self.joint_pos_targets[self.policy_joint_indices]}")
+    
+        for idx, joint_idx in enumerate(self.policy_joint_indices):
+            self.cmd[f"motor_{joint_idx}"] = {
+                "q": self.joint_pos_targets[joint_idx].item(),
+                # "q": self.default_joint_pos_np[idx],
+                "kp": self.Kp[idx],
+                "dq": 0.0,
+                "kd": self.Kd[idx],
+                "tau": 0.0,
+            }
+        for idx, joint_idx in enumerate(self.non_policy_joint_indices):
+            self.cmd[f"motor_{joint_idx}"] = {
+                "q": self.non_policy_default_angles[idx],
+                "kp": self.non_policy_joint_Kps[idx],
+                "dq": 0.0,
+                "kd": self.non_policy_joint_Kds[idx],
+                "tau": 0.0,
+            }
 
-            # Track command preparation time
-            self.cmd_preparation_time = time.perf_counter() - start_time
-
-        except Exception as e:
-            self.logger.error(f"Error computing torques: {e}")
-            for i, joint_idx in enumerate(self.robot.actuated_joint_indices):
-                self.cmd[f"motor_{joint_idx}"] = {
-                    "q": 0.0,
-                    "kp": 0.0,
-                    "dq": 0.0,
-                    "kd": 0.0,
-                    "tau": 0.0,
-                }
+        # Track command preparation time
+        self.cmd_preparation_time = time.perf_counter() - start_time
 
                 
         self.cmd["mode_pr"] = self.robot.MotorMode.PR
@@ -373,9 +379,9 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             object_quat_w = torch.tensor(self.latest_state["object/base_quat"], dtype=torch.float32, device=self.device)
             # self.logger.debug(f"Object pose: {object_pos_w}, {object_quat_w}")
             
-            # Get robot base pose
-            robot_pos_w = torch.tensor(self.latest_state["robot/base_pos_w"], dtype=torch.float32, device=self.device)
-            robot_quat_w = torch.tensor(self.latest_state["robot/base_quat"], dtype=torch.float32, device=self.device)
+            # # Get robot base pose
+            # robot_pos_w = torch.tensor(self.latest_state["robot/base_pos_w"], dtype=torch.float32, device=self.device)
+            # robot_quat_w = torch.tensor(self.latest_state["robot/base_quat"], dtype=torch.float32, device=self.device)
             
             # Contact poses in the world frame
             self.contact_pose_w[:, :3], self.contact_pose_w[:, 3:7] = combine_frame_transforms(
@@ -385,13 +391,13 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 q12=self.contact_pose_o[:, 3:7],
             )
 
-            # Contact poses in the base frame (for policy observations)
-            self.contact_pose_b[:, :3], self.contact_pose_b[:, 3:7] = subtract_frame_transforms(
-                t01=robot_pos_w.unsqueeze(0).expand(2, -1),
-                q01=robot_quat_w.unsqueeze(0).expand(2, -1),
-                t02=self.contact_pose_w[:, :3],
-                q02=self.contact_pose_w[:, 3:7],
-            )
+            # # Contact poses in the base frame (for policy observations)
+            # self.contact_pose_b[:, :3], self.contact_pose_b[:, 3:7] = subtract_frame_transforms(
+            #     t01=robot_pos_w.unsqueeze(0).expand(2, -1),
+            #     q01=robot_quat_w.unsqueeze(0).expand(2, -1),
+            #     t02=self.contact_pose_w[:, :3],
+            #     q02=self.contact_pose_w[:, 3:7],
+            # )
             
         except Exception as e:
             if hasattr(self, 'logger') and self.logger is not None:
@@ -416,16 +422,28 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         """Resample the commands for the controller with thread safety."""
         try:
             with self._command_lock:
-                
                 self.current_goal_idx += 1
                 
                 # Update contact pose_o based on current goal index
                 self._update_contact_pose_o()
 
-                if self.current_goal_idx >= self.repose_contact_pos_o.shape[0]-1:
+                if self.current_goal_idx + 2 > self.repose_contact_pos_o.shape[0]:
                     self.current_goal_idx = 2
                     
-                self.logger.info(f"Current goal index: {self.current_goal_idx}")
+                self.current_contact_plan = self.repose_contact_plan_[:, self.current_goal_idx : self.current_goal_idx + 2]
+                
+                if self.current_goal_idx > 2:
+                    rpy = torch.zeros(3, dtype=torch.float32, device=self.device)
+                    rpy[0].uniform_(self.object_rpy_ranges[0][0], self.object_rpy_ranges[0][1])
+                    rpy[1].uniform_(self.object_rpy_ranges[1][0], self.object_rpy_ranges[1][1])
+                    rpy[2].uniform_(self.object_rpy_ranges[2][0], self.object_rpy_ranges[2][1])
+                    self.object_goal_pose_w[3:] = quat_from_euler_xyz(rpy[0], rpy[1], rpy[2])
+                    
+                    
+                # self.logger.debug(f"Current goal index: {self.current_goal_idx}")
+                # self.logger.debug(f"Current contact plan: {self.current_contact_plan}")
+                
+                # self.logger.debug("--------------------------------")
 
         except Exception as e:
             if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
@@ -577,7 +595,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             object_pos_w = torch.tensor(self.latest_state["object/base_pos_w"], dtype=torch.float32, device=self.device)
             object_quat_w = torch.tensor(self.latest_state["object/base_quat"], dtype=torch.float32, device=self.device)
             
-
+            # self.logger.debug(f"Object pose: {object_pos_w}, {object_quat_w}")
             # Create cuboid marker
             marker = Marker()
             marker.header.frame_id = "world"
@@ -591,7 +609,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             marker.pose.position.x = float(object_pos_w[0])
             marker.pose.position.y = float(object_pos_w[1])
             marker.pose.position.z = float(object_pos_w[2])
-            marker.pose.orientation.w = float(obcjet_quat_w[0])
+            marker.pose.orientation.w = float(object_quat_w[0])
             marker.pose.orientation.x = float(object_quat_w[1])
             marker.pose.orientation.y = float(object_quat_w[2])
             marker.pose.orientation.z = float(object_quat_w[3])
@@ -720,7 +738,6 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 if self.visualize.get("contact_positions", False):
                     self.pub_contact_positions()
                 if self.visualize.get("desired_object_pose", False):
-
                     self.pub_desired_object_pose()
 
         except Exception as e:

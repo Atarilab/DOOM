@@ -1,32 +1,32 @@
 policy_path: "bimanual_g1/policy.pt"
-control_dt: 0.001
+control_dt: 0.005
 decimation: 4
 action_dim: 14
 use_threading: False
 use_buffer: False
 device: "cuda:0"
 horizon_length: 200
-action_filter_alpha: 0.5
-action_scale: 0.25 # 0.25
+action_filter_alpha: 0.3
+action_scale: 0.3 # 0.35
 soft_dof_limit_factor: 0.9
-stiffness: 
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
-  - 40
+stiffness:  # [100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20]
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
+  - 35
 
 
-damping: 
+damping: # [2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1]
   - 10
   - 10
   - 10
@@ -38,10 +38,16 @@ damping:
   - 10
   - 10
   - 10
-  - 10
-  - 10
-  - 10
+  - 5
+  - 5
+  - 5
 
 default_joint_pos: [
-                    -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
-                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000]
+                    -0.4500,  0.5000,  -0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
+                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000
+                    ]
+
+visualize:
+  object_pose: true
+  contact_positions: true
+  desired_object_pose: true
