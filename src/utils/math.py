@@ -392,3 +392,49 @@ def quat_from_euler_xyz(roll: torch.Tensor, pitch: torch.Tensor, yaw: torch.Tens
     qz = sy * cr * cp - cy * sr * sp
 
     return torch.stack([qw, qx, qy, qz], dim=-1)
+
+
+@torch.jit.script
+def axis_angle_from_quat(quat: torch.Tensor, eps: float = 1.0e-6) -> torch.Tensor:
+    """Convert rotations given as quaternions to axis/angle.
+
+    Args:
+        quat: The quaternion orientation in (w, x, y, z). Shape is (..., 4).
+        eps: The tolerance for Taylor approximation. Defaults to 1.0e-6.
+
+    Returns:
+        Rotations given as a vector in axis angle form. Shape is (..., 3).
+        The vector's magnitude is the angle turned anti-clockwise in radians around the vector's direction.
+
+    Reference:
+        https://github.com/facebookresearch/pytorch3d/blob/main/pytorch3d/transforms/rotation_conversions.py#L526-L554
+    """
+    # Modified to take in quat as [q_w, q_x, q_y, q_z]
+    # Quaternion is [q_w, q_x, q_y, q_z] = [cos(theta/2), n_x * sin(theta/2), n_y * sin(theta/2), n_z * sin(theta/2)]
+    # Axis-angle is [a_x, a_y, a_z] = [theta * n_x, theta * n_y, theta * n_z]
+    # Thus, axis-angle is [q_x, q_y, q_z] / (sin(theta/2) / theta)
+    # When theta = 0, (sin(theta/2) / theta) is undefined
+    # However, as theta --> 0, we can use the Taylor approximation 1/2 - theta^2 / 48
+    quat = quat * (1.0 - 2.0 * (quat[..., 0:1] < 0.0))
+    mag = torch.linalg.norm(quat[..., 1:], dim=-1)
+    half_angle = torch.atan2(mag, quat[..., 0])
+    angle = 2.0 * half_angle
+    # check whether to apply Taylor approximation
+    sin_half_angles_over_angles = torch.where(
+        angle.abs() > eps, torch.sin(half_angle) / angle, 0.5 - angle * angle / 48
+    )
+    return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
+
+@torch.jit.script
+def quat_error_magnitude(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
+    """Computes the rotation difference between two quaternions.
+
+    Args:
+        q1: The first quaternion in (w, x, y, z). Shape is (..., 4).
+        q2: The second quaternion in (w, x, y, z). Shape is (..., 4).
+
+    Returns:
+        Angular error between input quaternions in radians.
+    """
+    quat_diff = quat_mul(q1, quat_conjugate(q2))
+    return torch.norm(axis_angle_from_quat(quat_diff), dim=-1)

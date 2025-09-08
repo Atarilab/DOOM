@@ -175,7 +175,7 @@ def g1_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] =
 
     return states
 
-def g1_upper_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None):
+def g1_upper_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None) -> Dict[str, torch.Tensor]:
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
@@ -201,30 +201,67 @@ def g1_upper_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Log
 
     # Extract IMU states
     imu_state = msg["imu_state"]
+    
+    # Extract raw sensor data
+    joint_positions = tensorify(
+        [motor_states[i].q for i in range(len(joint2motor_idx))],
+        device=device
+    )
+    joint_velocities = tensorify(
+        [motor_states[i].dq for i in range(len(joint2motor_idx))],
+        device=device
+    )
+    joint_tau_est = tensorify(
+        [motor_states[i].tau_est for i in joint2motor_idx],
+        device=device
+    )
+    gyroscope = tensorify(imu_state.gyroscope, device=device)
+    accelerometer = tensorify(imu_state.accelerometer, device=device)
+    quaternion = tensorify(imu_state.quaternion, device=device)
+
+    # Filter joint states and IMU data
+    alpha = 0.5  # Adjust this value based on your needs (higher = more responsive)
+
+    if not hasattr(g1_upper_low_state_handler, "filtered_joint_pos"):
+        g1_upper_low_state_handler.filtered_joint_pos = joint_positions
+        g1_upper_low_state_handler.filtered_joint_vel = joint_velocities
+        g1_upper_low_state_handler.filtered_joint_tau = joint_tau_est
+        g1_upper_low_state_handler.filtered_gyro = gyroscope
+        g1_upper_low_state_handler.filtered_acc = accelerometer
+        g1_upper_low_state_handler.filtered_quat = quaternion
+    else:
+        g1_upper_low_state_handler.filtered_joint_pos = (
+            alpha * joint_positions + (1 - alpha) * g1_upper_low_state_handler.filtered_joint_pos
+        )
+        g1_upper_low_state_handler.filtered_joint_vel = (
+            alpha * joint_velocities + (1 - alpha) * g1_upper_low_state_handler.filtered_joint_vel
+        )
+        g1_upper_low_state_handler.filtered_joint_tau = (
+            alpha * joint_tau_est + (1 - alpha) * g1_upper_low_state_handler.filtered_joint_tau
+        )
+        g1_upper_low_state_handler.filtered_gyro = alpha * gyroscope + (1 - alpha) * g1_upper_low_state_handler.filtered_gyro
+        g1_upper_low_state_handler.filtered_acc = alpha * accelerometer + (1 - alpha) * g1_upper_low_state_handler.filtered_acc
+        g1_upper_low_state_handler.filtered_quat = alpha * quaternion + (1 - alpha) * g1_upper_low_state_handler.filtered_quat
+
+    # Normalize the filtered quaternion
+    g1_upper_low_state_handler.filtered_quat = g1_upper_low_state_handler.filtered_quat / torch.norm(
+        g1_upper_low_state_handler.filtered_quat
+    )
 
     states = {
         "mode_machine": msg["mode_machine"],
-        "robot/joint_pos": tensorify(
-            [motor_states[i].q for i in joint2motor_idx],
-            device=device
-        ),
-        "robot/joint_vel": tensorify(
-            [motor_states[i].dq for i in joint2motor_idx],
-            device=device
-        ),
-        "robot/joint_tau_est": tensorify(
-            [motor_states[i].tau_est for i in joint2motor_idx],
-            device=device
-        ),
-        "robot/gyroscope": tensorify(imu_state.gyroscope, device=device),
-        "robot/accelerometer": tensorify(imu_state.accelerometer, device=device),
-        "robot/base_quat": tensorify(imu_state.quaternion, device=device),
+        "robot/joint_pos": g1_upper_low_state_handler.filtered_joint_pos,
+        "robot/joint_vel": g1_upper_low_state_handler.filtered_joint_vel,
+        "robot/joint_tau_est": g1_upper_low_state_handler.filtered_joint_tau,
+        "robot/gyroscope": g1_upper_low_state_handler.filtered_gyro,
+        "robot/accelerometer": g1_upper_low_state_handler.filtered_acc,
+        "robot/base_quat": g1_upper_low_state_handler.filtered_quat,
         "robot/base_rpy": tensorify(imu_state.rpy, device=device),
     }
 
     return states
 
-def g1_lower_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None):
+def g1_lower_low_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None) -> Dict[str, torch.Tensor]:
     """Extracts the joint and feet states, and returns the joint positions, joint velocities,
     feet forces, joint accelerations, estimated torques, base quaternion, base rpy, and other IMU states.
 
@@ -395,7 +432,7 @@ def vicon_object_handler(msg: Dict[str, float], logger: Optional[logging.Logger]
     }
 
 
-def sport_mode_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None):
+def sport_mode_state_handler(msg: Dict[str, Any], logger: Optional[logging.Logger] = None, device: Optional[torch.device] = None) -> Dict[str, torch.Tensor]:
     """Uses the Sports Mode states of the Unitree SDK to extract bose position, base velocity, and base orientation
 
     Args:

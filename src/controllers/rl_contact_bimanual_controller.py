@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING, Any, Dict
 
 import torch
 
-from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
 from state_manager.obs_manager import ObsTerm
-from utils.math import combine_frame_transforms, subtract_frame_transforms, quat_from_euler_xyz
+from utils.math import combine_frame_transforms, quat_error_magnitude
 from utils.frequency_tracker import FrequencyTracker, MultiFrequencyTracker
 
 # ROS2 imports for visualization
@@ -84,6 +83,14 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             dtype=torch.bool, device=self.device
         )
         
+        self.reorientation_contact_plan_ = torch.tensor(
+            [
+                [False, True, False, True, False, True, False, True, False, True, False, True, False, True, False, True],
+                [False, True, False, True, False, True, False, True, False, True, False, True, False, True, False, True],
+            ], 
+            dtype=torch.bool, device=self.device
+        )
+        
         # self.repose_contact_plan_ = torch.tensor(
         #     [
         #         [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False],
@@ -93,12 +100,17 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         # )
 
         self.command_start_time = time.time()  # When the current plan started
-        self._command_lock = threading.RLock()  # Reentrant lock for gait changes
+        self._command_lock = threading.RLock()  # Reentrant lock for command changes
 
         self.time_left = self.command_duration
         self.current_goal_idx = 0
-        self.current_contact_plan = self.repose_contact_plan_[:, self.current_goal_idx : 2]
+        # self.current_contact_plan = self.repose_contact_plan_[:, self.current_goal_idx : 2]
+        self.current_contact_plan = self.reorientation_contact_plan_[:, self.current_goal_idx : 2]
         self.goal_completion_counter = 0
+        
+        # Task change management
+        self.pending_task_change = None  # Store pending task change
+        self.task_change_pending = False  # Flag to indicate pending task change
         
         self.repose_contact_pos_o = torch.tensor([
                 [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],
@@ -119,21 +131,69 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],
             ], 
             dtype=torch.float32, device=self.device)
-        
         self.repose_contact_pos_o[:, :, 0] *= self.object_size[0] / 2
         self.repose_contact_pos_o[:, :, 1] *= self.object_size[1] / 2
+        
+        self.reorientation_contact_pos_o = torch.tensor([
+                [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],  # y-axis top/bottom
+                [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],  # y-axis top/bottom
+                [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],  # y-axis top/bottom
+                [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]],  # x-axis sides
+                [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]],  # x-axis sides
+                [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]],  # x-axis sides
+                [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]],  # x-axis sides
+                [[0.0, -1.0, 0.0], [0.0, 1.0, 0.0]],  # y-axis bottom/top
+                [[0.0, -1.0, 0.0], [0.0, 1.0, 0.0]],  # y-axis bottom/top
+                [[0.0, -1.0, 0.0], [0.0, 1.0, 0.0]],  # y-axis bottom/top
+                [[0.0, -1.0, 0.0], [0.0, 1.0, 0.0]],  # y-axis bottom/top
+                [[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]],  # x-axis sides
+                [[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]],  # x-axis sides
+                [[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]],  # x-axis sides
+                [[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]],  # x-axis sides
+                [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],  # y-axis top/bottom
+                [[0.0, 1.0, 0.0], [0.0, -1.0, 0.0]],  # y-axis top/bottom
+            ], 
+            dtype=torch.float32, device=self.device
+        )
+        self.reorientation_contact_pos_o[:, :, 0] *= self.object_size[0] / 2
+        self.reorientation_contact_pos_o[:, :, 1] *= self.object_size[1] / 2
+        
+        self.reorientation_desired_object_quat_ = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.9238795325, 0.0, 0.0, 0.3826834324],
+                [0.9238795325, 0.0, 0.0, 0.3826834324],
+                [0.7071067812, 0.0, 0.0, 0.7071067812],
+                [0.7071067812, 0.0, 0.0, 0.7071067812],
+                [0.3826834324, 0.0, 0.0, 0.9238795325],
+                [0.3826834324, 0.0, 0.0, 0.9238795325],
+                [0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0, 1.0],
+                [-0.3826834324, 0.0, 0.0, 0.9238795325],
+                [-0.3826834324, 0.0, 0.0, 0.9238795325],
+                [-0.7071067812, 0.0, 0.0, 0.7071067812],
+                [-0.7071067812, 0.0, 0.0, 0.7071067812],
+                [-0.9238795325, 0.0, 0.0, 0.3826834324],
+                [-0.9238795325, 0.0, 0.0, 0.3826834324],
+                # [1.0, 0.0, 0.0, 0.0],
+            ],
+            dtype=torch.float32, device=self.device,
+        )
+        
         self.contact_pose_o = torch.zeros(2, 7, dtype=torch.float32, device=self.device)
         
-        self.contact_pose_o[:, :3] = self.repose_contact_pos_o[self.current_goal_idx, :, :3]
+        # self.contact_pose_o[:, :3] = self.repose_contact_pos_o[self.current_goal_idx, :, :3]
+        self.contact_pose_o[:, :3] = self.reorientation_contact_pos_o[self.current_goal_idx, :, :3]
         self.contact_pose_o[:, 3] = 1.0
         
         # self.contact_pose_b = torch.zeros_like(self.contact_pose_o)
         self.contact_pose_w = torch.zeros_like(self.contact_pose_o)
         
         self.actions_mapping = torch.arange(len(self.policy_joint_indices), dtype=torch.int32, device=self.device)
-        
+        self.init_goal_pos_w = torch.tensor([0.35, 0.0, 0.75], dtype=torch.float32, device=self.device)
         self.object_goal_pose_w = torch.zeros(7, dtype=torch.float32, device=self.device)
-        self.object_goal_pose_w[:3] = torch.tensor([0.3, 0.0, 0.85], dtype=torch.float32, device=self.device)
+        self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
         self.object_goal_pose_w[2] += self.object_size[2] / 2
         self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
         
@@ -144,6 +204,8 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             log_interval=2.0,  # Reduced for easier testing
             logger=self.logger  # Will be updated when logger is available
         )
+        
+        self.task = "repose"
 
     def register_observations(self):
         """
@@ -247,14 +309,13 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
     def register_commands(self):
         """Register contact command parameters."""
-        self.command_manager.register(
-            "task",
-            CommandTerm(
-                type=str,
-                name="task",
-                description="Task to perform (repose, reorient)",
-                default_value="repose",
-            ),
+        # Register task selection as button group
+        task_options = ["repose", "reorientation"]
+        self.command_manager.register_button_command(
+            name="task",
+            description="Select Task",
+            options=task_options,
+            default_value=self.task,
         )
 
     def set_mode(self):
@@ -264,10 +325,27 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         # Call the base class set_mode to activate the controller
         super().set_mode()
 
-        # Set default gait to stance when switching back to RL controller
+        # Set default task when switching back to RL controller
         with self._command_lock:
             self.current_goal_idx = 0
-            self.current_contact_plan = self.repose_contact_plan_[:, 0:2]
+            
+            # Clear any pending task changes
+            self.pending_task_change = None
+            self.task_change_pending = False
+            
+            # Set contact plan based on current task
+            if self.task == "repose":
+                self.current_contact_plan = self.repose_contact_plan_[:, 0:2]
+                self.contact_pose_o[:, :3] = self.repose_contact_pos_o[0, :, :3]
+            else:  # reorientation
+                self.current_contact_plan = self.reorientation_contact_plan_[:, 0:2]
+                self.contact_pose_o[:, :3] = self.reorientation_contact_pos_o[0, :, :3]
+            
+            self.contact_pose_o[:, 3] = 1.0  # Set quaternion w component to 1 (identity)
+            
+            self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
+            self.object_goal_pose_w[2] += self.object_size[2] / 2
+            self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
 
             self.command_duration = 1.3
 
@@ -278,7 +356,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         :param state: Current robot state
         :return: Motor commands dictionary
         """
-        # # Frequency tracking
+        # Frequency tracking
         # frequency = self._frequency_tracker.tick()
         # self.logger.debug(f"compute_lowlevelcmd frequency: {self._frequency_tracker.get_statistics()['current_frequency']:.2f} Hz")
 
@@ -301,7 +379,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 self._resample_commands()
 
         # Compute contact poses
-        self._update_contact_poses()
+        self._update_commands()
         
         # Publish visualizations to RViz
         self.pub_all_visualizations()
@@ -312,26 +390,13 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             if not self.use_threading:
                 obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
                 self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets_from_policy(obs_tensor)
-                # # Log each observation with key and value from 
-                # for name, obs_term in self.obs_manager.obs_terms.items():
-                #     self.logger.debug(f"{name}: {obs_term(self.latest_state, 0)}")
-                    
-                # self.logger.debug("--------------------------------")
             else:
                 self.joint_pos_targets[self.policy_joint_indices] = self.compute_joint_pos_targets()
-                
-        # self.joint_pos_targets[self.non_actuated_joint_indices] = 0.0
-            
+                            
         # # Clip the joint pos targets for safety
         if hasattr(self, "soft_dof_pos_limit"):
             self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
-        
-        # # Log each observation with key and value from 
-        # for name, obs_term in self.obs_manager.obs_terms.items():
-        #     obs_term_start_time = time.perf_counter()
-        #     self.logger.debug(f"{name}: {obs_term(self.latest_state)}")
-        # self.logger.debug("--------------------------------")
-        # self.logger.debug(f"Joint pos targets: {self.joint_pos_targets[self.policy_joint_indices]}")
+
     
         for idx, joint_idx in enumerate(self.policy_joint_indices):
             self.cmd[f"motor_{joint_idx}"] = {
@@ -359,91 +424,39 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.cmd["mode_machine"] = state["mode_machine"]
 
         return self.cmd
-
-    def _update_contact_poses(self):
-        """Update contact poses in world and base frames."""
-        try:
-            # Check if required state keys exist
-            if "object/base_pos_w" not in self.latest_state or "object/base_quat" not in self.latest_state:
-                if hasattr(self, 'logger') and self.logger is not None:
-                    self.logger.warning("Object pose not found in state, skipping contact pose update")
-                return
-                
-            if "robot/base_pos_w" not in self.latest_state or "robot/base_quat" not in self.latest_state:
-                if hasattr(self, 'logger') and self.logger is not None:
-                    self.logger.warning("Robot pose not found in state, skipping contact pose update")
-                return
-            
-            # Get object pose from state
-            object_pos_w = torch.tensor(self.latest_state["object/base_pos_w"], dtype=torch.float32, device=self.device)
-            object_quat_w = torch.tensor(self.latest_state["object/base_quat"], dtype=torch.float32, device=self.device)
-            # self.logger.debug(f"Object pose: {object_pos_w}, {object_quat_w}")
-            
-            # # Get robot base pose
-            # robot_pos_w = torch.tensor(self.latest_state["robot/base_pos_w"], dtype=torch.float32, device=self.device)
-            # robot_quat_w = torch.tensor(self.latest_state["robot/base_quat"], dtype=torch.float32, device=self.device)
-            
-            # Contact poses in the world frame
-            self.contact_pose_w[:, :3], self.contact_pose_w[:, 3:7] = combine_frame_transforms(
-                t01=object_pos_w.unsqueeze(0).expand(2, -1),
-                q01=object_quat_w.unsqueeze(0).expand(2, -1),
-                t12=self.contact_pose_o[:, :3],
-                q12=self.contact_pose_o[:, 3:7],
-            )
-
-            # # Contact poses in the base frame (for policy observations)
-            # self.contact_pose_b[:, :3], self.contact_pose_b[:, 3:7] = subtract_frame_transforms(
-            #     t01=robot_pos_w.unsqueeze(0).expand(2, -1),
-            #     q01=robot_quat_w.unsqueeze(0).expand(2, -1),
-            #     t02=self.contact_pose_w[:, :3],
-            #     q02=self.contact_pose_w[:, 3:7],
-            # )
-            
-        except Exception as e:
-            if hasattr(self, 'logger') and self.logger is not None:
-                self.logger.error(f"Error updating contact poses: {e}")
-            else:
-                print(f"Error updating contact poses: {e}")
-
-    def _update_contact_pose_o(self):
-        """Update contact pose_o based on current goal index."""
-        try:
-            # Update contact pose_o based on current goal index
-            if self.current_goal_idx < self.repose_contact_pos_o.shape[0]:
-                self.contact_pose_o[:, :3] = self.repose_contact_pos_o[self.current_goal_idx, :, :3]
-                self.contact_pose_o[:, 3] = 1.0  # Set quaternion w component to 1 (identity)
-        except Exception as e:
-            if hasattr(self, 'logger') and self.logger is not None:
-                self.logger.error(f"Error updating contact pose_o: {e}")
-            else:
-                print(f"Error updating contact pose_o: {e}")
-
+    
     def _resample_commands(self):
         """Resample the commands for the controller with thread safety."""
         try:
             with self._command_lock:
-                self.current_goal_idx += 1
                 
-                # Update contact pose_o based on current goal index
-                self._update_contact_pose_o()
-
-                if self.current_goal_idx + 2 > self.repose_contact_pos_o.shape[0]:
-                    self.current_goal_idx = 2
-                    
-                self.current_contact_plan = self.repose_contact_plan_[:, self.current_goal_idx : self.current_goal_idx + 2]
+                # Handle pending task change
+                if self.task_change_pending and self.pending_task_change is not None:
+                    self._handle_task_change()
                 
-                if self.current_goal_idx > 2:
-                    rpy = torch.zeros(3, dtype=torch.float32, device=self.device)
-                    rpy[0].uniform_(self.object_rpy_ranges[0][0], self.object_rpy_ranges[0][1])
-                    rpy[1].uniform_(self.object_rpy_ranges[1][0], self.object_rpy_ranges[1][1])
-                    rpy[2].uniform_(self.object_rpy_ranges[2][0], self.object_rpy_ranges[2][1])
-                    self.object_goal_pose_w[3:] = quat_from_euler_xyz(rpy[0], rpy[1], rpy[2])
+                dtheta = quat_error_magnitude(self.latest_state["object/base_quat"], self.object_goal_pose_w[3:7])
+                if dtheta < 0.3:
                     
+                    if self.current_goal_idx + 2 > self.repose_contact_pos_o.shape[0]:
+                        self.current_goal_idx = 2
+                        
+                    # Update contact location on object based on current goal index
+                    self._update_contact_pose()
+                    # Update object goal pose
+                    self._update_object_goal_pose()
                     
-                # self.logger.debug(f"Current goal index: {self.current_goal_idx}")
-                # self.logger.debug(f"Current contact plan: {self.current_contact_plan}")
-                
-                # self.logger.debug("--------------------------------")
+                    # update contact plan based on current task
+                    if self.task == "repose":
+                        self.current_contact_plan = self.repose_contact_plan_[:, self.current_goal_idx : self.current_goal_idx + 2]
+                    else:  # reorientation
+                        self.current_contact_plan = self.reorientation_contact_plan_[:, self.current_goal_idx : self.current_goal_idx + 2]
+                    
+                    self.current_goal_idx += 1
+                    
+                self.logger.debug(f"Current goal index: {self.current_goal_idx}")
+                self.logger.debug(f"Current contact plan: {self.current_contact_plan}")
+                self.logger.debug(f"Object goal pose: {self.object_goal_pose_w}")
+                self.logger.debug("--------------------------------")
 
         except Exception as e:
             if hasattr(self, "command_manager") and self.command_manager and hasattr(self.command_manager, "logger"):
@@ -451,6 +464,96 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             else:
                 print(f"Error resampling commands: {e}")
 
+    def _handle_task_change(self):
+        """Handle the pending task change by applying it and resetting state."""
+        try:
+            if self.pending_task_change is not None:
+                old_task = self.task
+                self.task = self.pending_task_change
+                
+                # Reset to initial state for the new task
+                self.current_goal_idx = 0
+                
+                if self.task == "repose":
+                    self.current_contact_plan = self.repose_contact_plan_[:, 0:2]
+                    self.contact_pose_o[:, :3] = self.repose_contact_pos_o[0, :, :3]
+                else:  # reorientation
+                    self.current_contact_plan = self.reorientation_contact_plan_[:, 0:2]
+                    self.contact_pose_o[:, :3] = self.reorientation_contact_pos_o[0, :, :3]
+                
+                self.contact_pose_o[:, 3] = 1.0  # Set quaternion w component to 1 (identity)
+                
+                # Reset object goal pose
+                self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
+                self.object_goal_pose_w[2] += self.object_size[2] / 2
+                self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+                
+                # Clear pending change
+                self.pending_task_change = None
+                self.task_change_pending = False
+                
+                if self.logger is not None:
+                    self.logger.debug(f"Task changed from {old_task} to {self.task}")
+                    
+        except Exception as e:
+            if self.logger is not None:
+                self.logger.error(f"Error handling task change: {e}")
+
+    def _update_commands(self):
+        """Update contact poses in world and base frames."""
+        try:
+            # Get object pose from state
+            object_pos_w = self.latest_state["object/base_pos_w"]
+            object_quat_w = self.latest_state["object/base_quat"]
+
+            # Contact poses in the world frame
+            self.contact_pose_w[:, :3], self.contact_pose_w[:, 3:7] = combine_frame_transforms(
+                t01=object_pos_w.unsqueeze(0).expand(2, -1),
+                q01=object_quat_w.unsqueeze(0).expand(2, -1),
+                t12=self.contact_pose_o[:, :3],
+                q12=self.contact_pose_o[:, 3:7],
+            )
+            
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Error updating contact poses: {e}")
+            else:
+                print(f"Error updating contact poses: {e}")
+
+    def _update_contact_pose(self):
+        """Update contact pose_o based on current goal index and task."""
+        try:
+            # Update contact pose_o based on current goal index and task
+            if self.task == "repose" and self.current_goal_idx < self.repose_contact_pos_o.shape[0]:
+                self.contact_pose_o[:, :3] = self.repose_contact_pos_o[self.current_goal_idx, :, :3]
+            elif self.task == "reorientation" and self.current_goal_idx < self.reorientation_contact_pos_o.shape[0]:
+                self.contact_pose_o[:, :3] = self.reorientation_contact_pos_o[self.current_goal_idx, :, :3]
+            
+            self.contact_pose_o[:, 3] = 1.0  # Set quaternion w component to 1 (identity)
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Error updating contact pose_o: {e}")
+            else:
+                print(f"Error updating contact pose_o: {e}")
+                
+    def _update_object_goal_pose(self):
+        """Update object goal pose based on current goal index and task."""
+        try:
+            self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
+            self.object_goal_pose_w[2] += self.object_size[2] / 2
+            
+            if self.task == "repose":
+                # For repose task, keep object in default orientation
+                self.object_goal_pose_w[3:7] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+            else:  # reorientation
+                # For reorientation task, use the desired quaternion sequence
+                if self.current_goal_idx < self.reorientation_desired_object_quat_.shape[0]:
+                    self.object_goal_pose_w[3:7] = self.reorientation_desired_object_quat_[self.current_goal_idx, :]
+                else:
+                    self.object_goal_pose_w[3:7] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+        except Exception as e:
+            if hasattr(self, 'logger') and self.logger is not None:
+                self.logger.error(f"Error updating object goal pose: {e}")
     
     """
     Joystick mappings and callbacks        
@@ -458,19 +561,15 @@ class RLHumanoidBimanualContactController(RLControllerBase):
 
     def get_joystick_mappings(self):
         """
-        Define joystick button mappings for gait changes and heading control.
+        Define joystick button mappings for task changes and control.
 
         Returns:
             Dict mapping button names to callback functions.
         """
         return {
-            # Reset to stance
-            "L2-R2": lambda: self.change_commands({"gait": "stance"}),
-            # Normal Gaits
-            "A": lambda: self.change_commands({"gait": "trot"}),
-            # Step Size
-            "up": lambda: self._handle_step_size_change("up"),
-            "down": lambda: self._handle_step_size_change("down"),
+            # Task selection
+            "A": lambda: self.change_commands({"task": "repose"}),
+            "B": lambda: self.change_commands({"task": "reorientation"}),
             # Command Duration
             "L1-up": lambda: self._handle_command_duration_change("increase"),
             "L1-down": lambda: self._handle_command_duration_change("decrease"),
@@ -485,37 +584,33 @@ class RLHumanoidBimanualContactController(RLControllerBase):
     def change_commands(self, new_commands: Dict[str, Any]):
         """Change the robot's contact commands with thread safety.
 
-        This method handles changes to the robot's gait pattern. When a new gait is requested,
-        it is stored as a pending change rather than applied immediately. The actual gait
+        This method handles changes to the robot's task. When a new task is requested,
+        it is stored as a pending change rather than applied immediately. The actual task
         transition happens during the next resampling phase to ensure smooth transitions.
 
         Args:
             new_commands: Dictionary containing command updates. Currently supports:
-                - 'gait': String specifying the new gait pattern (e.g. 'trot', 'pace', etc.)
+                - 'task': String specifying the new task ('repose' or 'reorientation')
 
         Raises:
-            ValueError: If an invalid gait pattern is specified
+            ValueError: If an invalid task is specified
         """
         try:
             if "task" in new_commands:
-                new_gait = new_commands["gait"].lower()
-                if new_gait in self.gait_patterns and new_gait != self.current_gait:
+                new_task = new_commands["task"].lower()
+                if new_task in ["repose", "reorientation"] and new_task != self.task:
                     with self._command_lock:
-                        # Only set pending change if it's different from current gait
-                        # and we're not already in a transition to this gait
-                        if self.pending_gait_change != new_gait:
-                            self.pending_gait_change = new_gait
-                            self._gait_change_event.clear()  # Reset event for new change
-
-                            # If we're already in a transition, reset it to start fresh
-                            if self.in_transition:
-                                self.transition_counter = 0
-                                self.transition_progress = 0.0
-                                self.transition_start_gait = self.current_gait
-                                self.transition_end_gait = new_gait
+                        # Only set pending change if it's different from current task
+                        if self.pending_task_change != new_task:
+                            self.pending_task_change = new_task
+                            self.task_change_pending = True
+                            
+                            if self.logger is not None:
+                                self.logger.debug(f"Pending task change to: {new_task}")
 
         except Exception as e:
-            self.logger.error(f"Contact command update failed: {e}")
+            if self.logger is not None:
+                self.logger.error(f"Task command update failed: {e}")
 
 
     def _handle_command_duration_change(self, direction: str):
@@ -615,9 +710,9 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             marker.pose.orientation.z = float(object_quat_w[3])
             
             # Set scale (cuboid size) - ensure minimum size for visibility
-            marker.scale.x = max(float(self.object_size[0]), 0.1)  # Minimum 10cm
-            marker.scale.y = max(float(self.object_size[1]), 0.1)  # Minimum 10cm
-            marker.scale.z = max(float(self.object_size[2]), 0.1)  # Minimum 10cm
+            marker.scale.x = float(self.object_size[0])
+            marker.scale.y = float(self.object_size[1])
+            marker.scale.z = float(self.object_size[2])
             
             # Set color (blue with transparency)
             marker.color = ColorRGBA(r=0.0, g=0.5, b=1.0, a=1.0)  # Increased alpha to 1.0 for better visibility
@@ -641,11 +736,6 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             # Create marker array for contact positions
             marker_array = MarkerArray()
             
-            # Colors for each contact point
-            colors = [
-                ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Red for first contact
-                ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Green for second contact
-            ]
             
             for i in range(2):
                 marker = Marker()
@@ -672,9 +762,8 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 marker.scale.y = 0.03
                 marker.scale.z = 0.03
                 
-                # Set color
-                marker.color = colors[i]
-                
+                # Set color based on contact plan
+                marker.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0) if self.current_contact_plan[i, 0] else ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)         
                 marker_array.markers.append(marker)
             
             # Publish marker array
