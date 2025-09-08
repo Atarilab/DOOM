@@ -1,11 +1,19 @@
 import dataclasses
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from enum import Enum
 
 import numpy as np
 
 
-# TODO: Extend to other types other than float commands
+class WidgetType(Enum):
+    """Types of UI widgets supported for commands."""
+    INPUT = "input"  # Numeric input field
+    BUTTON = "button"  # Button for discrete choices
+    DROPDOWN = "dropdown"  # Dropdown for multiple choices
+    SLIDER = "slider"  # Slider for numeric values
+
+
 @dataclasses.dataclass
 class CommandTerm:
     """
@@ -14,12 +22,16 @@ class CommandTerm:
 
     name: str
     description: str
-    default_value: float
+    default_value: Any
     type: type
-    min_value: float = None
-    max_value: float = None
+    widget_type: WidgetType = WidgetType.INPUT
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
     current_value: Any = None
     validator: Optional[Callable[[Any], bool]] = None
+    # Widget-specific options
+    options: Optional[List[Any]] = None  # For dropdown/button widgets
+    step: Optional[float] = None  # For slider widgets
 
     def validate_type(self, value: Any) -> bool:
         """
@@ -79,11 +91,96 @@ class CommandManager:
 
         self._commands[name] = command_term
 
+    def register_input_command(
+        self, 
+        name: str, 
+        description: str, 
+        default_value: float, 
+        min_value: Optional[float] = None, 
+        max_value: Optional[float] = None,
+        step: Optional[float] = None
+    ):
+        """Register a numeric input command."""
+        command_term = CommandTerm(
+            name=name,
+            description=description,
+            default_value=default_value,
+            type=float,
+            widget_type=WidgetType.INPUT,
+            min_value=min_value,
+            max_value=max_value,
+            step=step
+        )
+        self.register(name, command_term)
+
+    def register_button_command(
+        self, 
+        name: str, 
+        description: str, 
+        options: List[str], 
+        default_value: Optional[str] = None
+    ):
+        """Register a button group command for discrete choices."""
+        if default_value is None:
+            default_value = options[0] if options else ""
+            
+        command_term = CommandTerm(
+            name=name,
+            description=description,
+            default_value=default_value,
+            type=str,
+            widget_type=WidgetType.BUTTON,
+            options=options
+        )
+        self.register(name, command_term)
+
+    def register_dropdown_command(
+        self, 
+        name: str, 
+        description: str, 
+        options: List[str], 
+        default_value: Optional[str] = None
+    ):
+        """Register a dropdown command for multiple choices."""
+        if default_value is None:
+            default_value = options[0] if options else ""
+            
+        command_term = CommandTerm(
+            name=name,
+            description=description,
+            default_value=default_value,
+            type=str,
+            widget_type=WidgetType.DROPDOWN,
+            options=options
+        )
+        self.register(name, command_term)
+
+    def register_slider_command(
+        self, 
+        name: str, 
+        description: str, 
+        default_value: float, 
+        min_value: float, 
+        max_value: float,
+        step: Optional[float] = None
+    ):
+        """Register a slider command for numeric values."""
+        command_term = CommandTerm(
+            name=name,
+            description=description,
+            default_value=default_value,
+            type=float,
+            widget_type=WidgetType.SLIDER,
+            min_value=min_value,
+            max_value=max_value,
+            step=step
+        )
+        self.register(name, command_term)
+
     def get_command_specs(self) -> List[Tuple[str, str, float, float]]:
         """
-        Get command specifications for UI configuration.
+        Get command specifications for UI configuration (legacy method for backward compatibility).
 
-        :param controller_type: Name of the controller type
         :return: List of command specification tuples
         """
         if self._commands == {}:
@@ -92,6 +189,41 @@ class CommandManager:
         return [
             (param.name, param.description, param.min_value, param.max_value) for cmd, param in self._commands.items()
         ]
+
+    def get_widget_specs(self) -> List[Dict[str, Any]]:
+        """
+        Get widget specifications for UI configuration.
+
+        :return: List of widget specification dictionaries
+        """
+        if self._commands == {}:
+            return []
+
+        widget_specs = []
+        for cmd_name, param in self._commands.items():
+            spec = {
+                "name": param.name,
+                "description": param.description,
+                "widget_type": param.widget_type.value,
+                "default_value": param.default_value,
+                "current_value": param.current_value,
+                "type": param.type.__name__,
+            }
+            
+            # Add widget-specific parameters
+            if param.widget_type in [WidgetType.INPUT, WidgetType.SLIDER]:
+                spec["min_value"] = param.min_value
+                spec["max_value"] = param.max_value
+                if param.step is not None:
+                    spec["step"] = param.step
+                    
+            elif param.widget_type in [WidgetType.BUTTON, WidgetType.DROPDOWN]:
+                if param.options is not None:
+                    spec["options"] = param.options
+                    
+            widget_specs.append(spec)
+            
+        return widget_specs
 
     def validate_and_change_commands(
         self, current_commands: np.ndarray, new_command_values: Dict[str, Any]
@@ -115,7 +247,6 @@ class CommandManager:
                 command_term = self._commands[name]
                 if command_term.validate_type(value):
                     command_term.set_value(value)
-                    updated_commands[self.command_indices[name]] = value
                 else:
                     self.logger.warning(
                         f"Invalid value {value} for command {name}. " f"Must be of type {command_term.type}"

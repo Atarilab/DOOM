@@ -56,40 +56,30 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
                 self.logger.error(f"Command update failed: {e}")
 
     def register_commands(self):
-        self.command_manager.register(
-            "x_velocity",
-            CommandTerm(
-                type=float,
-                name="x_velocity",
-                description="X Velocity (m/s)",
-                min_value=-1.0,
-                max_value=1.0,
-                default_value=0.0,
-            ),
+        """Register velocity commands as input fields."""
+        
+        self.command_manager.register_input_command(
+            name="x_velocity",
+            description="X Velocity (m/s)",
+            default_value=0.0,
+            min_value=-1.0,
+            max_value=1.0,
         )
 
-        self.command_manager.register(
-            "y_velocity",
-            CommandTerm(
-                type=float,
-                name="y_velocity",
-                description="Y Velocity (m/s)",
-                min_value=-1.0,
-                max_value=1.0,
-                default_value=0.0,
-            ),
+        self.command_manager.register_input_command(
+            name="y_velocity", 
+            description="Y Velocity (m/s)",
+            default_value=0.0,
+            min_value=-1.0,
+            max_value=1.0,
         )
 
-        self.command_manager.register(
-            "yaw",
-            CommandTerm(
-                type=float,
-                name="yaw_rate",
-                description="Yaw Rate (rad/s)",
-                min_value=-3.14,
-                max_value=3.14,
-                default_value=0.0,
-            ),
+        self.command_manager.register_input_command(
+            name="yaw",
+            description="Yaw Rate (rad/s)",
+            default_value=0.0,
+            min_value=-3.14,
+            max_value=3.14,
         )
 
     def register_observations(self):
@@ -294,40 +284,29 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                 self.logger.error(f"Command update failed: {e}")
 
     def register_commands(self):
-        self.command_manager.register(
-            "x_velocity",
-            CommandTerm(
-                type=float,
-                name="x_velocity",
-                description="X Velocity (m/s)",
-                min_value=-0.5,
-                max_value=0.5,
-                default_value=0.0,
-            ),
+        # Register velocity commands as input fields
+        self.command_manager.register_input_command(
+            name="x_velocity",
+            description="X Velocity (m/s)",
+            default_value=0.0,
+            min_value=-0.5,
+            max_value=0.5,
         )
 
-        self.command_manager.register(
-            "y_velocity",
-            CommandTerm(
-                type=float,
-                name="y_velocity",
-                description="Y Velocity (m/s)",
-                min_value=-0.5,
-                max_value=0.5,
-                default_value=0.0,
-            ),
+        self.command_manager.register_input_command(
+            name="y_velocity",
+            description="Y Velocity (m/s)",
+            default_value=0.0,
+            min_value=-0.5,
+            max_value=0.5,
         )
 
-        self.command_manager.register(
-            "yaw",
-            CommandTerm(
-                type=float,
-                name="yaw_rate",
-                description="Yaw Rate (rad/s)", 
-                min_value=-3.14,
-                max_value=3.14,
-                default_value=0.0,
-            ),
+        self.command_manager.register_input_command(
+            name="yaw",
+            description="Yaw Rate (rad/s)",
+            default_value=0.0,
+            min_value=-3.14,
+            max_value=3.14,
         )
 
     def register_observations(self):
@@ -610,40 +589,29 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
                 self.logger.error(f"Command update failed: {e}")
 
     def register_commands(self):
-        self.command_manager.register(
-            "x_velocity",
-            CommandTerm(
-                type=float,
-                name="x_velocity",
-                description="X Velocity (m/s)",
-                min_value=float(-self.max_cmd[0]),
-                max_value=float(self.max_cmd[0]),
-                default_value=0.0,
-            ),
+        # Register velocity commands as input fields
+        self.command_manager.register_input_command(
+            name="x_velocity",
+            description="X Velocity (m/s)",
+            default_value=0.0,
+            min_value=float(-self.max_cmd[0]),
+            max_value=float(self.max_cmd[0]),
         )
 
-        self.command_manager.register(
-            "y_velocity",
-            CommandTerm(
-                type=float,
-                name="y_velocity",
-                description="Y Velocity (m/s)",
-                min_value=float(-self.max_cmd[1]),
-                max_value=float(self.max_cmd[1]),
-                default_value=0.0,
-            ),
+        self.command_manager.register_input_command(
+            name="y_velocity",
+            description="Y Velocity (m/s)",
+            default_value=0.0,
+            min_value=float(-self.max_cmd[1]),
+            max_value=float(self.max_cmd[1]),
         )
 
-        self.command_manager.register(
-            "yaw",
-            CommandTerm(
-                type=float,
-                name="yaw_rate",
-                description="Yaw Rate (rad/s)",
-                min_value=float(-self.max_cmd[2]),
-                max_value=float(self.max_cmd[2]),
-                default_value=0.0,
-            ),
+        self.command_manager.register_input_command(
+            name="yaw",
+            description="Yaw Rate (rad/s)",
+            default_value=0.0,
+            min_value=float(-self.max_cmd[2]),
+            max_value=float(self.max_cmd[2]),
         )
 
     def register_observations(self):

@@ -294,17 +294,13 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         )
 
     def register_commands(self):
-        """Register contact command parameters."""
-        self.command_manager.register(
-            "gait",
-            CommandTerm(
-                type=str,
-                name="gait",
-                description="Gait pattern (trot, pace, bound, jump)",
-                min_value=0,  # Not used for string type
-                max_value=1,  # Not used for string type
-                default_value="trot",
-            ),
+        """Register gait selection as button group."""
+        
+        self.command_manager.register_button_command(
+            name="gait",
+            description="Select Gait Pattern",
+            options=list(self.gait_patterns.keys()),
+            default_value="stance",
         )
 
     def set_mode(self):
@@ -351,10 +347,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             if self.robot.mj_model is not None:
                 self.robot.mj_model.update(state)
 
-            # Frequency tracking
-            frequency = self._frequency_tracker.tick()
-            self.logger.debug(f"compute_lowlevelcmd frequency: {self._frequency_tracker.get_statistics()['current_frequency']:.2f} Hz")
-        
             start_time = time.perf_counter()
 
             # Update the latest state for the observation processing thread

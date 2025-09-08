@@ -5,7 +5,7 @@ from textual.color import Color
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.validation import Number
-from textual.widgets import Button, Header, Input, Label, Static
+from textual.widgets import Button, Header, Input, Label, Static, Select
 
 from commands.command_manager import CommandManager
 from controllers.stand_controller import ControllerBase
@@ -556,44 +556,108 @@ class CommandWidget(Vertical):
                 id="update-commands-btn",
             )
 
-            # Check if this is a contact controller
-            if hasattr(self.controller, "gait_patterns"):
-                # Create gait selection buttons
-                yield Label("Select Gait Pattern", classes="command-label")
-                with Horizontal(classes="gait-buttons-container"):
-                    for gait in self.controller.gait_patterns.keys():
-                        yield Button(
-                            gait.capitalize(),
-                            classes="gait-button",
-                            id=f"gait-{gait}",
-                        )
-            elif hasattr(self.controller, "velocity_commands"):
-                # Create numeric input fields for other controllers
-                for command_name, label, min_val, max_val in self.command_specs:
+            # Use the new widget specifications from command manager
+            widget_specs = self.controller.command_manager.get_widget_specs()
+            
+            for spec in widget_specs:
+                yield Label(spec["description"], classes="command-label")
+                
+                if spec["widget_type"] == "input":
+                    # Create numeric input field
                     with Horizontal(classes="command-input-row"):
-                        yield Label(label, classes="command-label")
                         input_field = Input(
-                            placeholder=f"Enter {label}",
-                            validators=[Number(minimum=min_val, maximum=max_val)],
+                            placeholder=f"Enter {spec['description']}",
+                            validators=[Number(minimum=spec.get("min_value", -float('inf')), 
+                                             maximum=spec.get("max_value", float('inf')))],
                             classes="command-input",
-                            id=f"input-{command_name}",
+                            id=f"input-{spec['name']}",
+                        )
+                        yield input_field
+                        
+                elif spec["widget_type"] == "button":
+                    # Create button group for discrete choices
+                    with Horizontal(classes="gait-buttons-container"):
+                        for option in spec["options"]:
+                            yield Button(
+                                option.capitalize(),
+                                classes="gait-button",
+                                id=f"button-{spec['name']}-{option}",
+                            )
+                            
+                elif spec["widget_type"] == "dropdown":
+                    # Create dropdown for multiple choices
+                    with Horizontal(classes="command-input-row"):
+                        dropdown = Select(
+                            options=[(opt, opt) for opt in spec["options"]],
+                            classes="command-dropdown",
+                            id=f"dropdown-{spec['name']}",
+                        )
+                        yield dropdown
+                        
+                elif spec["widget_type"] == "slider":
+                    # Create input field for slider (fallback since Slider widget not available)
+                    with Horizontal(classes="command-input-row"):
+                        input_field = Input(
+                            placeholder=f"Enter {spec['description']}",
+                            validators=[Number(minimum=spec.get("min_value", -float('inf')), 
+                                             maximum=spec.get("max_value", float('inf')))],
+                            classes="command-input",
+                            id=f"input-{spec['name']}",
                         )
                         yield input_field
 
     def on_button_pressed(self, event: Button.Pressed):
-        """Handle button presses for gait selection."""
+        """Handle button presses for command selection."""
         button_id = event.button.id
 
-        if button_id.startswith("gait-"):
-            # Update the gait selection
-            gait = button_id.replace("gait-", "")
-            updates = {"gait": gait}
+        if button_id.startswith("button-"):
+            # Parse button ID: button-{command_name}-{option}
+            parts = button_id.split("-", 2)
+            if len(parts) == 3:
+                command_name = parts[1]
+                option = parts[2]
+                updates = {command_name: option}
+
+                # Update the controller
+                if hasattr(self.controller, "change_commands"):
+                    self.controller.change_commands(updates)
+
+                    # Visual feedback using predefined colors
+                    # Reset all buttons for this command group
+                    for btn in self.query(".gait-button"):
+                        btn.styles.background = BUTTON_DEFAULT_COLOR
+                    event.button.styles.background = BUTTON_ACTIVE_COLOR
+
+    def on_select_changed(self, event: Select.Changed):
+        """Handle dropdown selection changes."""
+        select_id = event.select.id
+        
+        if select_id.startswith("dropdown-"):
+            # Parse dropdown ID: dropdown-{command_name}
+            command_name = select_id.replace("dropdown-", "")
+            updates = {command_name: event.value}
 
             # Update the controller
             if hasattr(self.controller, "change_commands"):
                 self.controller.change_commands(updates)
 
-                # Visual feedback using predefined colors
-                for btn in self.query(".gait-button"):
-                    btn.styles.background = BUTTON_DEFAULT_COLOR
-                event.button.styles.background = BUTTON_ACTIVE_COLOR
+
+    def on_input_changed(self, event: Input.Changed):
+        """Handle input field changes."""
+        input_id = event.input.id
+        
+        if input_id.startswith("input-"):
+            # Parse input ID: input-{command_name}
+            command_name = input_id.replace("input-", "")
+            
+            try:
+                # Convert to float for numeric inputs
+                value = float(event.value) if event.value else 0.0
+                updates = {command_name: value}
+
+                # Update the controller
+                if hasattr(self.controller, "change_commands"):
+                    self.controller.change_commands(updates)
+            except ValueError:
+                # Invalid input, ignore
+                pass
