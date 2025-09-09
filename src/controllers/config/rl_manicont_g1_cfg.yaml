@@ -1,4 +1,4 @@
-policy_path: "bimanual_g1/policy_reorientation.pt"
+policy_path: "bimanual_g1/policy.pt"
 control_dt: 0.005
 decimation: 4
 action_dim: 14

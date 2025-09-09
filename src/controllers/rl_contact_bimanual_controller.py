@@ -6,7 +6,7 @@ import torch
 
 from controllers.rl_controller_base import RLControllerBase
 from state_manager.obs_manager import ObsTerm
-from utils.math import combine_frame_transforms, quat_error_magnitude
+from utils.math import combine_frame_transforms, quat_error_magnitude, euler_to_quaternion, quaternion_to_euler
 from utils.frequency_tracker import FrequencyTracker, MultiFrequencyTracker
 
 # ROS2 imports for visualization
@@ -73,7 +73,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.non_policy_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0, 0.0, 0.0, 0.0]
         # Contact command parameters
         self.command_duration = 1.3  # Duration of each contact plan in seconds
-        self.object_size = torch.tensor([0.14, 0.105, 0.14], dtype=torch.float32, device=self.device) * 2.0 
+        self.object_size = torch.tensor([0.1, 0.1, 0.1], dtype=torch.float32, device=self.device) * 2.0 
 
         self.repose_contact_plan_ = torch.tensor(
             [
@@ -198,6 +198,11 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
         
         self.object_rpy_ranges = torch.tensor([[-0.3, 0.3], [-0.3, 0.3], [-0.3, 0.3]], dtype=torch.float32, device=self.device)
+        
+        # Joystick control parameters for object goal pose
+        self.position_step_size = 0.05  # 1cm steps for position
+        self.orientation_step_size = 0.15  # ~3 degrees for orientation (in radians)
+        
         # Frequency tracking (logger will be set later in set_cmd_manager)
         self._frequency_tracker = FrequencyTracker(
             name="compute_lowlevelcmd",
@@ -539,13 +544,16 @@ class RLHumanoidBimanualContactController(RLControllerBase):
     def _update_object_goal_pose(self):
         """Update object goal pose based on current goal index and task."""
         try:
-            self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
-            self.object_goal_pose_w[2] += self.object_size[2] / 2
+            # self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
+            # self.object_goal_pose_w[2] += self.object_size[2] / 2
             
-            if self.task == "repose":
+            # if self.task == "repose":
+            #     # For repose task, keep object in default orientation
+            #     self.object_goal_pose_w[3:7] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+            # else:  # reorientation
+            if self.task == "reorientation":
                 # For repose task, keep object in default orientation
-                self.object_goal_pose_w[3:7] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
-            else:  # reorientation
+
                 # For reorientation task, use the desired quaternion sequence
                 if self.current_goal_idx < self.reorientation_desired_object_quat_.shape[0]:
                     self.object_goal_pose_w[3:7] = self.reorientation_desired_object_quat_[self.current_goal_idx, :]
@@ -554,7 +562,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
         except Exception as e:
             if hasattr(self, 'logger') and self.logger is not None:
                 self.logger.error(f"Error updating object goal pose: {e}")
-    
+
     """
     Joystick mappings and callbacks        
     """
@@ -571,14 +579,114 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             "A": lambda: self.change_commands({"task": "repose"}),
             "B": lambda: self.change_commands({"task": "reorientation"}),
             # Command Duration
-            "L1-up": lambda: self._handle_command_duration_change("increase"),
-            "L1-down": lambda: self._handle_command_duration_change("decrease"),
-            "L1-R1": lambda: self._handle_reset(),
+            "L2-up": lambda: self._handle_command_duration_change("increase"),
+            "L2-down": lambda: self._handle_command_duration_change("decrease"),
+            "L2-R2": lambda: self._handle_reset(),
+            
+            # Object goal pose position control (only for repose task)
+            "L1-up": lambda: self._update_object_goal_position("x", "increase") if self.task in ["repose", "reorientation"] else None,
+            "L1-down": lambda: self._update_object_goal_position("x", "decrease") if self.task in ["repose", "reorientation"] else None,
+            "left": lambda: self._update_object_goal_position("y", "increase") if self.task in ["repose", "reorientation"] else None,
+            "right": lambda: self._update_object_goal_position("y", "decrease") if self.task in ["repose", "reorientation"] else None,
+            "up": lambda: self._update_object_goal_position("z", "increase") if self.task == "repose" else None,
+            "down": lambda: self._update_object_goal_position("z", "decrease") if self.task == "repose" else None,
+            
+            # Object goal pose orientation control (only for repose task)
+            "R1-left": lambda: self._update_object_goal_orientation("roll", "increase") if self.task == "repose" else None,
+            "R1-right": lambda: self._update_object_goal_orientation("roll", "decrease") if self.task == "repose" else None,
+            "R2-left": lambda: self._update_object_goal_orientation("pitch", "increase") if self.task == "repose" else None,
+            "R2-right": lambda: self._update_object_goal_orientation("pitch", "decrease") if self.task == "repose" else None,
+            "L2-left": lambda: self._update_object_goal_orientation("yaw", "increase") if self.task == "repose" else None,
+            "L2-right": lambda: self._update_object_goal_orientation("yaw", "decrease") if self.task == "repose" else None,
         }
+        
+    def _update_object_goal_position(self, axis, direction):
+        """
+        Update object goal position along specified axis.
+        
+        Args:
+            axis: 'x', 'y', or 'z'
+            direction: 'increase' or 'decrease'
+        """
+        with self._command_lock:
+            if axis == 'x':
+                idx = 0
+            elif axis == 'y':
+                idx = 1
+            elif axis == 'z':
+                idx = 2
+            else:
+                return
+                
+            step = self.position_step_size if direction == 'increase' else -self.position_step_size
+            self.object_goal_pose_w[idx] += step
+            
+            if self.logger is not None:
+                self.logger.debug(f"Updated object goal position {axis}: {self.object_goal_pose_w[idx]:.3f}")
+    
+    def _update_object_goal_orientation(self, axis, direction):
+        """
+        Update object goal orientation around specified axis.
+        
+        Args:
+            axis: 'roll', 'pitch', or 'yaw'
+            direction: 'increase' or 'decrease'
+        """
+        with self._command_lock:
+            # Get current quaternion
+            current_quat = self.object_goal_pose_w[3:7].clone()
+            
+            # Convert current quaternion to RPY using torch operations
+            current_rpy = quaternion_to_euler(current_quat, order="wxyz")
+            
+            # Update the specified axis
+            step = self.orientation_step_size if direction == 'increase' else -self.orientation_step_size
+            
+            if axis == 'roll':
+                current_rpy[0] += step
+            elif axis == 'pitch':
+                current_rpy[1] += step
+            elif axis == 'yaw':
+                current_rpy[2] += step
+            else:
+                return
+            
+            # Convert back to quaternion using torch operations
+            new_quat = euler_to_quaternion(current_rpy[0].item(), current_rpy[1].item(), current_rpy[2].item(), order="wxyz").to(device=self.device)
+            self.object_goal_pose_w[3:7] = new_quat
+            
+            if self.logger is not None:
+                self.logger.debug(f"Updated object goal orientation {axis}: RPY = [{current_rpy[0]:.3f}, {current_rpy[1]:.3f}, {current_rpy[2]:.3f}]")
 
+    def _handle_command_duration_change(self, direction: str):
+        """
+        Handle command duration changes.
+
+        Args:
+            direction: String indicating whether to increase or decrease the duration
+        """
+        # Define duration change amount in seconds
+        duration_change = 0.1  # 50ms change
+
+        with self._command_lock:
+            if direction == "increase":
+                # Increase command duration
+                self.pending_command_duration = min(1.5, self.command_duration + duration_change)
+            elif direction == "decrease":
+                # Decrease command duration (with a minimum value)
+                self.pending_command_duration = max(1.0, self.command_duration - duration_change)
+            elif direction == "default":
+                self.pending_command_duration = 1.0
+
+            # Set the pending flag
+            self.command_duration_change_pending = True
+
+            if self.logger is not None:
+                self.logger.debug(f"Pending command duration change: {self.pending_command_duration:.2f} seconds")
+                
     """
-    Function handlers for changing the contact commands for the rl-contact-locomotion controller
-    - gait, step size, heading, lateral position, command duration, stance width
+    Function handlers for changing the task for the rl-contact-bimanual controller
+    - task, command
     """
 
     def change_commands(self, new_commands: Dict[str, Any]):
@@ -613,31 +721,7 @@ class RLHumanoidBimanualContactController(RLControllerBase):
                 self.logger.error(f"Task command update failed: {e}")
 
 
-    def _handle_command_duration_change(self, direction: str):
-        """
-        Handle command duration changes.
-
-        Args:
-            direction: String indicating whether to increase or decrease the duration
-        """
-        # Define duration change amount in seconds
-        duration_change = 0.1  # 50ms change
-
-        with self._command_lock:
-            if direction == "increase":
-                # Increase command duration
-                self.pending_command_duration = min(1.5, self.command_duration + duration_change)
-            elif direction == "decrease":
-                # Decrease command duration (with a minimum value)
-                self.pending_command_duration = max(1.0, self.command_duration - duration_change)
-            elif direction == "default":
-                self.pending_command_duration = 1.0
-
-            # Set the pending flag
-            self.command_duration_change_pending = True
-
-            if self.logger is not None:
-                self.logger.debug(f"Pending command duration change: {self.pending_command_duration:.2f} seconds")
+    
 
     def _handle_reset(self):
         """Reset command duration and offset values to default."""
@@ -645,6 +729,10 @@ class RLHumanoidBimanualContactController(RLControllerBase):
             # Reset command duration
             self.pending_command_duration = 1.3
             self.command_duration_change_pending = True
+            
+            self.object_goal_pose_w[:3] = self.init_goal_pos_w.clone()
+            self.object_goal_pose_w[2] += self.object_size[2] / 2
+            self.object_goal_pose_w[3:] = torch.tensor([1.0, 0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
 
             if self.logger is not None:
                 self.logger.debug("Reset command duration to default")
