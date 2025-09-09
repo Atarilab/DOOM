@@ -35,6 +35,12 @@ We welcome contributions to DOOM! This section outlines how you can contribute t
 - Add unit tests for new functionality when applicable
 - Ensure existing tests continue to pass
 
+#### Possible Contributions
+- Sampling-based MPC Integration inside DOOM
+- API Interface for Z1, AlienGo, Allegro (?)
+- Vision Pipeline (sim2real go2 policy with heightmap, depth map distillation policy)
+
+
 ### 🔧 Making Changes
 
 #### Adding New Controllers
