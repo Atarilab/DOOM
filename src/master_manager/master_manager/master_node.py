@@ -122,7 +122,9 @@ class LowLevelCmdPublisher(Node):
 
             # Calculate actual time since last callback
             time_since_last_callback = current_time - self.last_callback_time
-            self.logger.debug(f"Time since last low_level_cmd_callback: {time_since_last_callback}")
+            # self.logger.debug(f"Time since last low_level_cmd_callback: {time_since_last_callback}")
+            
+            # self.logger.error(f"Here3")
             
 
             # Update joystick state and handle mode switching
@@ -140,9 +142,13 @@ class LowLevelCmdPublisher(Node):
             except Exception as e:
                 self.logger.error(f"Error updating controller state: {e}")
                 return
+            
+            # self.logger.error(f"Here2")
+
 
             # Compute motor commands
             try:
+                # self.logger.debug(f"here 1")
                 motor_commands = active_controller.compute_torques(combined_state, {})
                 self.logger.debug(f"motor_commands after calling active_controller.compute_torques: {motor_commands}")
                 
@@ -152,6 +158,8 @@ class LowLevelCmdPublisher(Node):
 
             try:
                 # Update command structure
+                # self.logger.debug(f"here 5")
+                
                 for i in range(12):
                     motor = motor_commands[f"motor_{i}"]
                     for attr in ["q", "kp", "dq", "kd", "tau"]:
@@ -161,13 +169,17 @@ class LowLevelCmdPublisher(Node):
                 return
 
             # Publish robot state for visualization
+            # self.logger.debug(f"here 6")
+            
             self.publish_robot_state()
+            # self.logger.debug(f"here 7")
 
             # Publish the command
             self.dds_cmd.crc = self.crc.Crc(self.dds_cmd)
             self.dds_pub.Write(self.dds_cmd)
 
         except Exception as e:
+            # self.logger.error("here4")
             if self.logger:
                 self.logger.error(f"Error in low level callback computation: {e}")
 
@@ -183,12 +195,17 @@ class LowLevelCmdPublisher(Node):
         joint_state_msg.header.stamp = current_time.to_msg()
         joint_state_msg.name = self.joint_names
 
+        # self.logger.error("here8")
+        
         # Convert numpy arrays to Python lists of floats
         joint_pos = combined_state.get("joint_pos", [0.0] * 12)
         joint_vel = combined_state.get("joint_vel", [0.0] * 12)
 
         joint_state_msg.position = [float(x) for x in joint_pos]
         joint_state_msg.velocity = [float(x) for x in joint_vel]
+        
+        # self.logger.error("here9")
+        
 
         self.joint_state_pub.publish(joint_state_msg)
 
@@ -197,17 +214,23 @@ class LowLevelCmdPublisher(Node):
         transform.header.stamp = current_time.to_msg()
         transform.header.frame_id = "world"
         transform.child_frame_id = "base_link"
+         # self.logger.error(combined_state)
+        
 
         # Set translation from base_pos_w
         transform.transform.translation.x = float(combined_state["base_pos_w"][0])
         transform.transform.translation.y = float(combined_state["base_pos_w"][1])
         transform.transform.translation.z = float(combined_state["base_pos_w"][2])
+        # self.logger.error("here11")
+        
 
         # Set rotation from base_quat
         transform.transform.rotation.x = float(combined_state["base_quat"][1])
         transform.transform.rotation.y = float(combined_state["base_quat"][2])
         transform.transform.rotation.z = float(combined_state["base_quat"][3])
         transform.transform.rotation.w = float(combined_state["base_quat"][0])
+        # self.logger.error("here12")
+        
 
         # Broadcast the transform
         self.tf_broadcaster.sendTransform(transform)
@@ -304,14 +327,14 @@ async def main_async(args=None):
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
             
-            ros2_vicon_sub_obj = ROS2StateSubscriber(
-                topic="/vicon/Step/Step",
-                node_name="vicon_state_obj",
-                msg_type=Position,
-                handler_func=vicon_object_handler,
-                logger=logger,
-            )
-            state_manager.add_subscriber("vicon_state_obj", ros2_vicon_sub_obj)
+            # ros2_vicon_sub_obj = ROS2StateSubscriber(
+            #     topic="/vicon/Step/Step",
+            #     node_name="vicon_state_obj",
+            #     msg_type=Position,
+            #     handler_func=vicon_object_handler,
+            #     logger=logger,
+            # )
+            # state_manager.add_subscriber("vicon_state_obj", ros2_vicon_sub_obj)
 
         mj_model_wrapper = MjQuadRobotWrapper(configs["robot_config"]["xml_path"])  # Using same URDF for now
 

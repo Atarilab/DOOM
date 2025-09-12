@@ -141,6 +141,13 @@ def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
     
     return torch.tensor([0.32])
 
+def sin_cos_phase(states: Dict[str, Any]) -> torch.Tensor:
+    """
+    This is just the height of the box.
+    """
+    
+    return torch.tensor([0.0, 1.0])
+
 def starting_time(states: Dict[str, Any]):
     return time.time()
 

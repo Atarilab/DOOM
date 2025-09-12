@@ -1,6 +1,6 @@
-policy_path: "src/controllers/policies/IsaacLab policies/torqueComplexReward/TORQUE_complex_reward_10_SEED_42/policy.pt"
+policy_path: "src/controllers/policies/latentPD/LatentSpacePD_4_SEED_2/policy.pt"
 # For flat use src/controllers/policies/IsaacLab policies/flatAmpVision/2025-08-25_11-09-21_flat_DR5_improved_minimal_motion_files_lessTaskRewardLerp_SEED_1 and src/controllers/policies/IsaacLab policies/flatAmpVision/2025-08-12_14-23-30_flat_DR5_improved_minimal_motion_files_SEED_3
-obs_dim: 51 # 51 for box, 48 for flat and standing w/ vicon
+obs_dim: 50 # 51 for box, 48 for flat and standing w/ vicon, 50 for flat w/ phases
 control_dt: 0.001
 decimation: 1
 SIMULATION_DT: 0.001

@@ -19,6 +19,7 @@ from state_manager.observations import (
     joint_pos_rel,
     joint_vel,
     last_action,
+    sin_cos_phase,
     lin_vel_b,
     projected_gravity_b,
     velocity_commands,
@@ -184,7 +185,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
                         obs = self.obs_manager.compute(current_state)
                         obs_tensor = torch.cat([v.reshape(-1) for v in obs.values()])
                         self.obs_buffer.add(obs_tensor.unsqueeze(0))
-                        self.command_manager.logger.debug(f"New obs in _process_observations: {obs}")
+                        # self.command_manager.logger.debug(f"New obs in _process_observations: {obs}")
                         
                     except Exception as e:
                         print(f"Error converting observations to tensor: {e}")
@@ -321,11 +322,11 @@ class BaseRLLocomotionController(ControllerBase, Node):
             }
             loc_from_vid_paper_01_log["cmd"] = self.cmd
             
-            self.command_manager.logger.debug(
-                f"LOC-FROM-VID-PAPER-EXP-01: %s",
-                json.dumps(loc_from_vid_paper_01_log, default=to_serializable, separators=(",", ":"))
-            )
-
+            # self.command_manager.logger.debug(
+            #     f"LOC-FROM-VID-PAPER-EXP-01: %s",
+            #     json.dumps(loc_from_vid_paper_01_log, default=to_serializable, separators=(",", ":"))
+            # )
+# 
             # Track command preparation time
             self.cmd_preparation_time = time.perf_counter() - start_time
 
@@ -451,6 +452,10 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         self.obs_manager.register(
             "last_action",
             ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
+        )
+        self.obs_manager.register(
+            "sin_cos_phase",
+            ObsTerm(sin_cos_phase),
         )
         
     def get_joystick_mappings(self):
