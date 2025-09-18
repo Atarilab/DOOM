@@ -150,7 +150,7 @@ class LowLevelCmdPublisher(Node):
             try:
                 # self.logger.debug(f"here 1")
                 motor_commands = active_controller.compute_torques(combined_state, {})
-                self.logger.debug(f"motor_commands after calling active_controller.compute_torques: {motor_commands}")
+                # self.logger.debug(f"motor_commands after calling active_controller.compute_torques: {motor_commands}")
                 
             except Exception as e:
                 self.logger.error(f"Error computing motor commands: {e}")
@@ -327,14 +327,14 @@ async def main_async(args=None):
             )
             state_manager.add_subscriber("vicon_state", ros2_vicon_sub)
             
-            # ros2_vicon_sub_obj = ROS2StateSubscriber(
-            #     topic="/vicon/Step/Step",
-            #     node_name="vicon_state_obj",
-            #     msg_type=Position,
-            #     handler_func=vicon_object_handler,
-            #     logger=logger,
-            # )
-            # state_manager.add_subscriber("vicon_state_obj", ros2_vicon_sub_obj)
+            ros2_vicon_sub_obj = ROS2StateSubscriber(
+                topic="/vicon/Step/Step",
+                node_name="vicon_state_obj",
+                msg_type=Position,
+                handler_func=vicon_object_handler,
+                logger=logger,
+            )
+            state_manager.add_subscriber("vicon_state_obj", ros2_vicon_sub_obj)
 
         mj_model_wrapper = MjQuadRobotWrapper(configs["robot_config"]["xml_path"])  # Using same URDF for now
 

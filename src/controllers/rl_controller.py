@@ -88,6 +88,10 @@ class BaseRLLocomotionController(ControllerBase, Node):
         
         self.logged_params = False
         
+        self.phase = 0.0
+        self.freq = 2.0
+        self.last_phase_time = time.time()
+        
     def log_params(self):
         self.command_manager.logger.debug(f"Model: {self.configs['controller_config']['policy_path']}")
         self.command_manager.logger.debug(f"Parameters: Kp={self.Kp} Kd={self.Kd} action_dim={self.action_dim} control_dt={self.control_dt} decimation={self.decimation}, action_scale={self.action_scale}")
@@ -182,10 +186,15 @@ class BaseRLLocomotionController(ControllerBase, Node):
                 # Compute and store observations
                 with torch.no_grad():
                     try:
+                        # step phase
+                        phase_dt = self.last_phase_time - time.time()
+                        self.phase = self.phase + phase_dt * 2 * 3.1415 * self.freq
+                        self.last_phase_time = time.time()
+                        
+                        
                         obs = self.obs_manager.compute(current_state)
                         obs_tensor = torch.cat([v.reshape(-1) for v in obs.values()])
                         self.obs_buffer.add(obs_tensor.unsqueeze(0))
-                        # self.command_manager.logger.debug(f"New obs in _process_observations: {obs}")
                         
                     except Exception as e:
                         print(f"Error converting observations to tensor: {e}")
@@ -455,7 +464,7 @@ class RLLocomotionVelocityController(BaseRLLocomotionController):
         )
         self.obs_manager.register(
             "sin_cos_phase",
-            ObsTerm(sin_cos_phase),
+            ObsTerm(sin_cos_phase, params={"phase": lambda: self.phase}),
         )
         
     def get_joystick_mappings(self):
@@ -669,6 +678,10 @@ class GlobalRLLocomotionVelocityControllerBox(BaseRLLocomotionController):
             ObsTerm(last_action, params={"last_action": lambda: self.raw_action}),
         )
         self.obs_manager.register(
+            "sin_cos_phase",
+            ObsTerm(sin_cos_phase, params={"phase": lambda: self.phase}),
+        )
+        self.obs_manager.register(
             "relative_distance_to_box",
             ObsTerm(relative_distance_to_box)
         )
@@ -676,6 +689,7 @@ class GlobalRLLocomotionVelocityControllerBox(BaseRLLocomotionController):
             "box_parameters",
             ObsTerm(box_parameters)
         )
+    
         
     def get_joystick_mappings(self):
         """

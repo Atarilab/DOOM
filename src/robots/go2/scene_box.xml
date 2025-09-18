@@ -18,8 +18,8 @@
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" />
-    <body name="object" pos="1.5 0.0 0.1" quat="1.0 0.0 0.0 0.0"><!--Box-->
-      <geom  type="box" size="0.73 1.0 0.15"/><!--IMPORTANT: if you change those values, you need to adapt them also in the object_state_handler and box height observation-->
+    <body name="object" pos="1.5 0.0 0.0" quat="1.0 0.0 0.0 0.0"><!--Box-->
+      <geom  type="box" size="0.73 1.0 0.15"/><!--IMPORTANT: if you change those values, you need to adapt them also in the box height observation; the object_state_handler should take care of the relative position; sizes are half-dimensions along each axis-->
     </body>
   </worldbody>
 </mujoco>

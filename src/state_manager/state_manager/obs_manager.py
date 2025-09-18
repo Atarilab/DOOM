@@ -126,6 +126,8 @@ class ObservationManager:
             try:
                 computed_obs = obs_term(combined_state)
                 self.obs_order.append(name)
+                # if name == "relative_distance_to_box":
+                    # self.logger.error(f"relative_distance_to_box {computed_obs}")
 
                 # Only include in returned observations if include is True
                 if obs_term._include:

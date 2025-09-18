@@ -269,7 +269,7 @@ def object_state_handler(msg: Dict[str, List], logger: Optional[logging.Logger] 
     #ang_vel_b = np.dot(quat_to_rotmatrix(base_quat, order="wxyz").T, ang_vel)
     
     return {
-        "object_pos_w": list(np.array(base_pos_w) - np.array([0.7, 0.0, 0.0] )), # I dont really know what value needs to be substracted here. I basically do try-and-error with the box size.
+        "object_pos_w": list(np.array(base_pos_w) + np.array([-0.7, 0.0, 0.0] )), # more positive value in x direction moves the beginning of the box further away from the robot
         "object_quat": base_quat,
         #"object_lin_vel_w": lin_vel_w,
         #"object_ang_vel": ang_vel,
