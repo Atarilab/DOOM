@@ -23,5 +23,5 @@ class RealRobotInterface(RobotInterfaceBase):
         self.command_pub.publish(msg)
 
     def receive_state(self):
-        rclpy.spin_once(self.node, timeout_sec=0.1)
+        rclpy.spin_once(self.node, timeout_sec=0.0)
         return self.current_state

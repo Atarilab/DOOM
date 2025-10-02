@@ -15,7 +15,7 @@ class SimRobotInterface(RobotInterfaceBase):
     def __init__(self, config):
 
         self.robot_name = config["ROBOT"]
-        self.robot_scene = os.getcwd() + "/robots/" + self.robot_name + "/scene.xml" # + "/scene_box.xml"
+        self.robot_scene = os.getcwd() + "/robots/" + self.robot_name + "/scene.xml" # "/scene_box.xml" ;"/scene.xml"
 
         # Initialize Mujoco model and data
         self.mj_model = mujoco.MjModel.from_xml_path(self.robot_scene)

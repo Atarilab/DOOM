@@ -132,7 +132,7 @@ def relative_distance_to_box(states: Dict[str, Any]) -> torch.Tensor:
     
     # TODO clip (AMPfrom Vision not trained with clipping; latent box trained with clipping)
     # dist = torch.tensor(states["base_pos_w"][0] - states["object_pos_w"][0] - 0.02)
-    dist = torch.tensor(states["base_pos_w"][0] - states["object_pos_w"][0] + 0.05) # positive offsets move the beginning of the step CLOSER to the robot, ie if you want the robot to step earlier, make the offset more positive
+    dist = torch.tensor(states["base_pos_w"][0] - states["object_pos_w"][0] + 0.055).clamp(-.6,.6) # positive offsets move the beginning of the step CLOSER to the robot, ie if you want the robot to step earlier, make the offset more positive
     return dist
 
 
@@ -141,7 +141,7 @@ def box_parameters(states: Dict[str, Any]) -> torch.Tensor:
     This is just the height of the box.
     """
     
-    return torch.tensor([0.20])
+    return torch.tensor([0.2])
 
 def sin_cos_phase(states: Dict[str, Any], phase) -> torch.Tensor:
     

@@ -89,7 +89,7 @@ class BaseRLLocomotionController(ControllerBase, Node):
         self.logged_params = False
         
         self.phase = 0.0
-        self.freq = 2.0
+        self.freq = 1.5 # 2 for torque
         self.last_phase_time = time.time()
         
     def log_params(self):

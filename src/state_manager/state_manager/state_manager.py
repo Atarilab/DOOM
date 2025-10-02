@@ -181,7 +181,7 @@ class ROS2StateSubscriber(StateSubscriber):
 
     def spin_once(self):
         """Spin the subscriber node once."""
-        rclpy.spin_once(self.node)
+        rclpy.spin_once(self.node, timeout_sec=0.00)
 
 
 class StateManager:
