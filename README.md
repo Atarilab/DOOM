@@ -265,6 +265,8 @@ Note: This is a research prototype. Use at your own risk.
 ## 📝 TODO
 - [ ] Test g1 bimanual manipulation policy
 - [ ] Add support for AlienGo/Allegro
+- [ ] Remove ROS2 Node from `LowLevelCmdPublisher` and publish robot states instead from `state_manager`.
+- [ ] Remove low level cmd spin code from master node
 - [ ] Remove ROS2 Node to just Subscriber inside `ROS2StateSubscriber`.
 - [x] Add controller for tuning the PD gains of G1
 - [x] Add RViz visualization for G1
