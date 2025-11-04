@@ -70,7 +70,7 @@ ping $ROBOT_IP
 ```
 If the connection is not established, you might need to manually set the IP for the wired connection. You can do so by following the "Configure Network Environment" section [here](https://support.unitree.com/home/en/developer/Quick_start).
 
-If it still doesn't ping the robot after manually configuring the IP, you can check if the right network interface is chosen. Using the USB-Ethernet Adapter, the network interface should have the ID `enx3c4937046061` by default. You can confirm it using `ifconfig` and checking the network interface ID for the corresponding `$ROBOT_IP`. If not, you should manually change it in `.env.base`, `.env.docker`, then delete the existing container using `./doom.sh -d`, rebuild the container using `./doom.sh -b`, enter inside the container using `./doom.sh -e`, and update the ROS2/DDS network interface inside `setup.sh` using the one you found with `ifconfig`. Don't forget to run `source setup.sh` to update them.
+If it still doesn't ping the robot after manually configuring the IP, you can check if the right network interface is chosen. Using the USB-Ethernet Adapter, the network interface should have the ID `enx3c4937046061` by default. You can confirm it using `ifconfig` and checking the network interface ID for the corresponding `$ROBOT_IP`. If not, you should manually change it in `.env.docker`, then delete the existing container using `./doom.sh -d`, rebuild the container using `./doom.sh -b`, enter inside the container using `./doom.sh -e`, and update the ROS2/DDS network interface inside `setup.sh` using the one you found with `ifconfig`. Don't forget to run `source setup.sh` to update them.
 
 ---
 
@@ -80,10 +80,8 @@ The various tasks are defined in [`tasks/task_configs.json`](src/tasks/task_conf
 - `rl-velocity-real-go2` (Status: ✅ )
 - `rl-contact-sim-go2` (Status: ✅ )
 - `rl-contact-real-go2` (Status: ✅ )
-- `rl-unitree-sim-g1` (Status: ✅ )
-- `rl-unitree-real-g1` (Status: 👀 ) - to be tested
 - `rl-velocity-sim-g1` (Status: ✅ ) 
-- `rl-velocity-real-g1` (Status: 👀 ) - to be tested
+- `rl-velocity-real-g1` (Status: ✅ )
 - `rl-contact-sim-g1` (Status: ⚠️ )
   
 Once you've chosen the task you want to run, you can run the master node to control the robot using:

@@ -1,0 +1,17 @@
+policy_path: "balance_g1/policy.pt"
+control_dt: 0.005
+decimation: 4
+action_dim: 12
+action_scale: 0.35
+use_threading: False
+use_buffer: False
+device: "cuda:0"
+horizon_length: 200
+action_filter_alpha: 0.5
+soft_dof_limit_factor: 0.9
+
+
+default_joint_pos: [
+  -0.20, 0.0, 0.0, 0.42, -0.23, 0.0,
+  -0.20, 0.0, 0.0, 0.42, -0.23, 0.0
+ ]

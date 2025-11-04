@@ -3,9 +3,10 @@
 import sys
 import time
 
-import unitree_legged_const as go2
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize, ChannelSubscriber
 from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_
+
+import unitree_legged_const as go2
 
 
 def LowStateHandler(msg: LowState_):

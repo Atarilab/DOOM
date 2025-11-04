@@ -4,6 +4,7 @@ import torch
 
 GRAVITY_DIR = torch.tensor([0, 0, -1.0])  # Standard gravity in the Z direction
 
+
 def quaternion_to_euler(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
     """
     Convert quaternion to Euler angles (roll, pitch, yaw).
@@ -42,6 +43,7 @@ def quaternion_to_euler(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
 
     return torch.stack([roll, pitch, yaw])
 
+
 def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order="wxyz") -> torch.Tensor:
     """
     Rotate a vector by the inverse of a quaternion along the last dimension of q and v.
@@ -69,6 +71,7 @@ def quat_rotate_inverse(q: torch.Tensor, v: torch.Tensor, order="wxyz") -> torch
         c = q_vec * torch.einsum("...i,...i->...", q_vec, v).unsqueeze(-1) * 2.0
     return a - b + c
 
+
 def quat_to_rotmatrix(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
     """
     Convert quaternion to rotation matrix.
@@ -82,9 +85,9 @@ def quat_to_rotmatrix(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
     if norm < 1e-8:
         # If quaternion is zero or very small, return identity matrix
         return torch.eye(3, dtype=q.dtype, device=q.device)
-    
+
     q = q / norm
-    
+
     if order == "wxyz":
         w, x, y, z = q[0], q[1], q[2], q[3]
     else:  # xyzw
@@ -92,13 +95,16 @@ def quat_to_rotmatrix(q: torch.Tensor, order: str = "wxyz") -> torch.Tensor:
 
     # Convert quaternion to rotation matrix
     # Using the standard formula for quaternion to rotation matrix conversion
-    rot_matrix = torch.stack([
-        torch.stack([1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y)]),
-        torch.stack([2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x)]),
-        torch.stack([2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y)])
-    ])
-    
+    rot_matrix = torch.stack(
+        [
+            torch.stack([1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)]),
+            torch.stack([2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)]),
+            torch.stack([2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]),
+        ]
+    )
+
     return rot_matrix
+
 
 def euler_to_quaternion(roll: float, pitch: float, yaw: float, order: str = "wxyz") -> torch.Tensor:
     """
@@ -115,12 +121,12 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float, order: str = "wxy
     """
     # Convert Euler angles to quaternion using the standard formula
     # Roll (x), Pitch (y), Yaw (z) -> Quaternion (w, x, y, z)
-    
+
     # Convert floats to tensors for torch operations
     roll_tensor = torch.tensor(roll, dtype=torch.float32)
     pitch_tensor = torch.tensor(pitch, dtype=torch.float32)
     yaw_tensor = torch.tensor(yaw, dtype=torch.float32)
-    
+
     cr = torch.cos(roll_tensor * 0.5)
     sr = torch.sin(roll_tensor * 0.5)
     cp = torch.cos(pitch_tensor * 0.5)
@@ -138,6 +144,7 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float, order: str = "wxy
     else:  # xyzw
         return torch.stack([x, y, z, w])
 
+
 @torch.jit.script
 def quat_conjugate(q: torch.Tensor) -> torch.Tensor:
     """Computes the conjugate of a quaternion.
@@ -152,6 +159,7 @@ def quat_conjugate(q: torch.Tensor) -> torch.Tensor:
     q = q.reshape(-1, 4)
     return torch.cat((q[:, 0:1], -q[:, 1:]), dim=-1).view(shape)
 
+
 @torch.jit.script
 def normalize(x: torch.Tensor, eps: float = 1e-9) -> torch.Tensor:
     """Normalizes a given input tensor to unit length.
@@ -165,6 +173,7 @@ def normalize(x: torch.Tensor, eps: float = 1e-9) -> torch.Tensor:
     """
     return x / x.norm(p=2, dim=-1).clamp(min=eps, max=None).unsqueeze(-1)
 
+
 @torch.jit.script
 def quat_inv(q: torch.Tensor) -> torch.Tensor:
     """Compute the inverse of a quaternion.
@@ -176,6 +185,7 @@ def quat_inv(q: torch.Tensor) -> torch.Tensor:
         The inverse quaternion in (w, x, y, z). Shape is (N, 4).
     """
     return normalize(quat_conjugate(q))
+
 
 @torch.jit.script
 def quat_mul(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
@@ -215,6 +225,7 @@ def quat_mul(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
 
     return torch.stack([w, x, y, z], dim=-1).view(shape)
 
+
 @torch.jit.script
 def quat_apply(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
     """Apply a quaternion rotation to a vector.
@@ -235,7 +246,6 @@ def quat_apply(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
     xyz = quat[:, 1:]
     t = xyz.cross(vec, dim=-1) * 2
     return (vec + quat[:, 0:1] * t + xyz.cross(t, dim=-1)).view(shape)
-
 
 
 @torch.jit.script
@@ -317,33 +327,38 @@ def pose_diff(pos1: torch.Tensor, quat1: torch.Tensor, pos2: torch.Tensor, quat2
     # Compute quaternion difference: quat_mul(object_quat_w, quat_conjugate(goal_quat_w))
     # Optimized quaternion conjugate: negate x, y, z components
     quat2_conj = torch.cat([quat2[0:1], -quat2[1:]], dim=0)
-    
+
     # Vectorized quaternion multiplication using torch operations
     # Reshape to (1, 4) for batch operations
     q1 = quat1.unsqueeze(0)  # (1, 4)
     q2 = quat2_conj.unsqueeze(0)  # (1, 4)
-    
+
     # Extract components
     w1, x1, y1, z1 = q1[:, 0], q1[:, 1], q1[:, 2], q1[:, 3]
     w2, x2, y2, z2 = q2[:, 0], q2[:, 1], q2[:, 2], q2[:, 3]
-    
+
     # Optimized quaternion multiplication
     ww = (z1 + x1) * (x2 + y2)
     yy = (w1 - y1) * (w2 + z2)
     zz = (w1 + y1) * (w2 - z2)
     xx = ww + yy + zz
     qq = 0.5 * (xx + (z1 - x1) * (x2 - y2))
-    
-    quat_diff = torch.stack([
-        qq - ww + (z1 - y1) * (y2 - z2),  # w
-        qq - xx + (x1 + w1) * (x2 + w2),  # x
-        qq - yy + (w1 - x1) * (y2 + z2),  # y
-        qq - zz + (z1 + y1) * (w2 - x2)   # z
-    ], dim=1).squeeze(0)  # Remove batch dimension
-    
+
+    quat_diff = torch.stack(
+        [
+            qq - ww + (z1 - y1) * (y2 - z2),  # w
+            qq - xx + (x1 + w1) * (x2 + w2),  # x
+            qq - yy + (w1 - x1) * (y2 + z2),  # y
+            qq - zz + (z1 + y1) * (w2 - x2),  # z
+        ],
+        dim=1,
+    ).squeeze(
+        0
+    )  # Remove batch dimension
+
     # Compute position difference
     pos_diff = pos2 - pos1
-    
+
     # Concatenate results
     return torch.cat([pos_diff, quat_diff], dim=0)
 
@@ -353,11 +368,11 @@ def pos_diff(pos1: torch.Tensor, pos2: torch.Tensor) -> torch.Tensor:
     """
     Optimized position difference computation.
     Computes pos2 - pos1 efficiently.
-    
+
     Args:
         pos1: First position tensor (..., 3)
         pos2: Second position tensor (..., 3)
-    
+
     Returns:
         Position difference tensor (..., 3)
     """
@@ -425,6 +440,7 @@ def axis_angle_from_quat(quat: torch.Tensor, eps: float = 1.0e-6) -> torch.Tenso
     )
     return quat[..., 1:4] / sin_half_angles_over_angles.unsqueeze(-1)
 
+
 @torch.jit.script
 def quat_error_magnitude(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
     """Computes the rotation difference between two quaternions.
@@ -438,3 +454,24 @@ def quat_error_magnitude(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
     """
     quat_diff = quat_mul(q1, quat_conjugate(q2))
     return torch.norm(axis_angle_from_quat(quat_diff), dim=-1)
+
+
+@torch.jit.script
+def unscale_transform(x: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
+    """De-normalizes a given input tensor from range of [-1, 1] to (lower, upper).
+
+    .. note::
+        It uses pytorch broadcasting functionality to deal with batched input.
+
+    Args:
+        x: Input tensor of shape (N, dims).
+        lower: The minimum value of the tensor. Shape is (N, dims) or (dims,).
+        upper: The maximum value of the tensor. Shape is (N, dims) or (dims,).
+
+    Returns:
+        De-normalized transform of the tensor. Shape is (N, dims).
+    """
+    # default value of center
+    offset = (lower + upper) * 0.5
+    # return normalized tensor
+    return x * (upper - lower) * 0.5 + offset

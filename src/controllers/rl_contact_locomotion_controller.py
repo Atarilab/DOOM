@@ -9,6 +9,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
 from state_manager.obs_manager import ObsTerm
+
 # from utils.frequency_tracker import FrequencyTracker
 
 if TYPE_CHECKING:
@@ -21,11 +22,17 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
     Uses contact-explicit reinforcement learning policy
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         # Initialize publshers for visualization
         self._init_publishers(configs)
+
+        self.policy_stiffness = torch.tensor([self.Kp] * len(self.robot.actuated_joint_names), device=self.device)
+        self.policy_damping = torch.tensor([self.Kd] * len(self.robot.actuated_joint_names), device=self.device)
+        self.policy_joint_indices = [
+            self.robot.actuated_joint_names.index(joint_name) for joint_name in self.robot.actuated_joint_names
+        ]
 
         # Contact command parameters
         self.command_duration = 0.35  # Duration of each contact plan in seconds
@@ -248,7 +255,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         )
         self.obs_manager.register(
             "contact_time_left",
-            ObsTerm(contact_time_left, params={"contact_time_left": lambda: self.time_left}, obs_dim=1, device=self.device),
+            ObsTerm(
+                contact_time_left, params={"contact_time_left": lambda: self.time_left}, obs_dim=1, device=self.device
+            ),
         )
         self.obs_manager.register(
             "contact_plan",
@@ -273,7 +282,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=12, device=self.device),
+            ObsTerm(
+                joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=12, device=self.device
+            ),
         )
         self.obs_manager.register(
             "ee_pos_rel_b",
@@ -290,12 +301,14 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=12, device=self.device),
+            ObsTerm(
+                last_action, params={"last_action": lambda: self.action_term.raw_action}, obs_dim=12, device=self.device
+            ),
         )
 
     def register_commands(self):
         """Register gait selection as button group."""
-        
+
         self.command_manager.register_button_command(
             name="gait",
             description="Select Gait Pattern",
@@ -328,10 +341,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.pending_step_size = 0.0
             self.pending_lateral_pos = 0.0
 
-        base_pos_w = torch.tensor(self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device)
+        base_pos_w = torch.tensor(
+            self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device
+        )
         self.lateral_pos = base_pos_w[1]
         self.generate_future_feet_positions(pos=base_pos_w)
-        
+
         self.joint_pos_targets = self.default_joint_pos.clone()
 
     def compute_lowlevelcmd(self, state):
@@ -343,7 +358,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         """
         try:
             self.counter += 1
-            
+
             if self.robot.mj_model is not None:
                 self.robot.mj_model.update(state)
 
@@ -378,17 +393,17 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 self.pub_contact_plan()
 
             # self.logger.debug(f"Time left: {self.time_left:.2f} seconds")
-            
+
             # If we do not use threading, we need to compute the obs first, pass it to the policy, and then compute the joint pos targets
             # else we can compute the joint pos targets directly from the obs tensor
-            
+
             if self.counter % self.decimation == 0:
                 if not self.use_threading:
                     obs_tensor = self.obs_manager.compute_full_tensor(self.latest_state, batch_idx=0)
                     self.joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
                 else:
                     self.joint_pos_targets = self.compute_joint_pos_targets()
-                
+
             # Clip the joint pos targets for safety
             if hasattr(self, "soft_dof_pos_limit"):
                 self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
@@ -409,7 +424,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.cmd_preparation_time = time.perf_counter() - start_time
 
             return self.cmd
-        
+
         except Exception as e:
             self.logger.error(f"Error computing low level commands: {e}. Defaulting to default joint positions.")
             self.cmd = {
@@ -587,7 +602,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 # Safety mechanism, if the goal index exceeds the horizon length, reset the goal index and replan feet sequences
                 if self.current_goal_idx >= self.horizon_length:
                     base_pos_w = torch.tensor(
-                        self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device
+                        self.robot.mj_model.get_body_position_world("base_link"),
+                        dtype=torch.float32,
+                        device=self.device,
                     )
                     self.generate_future_feet_positions(pos=base_pos_w)
 
@@ -626,7 +643,11 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # Create rotation matrix for the target yaw
         cos_yaw = torch.cos(target_yaw)
         sin_yaw = torch.sin(target_yaw)
-        rotation_matrix = torch.tensor([[cos_yaw.item(), -sin_yaw.item(), 0], [sin_yaw.item(), cos_yaw.item(), 0], [0, 0, 1]], dtype=torch.float32, device=self.device)
+        rotation_matrix = torch.tensor(
+            [[cos_yaw.item(), -sin_yaw.item(), 0], [sin_yaw.item(), cos_yaw.item(), 0], [0, 0, 1]],
+            dtype=torch.float32,
+            device=self.device,
+        )
 
         # Rotate the offset positions
         rotated_offset = torch.matmul(rotation_matrix, offset.T).T
@@ -634,16 +655,17 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # Check if pos is a tensor of zeros (default case)
         if torch.all(pos == 0):
             # Get the robot's current position
-            robot_pos = torch.tensor(self.robot.mj_model.get_body_position_world(self.base_link), dtype=torch.float32, device=self.device)
+            robot_pos = torch.tensor(
+                self.robot.mj_model.get_body_position_world(self.base_link), dtype=torch.float32, device=self.device
+            )
             # Use only the x-dimension of the robot's position
             pos = torch.tensor([robot_pos[0], self.lateral_pos, 0.0], dtype=torch.float32, device=self.device)
 
-
         self.future_feet_positions_w[:] = (pos + rotated_offset).unsqueeze(1)
 
-        stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32, device=self.device).unsqueeze(0) * torch.tensor(
-            self.feet_step_size, dtype=torch.float32, device=self.device
-        ).unsqueeze(-1)
+        stride_offsets = torch.arange(self.horizon_length, dtype=torch.float32, device=self.device).unsqueeze(
+            0
+        ) * torch.tensor(self.feet_step_size, dtype=torch.float32, device=self.device).unsqueeze(-1)
 
         # r = torch.zeros(4, self.horizon_length)
         # x_rand = r.uniform_(-0.06, 0.06).clone()
@@ -721,7 +743,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             "R1-left": lambda: self._handle_stance_width_change("rear", "decrease"),
             "R1-right": lambda: self._handle_stance_width_change("rear", "increase"),
         }
-        
 
     """
     Handler functions for changing the contact commands for the rl-contact-locomotion controller
@@ -1098,8 +1119,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         try:
             # Calculate error norms directly
             feet_errors = torch.linalg.norm(
-                self.robot.mj_model.get_ee_positions_w()
-                - self.future_feet_positions_w[:, self.current_goal_idx],
+                self.robot.mj_model.get_ee_positions_w() - self.future_feet_positions_w[:, self.current_goal_idx],
                 axis=-1,
             )
 
@@ -1182,12 +1202,14 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
 
 class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactController):
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
         super().__init__(robot, configs)
-        
-        self.default_offset = torch.tensor([[0.35, 0.15, 0.0], [0.35, -0.15, 0.0], [-0.8, 0.15, 0.0], [-0.8, -0.15, 0.0]])
+
+        self.default_offset = torch.tensor(
+            [[0.35, 0.15, 0.0], [0.35, -0.15, 0.0], [-0.8, 0.15, 0.0], [-0.8, -0.15, 0.0]]
+        )
         self.base_link = self.robot.base_link
-        
+
     def register_observations(self):
         """
         Register observations for contact-conditioned humanoid locomotion.
@@ -1225,7 +1247,9 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
         )
         self.obs_manager.register(
             "contact_time_left",
-            ObsTerm(contact_time_left, params={"contact_time_left": lambda: self.time_left}, obs_dim=1, device=self.device),
+            ObsTerm(
+                contact_time_left, params={"contact_time_left": lambda: self.time_left}, obs_dim=1, device=self.device
+            ),
         )
         self.obs_manager.register(
             "contact_plan",
@@ -1250,7 +1274,9 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=29, device=self.device),
+            ObsTerm(
+                joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=29, device=self.device
+            ),
         )
         self.obs_manager.register(
             "ee_pos_rel_b",
@@ -1267,6 +1293,7 @@ class RLHumanoidLocomotionContactController(RLQuadrupedLocomotionContactControll
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=29, device=self.device),
+            ObsTerm(
+                last_action, params={"last_action": lambda: self.action_term.raw_action}, obs_dim=29, device=self.device
+            ),
         )
-        

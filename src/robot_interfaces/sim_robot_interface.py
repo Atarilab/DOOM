@@ -12,7 +12,7 @@ from unitree_sdk2py.core.channel import ChannelFactoryInitialize
 from utils.unitree_sdk2py_bridge import UnitreeSdk2Bridge
 
 
-class SimRobotInterface():
+class SimRobotInterface:
     def __init__(self, config):
 
         self.robot_name = config["ROBOT"]
@@ -111,7 +111,7 @@ class SimRobotInterface():
             self.locker.acquire()
             # Find the robot body (might need adjustment based on your exact model)
             robot_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, self.base_link_name)
-            if robot_body_id >= 0:
+            if robot_body_id >= 0 and self.fixed_base_pos is None:
                 robot_pos = self.mj_data.xpos[robot_body_id]
 
                 # Set camera lookat point

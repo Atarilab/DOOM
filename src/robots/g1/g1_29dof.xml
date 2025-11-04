@@ -3,20 +3,20 @@
 
   <default>
     <default class="torso_motor">
-      <joint damping="50" armature="0.01" frictionloss="0.1"/>
+      <joint damping="50" armature="0.01" frictionloss="0.0"/>
     </default>
     <default class="leg_motor">
-      <joint damping="10" armature="0.01" frictionloss="0.1"/>
+      <joint damping="10" armature="0.01" frictionloss="0.0"/>
     </default>
     <default class="ankle_motor">
-      <joint damping="2" armature="0.01" frictionloss="0.1"/>
+      <joint damping="5" armature="0.01" frictionloss="0.0"/>
     </default>
     <default class="arm_motor">
-      <joint damping="20" armature="0.01" frictionloss="0.1"/>
+      <joint damping="5" armature="0.01" frictionloss="0.0"/>
       <!-- <joint damping="25" armature="0.01" frictionloss="0.1"/> -->
     </default>
     <default class="wrist_motor">
-      <joint damping="12" armature="0.001" frictionloss="0.1"/>
+      <joint damping="3" armature="0.001" frictionloss="0.0"/>
       <!-- <joint damping="15" armature="0.001" frictionloss="0.1"/> -->
     </default>
     
@@ -299,8 +299,10 @@
                             <inertial pos="0.06214634836 -0.00050869656 -0.00058171093" quat="1 0 0 0"
                               mass="0.37283854"
                               diaginertia="0.00027535181027 0.00053951827219 0.00039623390907" />
-                            <geom pos="0.035 0 0" quat="1 0 0 0" type="sphere" size="0.035" contype="1"
-                              conaffinity="1" group="1" density="0" rgba="0.7 0.7 0.7 1" />
+                            <!-- <geom pos="0.035 0 0" quat="1 0 0 0" type="sphere" size="0.035" contype="1"
+                              conaffinity="1" group="1" density="0" rgba="0.7 0.7 0.7 1" /> -->
+                              <geom pos="0.0 0 0" quat="1 0 0 0" type="sphere" size="0.00000035" contype="1"
+                              conaffinity="1" group="1" density="0" rgba="0.7 0.7 0.7 1" friction="50 10 1" />
                           </body>
                         </body>
                       </body>
@@ -379,8 +381,10 @@
                             <inertial pos="0.06214634836 0.00050869656 -0.00058171093" quat="1 0 0 0"
                               mass="0.37283854"
                               diaginertia="0.00027535181027 0.00053951827219 0.00039623390907" />
-                            <geom pos="0.035 0 0" quat="1 0 0 0" type="sphere" size="0.035" contype="1"
-                              conaffinity="1" group="1" density="0" rgba="0.7 0.7 0.7 1" />
+                            <!-- <geom pos="0.035 0 0" quat="1 0 0 0" type="sphere" size="0.035" contype="1"
+                              conaffinity="1" group="1" density="0" rgba="0.7 0.7 0.7 1" /> -->
+                              <geom pos="0.0 0 0" quat="1 0 0 0" type="sphere" size="0.00000035" contype="1"
+                              conaffinity="1" group="1" density="0" rgba="0.7 0.7 0.7 1" friction="50 10 1" />
                           </body>
                         </body>
                       </body>

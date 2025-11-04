@@ -1,8 +1,8 @@
 import time
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
-import torch
 import numpy as np
+import torch
 
 from commands.command_manager import CommandTerm
 from controllers.rl_controller_base import RLControllerBase
@@ -18,8 +18,8 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
     Uses contact-implicit reinforcement learning policy
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         # Default velocity commands
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0], device=self.device)
@@ -57,7 +57,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
 
     def register_commands(self):
         """Register velocity commands as input fields."""
-        
+
         self.command_manager.register_input_command(
             name="x_velocity",
             description="X Velocity (m/s)",
@@ -67,7 +67,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
         )
 
         self.command_manager.register_input_command(
-            name="y_velocity", 
+            name="y_velocity",
             description="Y Velocity (m/s)",
             default_value=0.0,
             min_value=-1.0,
@@ -123,7 +123,9 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=12, device=self.device),
+            ObsTerm(
+                joint_vel, params={"mapping": self.joint_obs_unitree_to_isaac_mapping}, obs_dim=12, device=self.device
+            ),
         )
         self.obs_manager.register(
             "last_action",
@@ -183,7 +185,7 @@ class RLQuadrupedLocomotionVelocityController(RLControllerBase):
                 joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
             else:
                 joint_pos_targets = self.compute_joint_pos_targets()
-                
+
             # Clip the joint pos targets for safety
             if hasattr(self, "soft_dof_pos_limit"):
                 joint_pos_targets = self._clip_dof_pos(joint_pos_targets)
@@ -225,19 +227,27 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
     Uses contact-implicit reinforcement learning policy
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         # Ensure tensors are on the correct device
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0], device=self.device)
         # Pre-allocate motor command dictionary
         self.G1_NUM_MOTOR = 29
-        self.cmd = {f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(self.G1_NUM_MOTOR)}
+        self.cmd = {
+            f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(self.G1_NUM_MOTOR)
+        }
         # self.cmd["mode_pr"] = self.robot.MotorMode.PR
         # self.cmd["mode_machine"] = 0
         self.default_joint_pos_np = self.default_joint_pos.cpu().numpy()
         self.Kp = configs["controller_config"]["stiffness"]
         self.Kd = configs["controller_config"]["damping"]
+        self.policy_stiffness = torch.tensor(self.Kp, device=self.device)
+        self.policy_damping = torch.tensor(self.Kd, device=self.device)
+        self.policy_joint_indices = [
+            self.robot.actuated_joint_names.index(joint_name) for joint_name in self.robot.actuated_joint_names
+        ]
+
         self.decimation = configs["controller_config"]["decimation"]
         self.control_dt = configs["controller_config"]["control_dt"]
         self.counter = 0
@@ -250,7 +260,6 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
         #     log_interval=2.0,  # Reduced for easier testing
         #     logger=self.logger  # Will be updated when logger is available
         # )
-
 
     def set_mode(self):
         """Runs when the mode is changed in the UI."""
@@ -354,13 +363,23 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, obs_dim=self.num_actuated_joints, params={"mapping": self.robot.actuated_joint_indices}, device=self.device),
+            ObsTerm(
+                joint_vel,
+                obs_dim=self.num_actuated_joints,
+                params={"mapping": self.robot.actuated_joint_indices},
+                device=self.device,
+            ),
         )
         self.obs_manager.register(
             "last_action",
-            ObsTerm(last_action, params={"last_action": lambda: self.raw_action}, obs_dim=self.num_actuated_joints, device=self.device),
+            ObsTerm(
+                last_action,
+                params={"last_action": lambda: self.raw_action},
+                obs_dim=self.num_actuated_joints,
+                device=self.device,
+            ),
         )
-        
+
     def compute_lowlevelcmd(self, state):
         """
         Compute motor commands using the learned policy.
@@ -372,11 +391,11 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
 
         start_time = time.perf_counter()
         self.counter += 1
-        
+
         # # Frequency tracking
         # frequency = self._frequency_tracker.tick()
         # self.logger.debug(f"compute_lowlevelcmd frequency: {self._frequency_tracker.get_statistics()['current_frequency']:.2f} Hz")
-        
+
         if self.counter % self.decimation == 0:
             try:
                 if not self.use_threading:
@@ -384,7 +403,7 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                     self.joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
                 else:
                     self.joint_pos_targets = self.compute_joint_pos_targets()
-                    
+
                 # # Clip the joint pos targets for safety
                 # if hasattr(self, "soft_dof_pos_limit"):
                 #     self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
@@ -424,7 +443,7 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
                     }
 
         return self.cmd
-        
+
     # def compute_lowlevelcmd(self, state):
     #     """
     #     Compute motor commands using the learned policy.
@@ -434,7 +453,7 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
     #     """
     #     start_time = time.perf_counter()
     #     self.counter += 1
-        
+
     #     if self.counter % self.decimation == 0:
     #         # Build observation tensor efficiently
     #         obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
@@ -442,7 +461,7 @@ class RLHumanoidLocomotionVelocityController(RLControllerBase):
     #         # Clip the joint pos targets for safety
     #         if hasattr(self, "soft_dof_pos_limit"):
     #             self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets)
-                
+
     #     for i in range(self.robot.num_joints):
     #         self.cmd[f"motor_{i}"].update({
     #             "q": float(self.joint_pos_targets[i]),
@@ -519,8 +538,8 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
     Only the leg joints (12) are actuated, the arm and waist joints (17) are PD controlled to zero positions.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
         self.velocity_commands = torch.tensor([0.0, 0.0, 0.0], device=self.device)
         self.max_cmd = torch.tensor([0.8, 0.5, 1.57])
 
@@ -528,31 +547,33 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
         self.arm_waist_kds = configs["controller_config"]["arm_waist_kds"]
 
         self.leg_joint2motor_idx = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], device=self.device)
-        self.arm_waist_joint2motor_idx = torch.tensor([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28], device=self.device)
+        self.arm_waist_joint2motor_idx = torch.tensor(
+            [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28], device=self.device
+        )
         self.actions_mapping = self.leg_joint2motor_idx
         self.Kp = configs["controller_config"]["stiffness"]
         self.Kd = configs["controller_config"]["damping"]
 
         self.leg_kps = self.Kp
         self.leg_kds = self.Kd
-        
-        
+
         # Pre-compute scaling factors
         self.ang_vel_scale = 0.25
         self.joint_vel_scale = 0.05
         self.cmd_scale = torch.tensor([2.0, 2.0, 0.25], device=self.device)
         self.period = 0.8
 
-        
         # Pre-allocate motor command dictionary
         self.G1_NUM_MOTOR = 29
-        self.cmd = {f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(self.G1_NUM_MOTOR)}
+        self.cmd = {
+            f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(self.G1_NUM_MOTOR)
+        }
         self.cmd["mode_pr"] = 0  # Mode.PR
         self.default_joint_pos_np = self.default_joint_pos.cpu().numpy()
         # Move all tensors to GPU for consistency
         self.default_joint_pos = self.default_joint_pos.to(self.device)
         self.velocity_commands = self.velocity_commands.to(self.device)
-        
+
         # Pre-allocate joint position targets on GPU
         self.joint_pos_targets = self.default_joint_pos.clone()
 
@@ -622,15 +643,17 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
 
         from state_manager.observations import (
             ang_vel_b,
-            projected_gravity_b,
             joint_pos_rel,
             joint_vel,
             last_action,
             phase_with_timing,
+            projected_gravity_b,
             velocity_commands,
         )
 
-        self.obs_manager.register("ang_vel_b", ObsTerm(ang_vel_b, params={"scale": 0.25}, obs_dim=3, device=self.device))
+        self.obs_manager.register(
+            "ang_vel_b", ObsTerm(ang_vel_b, params={"scale": 0.25}, obs_dim=3, device=self.device)
+        )
         self.obs_manager.register("projected_gravity", ObsTerm(projected_gravity_b, obs_dim=3, device=self.device))
         self.obs_manager.register(
             "velocity_commands",
@@ -656,7 +679,12 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
         )
         self.obs_manager.register(
             "joint_vel",
-            ObsTerm(joint_vel, obs_dim=12, params={"mapping": self.leg_joint2motor_idx.cpu().numpy(), "scale": 0.05}, device=self.device),
+            ObsTerm(
+                joint_vel,
+                obs_dim=12,
+                params={"mapping": self.leg_joint2motor_idx.cpu().numpy(), "scale": 0.05},
+                device=self.device,
+            ),
         )
         self.obs_manager.register(
             "last_action",
@@ -664,7 +692,17 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
         )
         self.obs_manager.register(
             "phase",
-            ObsTerm(phase_with_timing, obs_dim=2, params={"counter": lambda: self.counter, "period": 0.8, "control_dt": self.control_dt, "decimation": self.decimation}, device=self.device),
+            ObsTerm(
+                phase_with_timing,
+                obs_dim=2,
+                params={
+                    "counter": lambda: self.counter,
+                    "period": 0.8,
+                    "control_dt": self.control_dt,
+                    "decimation": self.decimation,
+                },
+                device=self.device,
+            ),
         )
 
     def compute_lowlevelcmd(self, state):
@@ -676,39 +714,44 @@ class RLHumanoidUnitreeLocomotionVelocityController(RLControllerBase):
         """
         start_time = time.perf_counter()
         self.counter += 1
-        
+
         if self.counter % self.decimation == 0:
             # Build observation tensor efficiently
             obs_tensor = self.obs_manager.compute_full_tensor(state, batch_idx=0)
             self.joint_pos_targets = self.compute_joint_pos_targets_from_policy(obs_tensor)
             # Clip the joint pos targets for safety
             if hasattr(self, "soft_dof_pos_limit"):
-                self.joint_pos_targets = self._clip_dof_pos(self.joint_pos_targets, joint_indices=self.leg_joint2motor_idx.cpu().numpy())
-
+                self.joint_pos_targets = self._clip_dof_pos(
+                    self.joint_pos_targets, joint_indices=self.leg_joint2motor_idx.cpu().numpy()
+                )
 
         # Build motor commands efficiently using pre-allocated dictionary
         # Leg joints
         for i in range(len(self.leg_joint2motor_idx)):
             motor_idx = self.leg_joint2motor_idx[i]
-            self.cmd[f"motor_{motor_idx}"].update({
-                "q": float(self.joint_pos_targets[i]),
-                "kp": float(self.leg_kps[i]),
-                "dq": 0.0,
-                "kd": float(self.leg_kds[i]),
-                "tau": 0.0,
-            })
+            self.cmd[f"motor_{motor_idx}"].update(
+                {
+                    "q": float(self.joint_pos_targets[i]),
+                    "kp": float(self.leg_kps[i]),
+                    "dq": 0.0,
+                    "kd": float(self.leg_kds[i]),
+                    "tau": 0.0,
+                }
+            )
 
         # Arm/waist joints
         for i in range(len(self.arm_waist_joint2motor_idx)):
             motor_idx = self.arm_waist_joint2motor_idx[i]
-            self.cmd[f"motor_{motor_idx}"].update({
-                "q": 0.0,
-                "kp": float(self.arm_waist_kps[i]),
-                "dq": 0.0,
-                "kd": float(self.arm_waist_kds[i]),
-                "tau": 0.0,
-            })
-        
+            self.cmd[f"motor_{motor_idx}"].update(
+                {
+                    "q": 0.0,
+                    "kp": float(self.arm_waist_kps[i]),
+                    "dq": 0.0,
+                    "kd": float(self.arm_waist_kds[i]),
+                    "tau": 0.0,
+                }
+            )
+
         self.cmd_preparation_time = time.perf_counter() - start_time
         if self.logger:
             self.logger.debug(f"Command preparation time (in seconds): {self.cmd_preparation_time}")

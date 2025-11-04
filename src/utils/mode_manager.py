@@ -28,7 +28,10 @@ class ModeManager:
         :param controllers: Dictionary of controllers for this mode
         """
         # Create an observation manager for each submode
-        obs_managers = {submode_name: ObservationManager(logger=self.logger, device=self.device) for submode_name in controllers.keys()}
+        obs_managers = {
+            submode_name: ObservationManager(logger=self.logger, device=self.device)
+            for submode_name in controllers.keys()
+        }
 
         self._modes[mode_name] = controllers
         self._mode_obs_managers[mode_name] = obs_managers

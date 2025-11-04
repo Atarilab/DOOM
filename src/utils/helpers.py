@@ -45,7 +45,7 @@ class ObservationHistoryStorage:
         # Shift the buffer to make space for the new observation
         # Use roll operation which is more efficient than clone + assignment
         self.buffer = torch.roll(self.buffer, shifts=-self.num_obs, dims=1)
-        
+
         # Add the new observation at the end
         self.buffer[:, -self.num_obs :] = observation
 
@@ -71,7 +71,7 @@ class ObservationHistoryStorage:
 
         done_indices = torch.nonzero(done == 1)
         self.buffer[done_indices] = 0.0
-        
+
 
 class EMAFilter:
     def __init__(self, alpha: float, action_dim: int, device: torch.device = torch.device("cpu")):
@@ -151,24 +151,27 @@ def create_joint_mapping(list_a: list, list_b: list) -> list:
             mapping.append(-1)
     return mapping
 
-def tensorify(data: Union[np.ndarray, torch.Tensor, list, float, tuple], 
-                  dtype: torch.dtype = torch.float32,
-                  device: Optional[torch.device] = None) -> torch.Tensor:
+
+def tensorify(
+    data: Union[np.ndarray, torch.Tensor, list, float, tuple],
+    dtype: torch.dtype = torch.float32,
+    device: Optional[torch.device] = None,
+) -> torch.Tensor:
     """
     Helper function to ensure data is a torch tensor with consistent dtype and device.
-    
+
     :param data: Input data (numpy array, torch tensor, list, or scalar)
     :param dtype: Desired tensor dtype
     :param device: Desired tensor device (if None, keeps original device)
     :return: torch.Tensor with specified dtype and device
     """
     if isinstance(data, torch.Tensor):
-        tensor = data.to(dtype=dtype)    
+        tensor = data.to(dtype=dtype)
     elif isinstance(data, np.ndarray):
         tensor = torch.from_numpy(data).to(dtype=dtype)
-    else: # Handle lists, scalars, etc.
+    else:  # Handle lists, scalars, etc.
         tensor = torch.tensor(data, dtype=dtype)
-    
+
     if device is not None:
         tensor = tensor.to(device)
     return tensor

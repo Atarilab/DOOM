@@ -3,8 +3,8 @@ from typing import Dict, List, Optional
 import mujoco
 import torch
 
-from utils.math import quat_to_rotmatrix
 from utils.helpers import tensorify
+from utils.math import quat_to_rotmatrix
 
 
 class MjRobotWrapper:
@@ -35,7 +35,7 @@ class MjRobotWrapper:
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_JOINT, i)  # type: ignore
             if name and name != "floating_base_joint":
                 self.joint_names[name] = i
-                
+
         self.num_joints = len(self.joint_names)
 
         # Debug print to see what bodies are available
@@ -45,23 +45,25 @@ class MjRobotWrapper:
         self.base_link = base_link
         self.ee_indices = [self.body_names.get(name, -1) for name in ee_names]
         self.base_idx = self.body_names.get(self.base_link, -1)
-        
+
         # Store device for torch operations
-        self.device = device if device is not None else torch.device('cpu')
+        self.device = device if device is not None else torch.device("cpu")
 
         # Pre-allocate tensors for performance optimization
         self.num_ee = len(self.ee_indices)
         self._ee_positions_w = torch.zeros((self.num_ee, 3), dtype=torch.float32, device=self.device)
         self._ee_positions_b = torch.zeros((self.num_ee, 3), dtype=torch.float32, device=self.device)
         self._feet_positions_init = torch.zeros((self.num_ee, 3), dtype=torch.float32, device=self.device)
-        
+
         # Pre-compute valid indices for performance
         self.valid_ee_indices = [i for i, idx in enumerate(self.ee_indices) if idx >= 0]
         self.valid_mj_indices = [self.ee_indices[i] for i in self.valid_ee_indices]
 
         # Initialize world frame transform
         self._init_world_frame = False
-        self.world_to_init = torch.eye(4, dtype=torch.float32, device=self.device)  # Will store the transform from world to initial pose
+        self.world_to_init = torch.eye(
+            4, dtype=torch.float32, device=self.device
+        )  # Will store the transform from world to initial pose
 
         # Store initial feet positions
         self.initial_feet_positions_init_frame = None
@@ -89,7 +91,6 @@ class MjRobotWrapper:
         except Exception as e:
             print(f"Error setting init frame: {e}")
             return
-
 
         # Update the robot state with the current state
         self.update(state)
@@ -126,7 +127,9 @@ class MjRobotWrapper:
         """Get end effector positions in world frame."""
         # Reset to zeros for invalid indices
         self._ee_positions_w.zero_()
-        self._ee_positions_w[self.valid_ee_indices] = torch.from_numpy(self.data.xpos[self.valid_mj_indices]).float().to(self.device)
+        self._ee_positions_w[self.valid_ee_indices] = (
+            torch.from_numpy(self.data.xpos[self.valid_mj_indices]).float().to(self.device)
+        )
         return self._ee_positions_w
 
     def get_ee_positions_b(self) -> torch.Tensor:
@@ -277,7 +280,7 @@ class MjRobotWrapper:
             raise RuntimeError("Init frame not set. Call set_initial_world_frame() first.")
 
         world_positions = self.get_ee_positions_w()
-        
+
         # Vectorized transformation from world to init frame using pre-allocated tensor
         # Subtract init frame origin from all positions at once
         rel_pos = world_positions - self.world_to_init[:3, 3]

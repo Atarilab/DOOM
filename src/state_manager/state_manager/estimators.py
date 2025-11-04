@@ -30,30 +30,42 @@ class VelocityEstimator:
             self.covariance = torch.eye(12, dtype=torch.float32, device=device) * 1000
 
             # Process noise covariance
-            self.Q = torch.diag(torch.tensor([
-                position_noise,
-                position_noise,
-                position_noise,  # position
-                velocity_noise,
-                velocity_noise,
-                velocity_noise,  # linear velocity
-                0.1,
-                0.1,
-                0.1,  # orientation
-                0.1,
-                0.1,
-                0.1,  # angular velocity
-            ], dtype=torch.float32, device=device))
+            self.Q = torch.diag(
+                torch.tensor(
+                    [
+                        position_noise,
+                        position_noise,
+                        position_noise,  # position
+                        velocity_noise,
+                        velocity_noise,
+                        velocity_noise,  # linear velocity
+                        0.1,
+                        0.1,
+                        0.1,  # orientation
+                        0.1,
+                        0.1,
+                        0.1,  # angular velocity
+                    ],
+                    dtype=torch.float32,
+                    device=device,
+                )
+            )
 
             # Measurement noise covariance
-            self.R = torch.diag(torch.tensor([
-                position_noise,
-                position_noise,
-                position_noise,  # position
-                0.1,
-                0.1,
-                0.1,  # orientation
-            ], dtype=torch.float32, device=device))
+            self.R = torch.diag(
+                torch.tensor(
+                    [
+                        position_noise,
+                        position_noise,
+                        position_noise,  # position
+                        0.1,
+                        0.1,
+                        0.1,  # orientation
+                    ],
+                    dtype=torch.float32,
+                    device=device,
+                )
+            )
 
         # Finite differencing specific initialization
         elif method == "finite_diff":
@@ -88,19 +100,24 @@ class VelocityEstimator:
             # Compute matrix logarithm using torch operations
             # For rotation matrices, we can use eigenvalue decomposition
             eigenvalues, eigenvectors = torch.linalg.eig(R_diff)
-            
+
             # Compute log of eigenvalues
             log_eigenvalues = torch.log(eigenvalues)
-            
+
             # Reconstruct the matrix logarithm
-            omega_skew = torch.matmul(torch.matmul(eigenvectors, torch.diag(log_eigenvalues)), torch.linalg.inv(eigenvectors))
-            
+            omega_skew = torch.matmul(
+                torch.matmul(eigenvectors, torch.diag(log_eigenvalues)), torch.linalg.inv(eigenvectors)
+            )
+
             # Extract angular velocity from skew-symmetric matrix and divide by dt
-            angular_velocity = torch.tensor([
-                omega_skew[2, 1].real, 
-                omega_skew[0, 2].real, 
-                omega_skew[1, 0].real
-            ], dtype=torch.float32, device=self.device) / dt
+            angular_velocity = (
+                torch.tensor(
+                    [omega_skew[2, 1].real, omega_skew[0, 2].real, omega_skew[1, 0].real],
+                    dtype=torch.float32,
+                    device=self.device,
+                )
+                / dt
+            )
         except Exception:
             # Fallback to zero angular velocity if computation fails
             angular_velocity = torch.zeros(3, dtype=torch.float32, device=self.device)
@@ -167,9 +184,13 @@ class VelocityEstimator:
             if self.last_timestamp is None:
                 self.last_timestamp = timestamp
                 self.state[:3] = position
-                self.state[6:9] = tensorify(quaternion_to_euler(quaternion, order="wxyz"), dtype=torch.float32, device=self.device)
+                self.state[6:9] = tensorify(
+                    quaternion_to_euler(quaternion, order="wxyz"), dtype=torch.float32, device=self.device
+                )
                 self.last_quaternion = quaternion
-                return torch.zeros(3, dtype=torch.float32, device=self.device), torch.zeros(3, dtype=torch.float32, device=self.device)
+                return torch.zeros(3, dtype=torch.float32, device=self.device), torch.zeros(
+                    3, dtype=torch.float32, device=self.device
+                )
 
             dt = timestamp - self.last_timestamp
 
@@ -190,7 +211,9 @@ class VelocityEstimator:
             H[:3, :3] = torch.eye(3, dtype=torch.float32, device=self.device)  # Position
             H[3:6, 6:9] = torch.eye(3, dtype=torch.float32, device=self.device)  # Orientation
             # Compute Euler angles from current quaternion
-            current_euler = tensorify(quaternion_to_euler(quaternion, order="wxyz"), dtype=torch.float32, device=self.device)
+            current_euler = tensorify(
+                quaternion_to_euler(quaternion, order="wxyz"), dtype=torch.float32, device=self.device
+            )
 
             # Angular velocity estimation
             raw_angular_velocity = self._compute_angular_velocity(self.last_quaternion, quaternion, dt)
@@ -207,7 +230,9 @@ class VelocityEstimator:
             # Update state and covariance
             self.state = predicted_state + torch.matmul(K, innovation)
             self.state[9:] = raw_angular_velocity  # Update angular velocity
-            self.covariance = torch.matmul((torch.eye(12, dtype=torch.float32, device=self.device) - torch.matmul(K, H)), predicted_covariance)
+            self.covariance = torch.matmul(
+                (torch.eye(12, dtype=torch.float32, device=self.device) - torch.matmul(K, H)), predicted_covariance
+            )
             self.last_quaternion = quaternion
 
             # Update timestamp

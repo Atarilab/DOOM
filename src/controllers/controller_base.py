@@ -21,7 +21,8 @@ class ControllerBase(ABC):
     def __init__(
         self,
         robot: "RobotBase",
-        configs: Dict[str, Any] = None,
+        configs: Optional[Dict[str, Any]] = None,
+        debug: bool = False,
     ):
         """
         Initialize the base controller with robot and configuration.
@@ -37,11 +38,11 @@ class ControllerBase(ABC):
         self.robot: "RobotBase" = robot
         self.command_manager: Optional[CommandManager] = None
         self.obs_manager: Optional[ObservationManager] = None
-        self.configs = configs
-        self.control_dt = configs["controller_config"]["control_dt"]
-        self.debug = configs["controller_config"].get("debug", False)
-        self.device = configs["controller_config"].get("device", "cpu")
-        
+        self.configs = configs or {}
+        self.control_dt = self.configs["controller_config"]["control_dt"]
+        self.debug = debug
+        self.device = self.configs["controller_config"].get("device", "cpu")
+
         self.name = None
         self.logger = None
         self.active = False
@@ -72,29 +73,41 @@ class ControllerBase(ABC):
         else:
             lower_limits = self.robot.mj_model.model.jnt_range[:, 0]
             upper_limits = self.robot.mj_model.model.jnt_range[:, 1]
-            
+
         lower_limits = lower_limits[self.robot.actuated_joint_indices]
         upper_limits = upper_limits[self.robot.actuated_joint_indices]
 
         # Conservative limit settings
         soft_dof_limit_factor = self.configs["controller_config"].get("soft_dof_limit_factor", 0.95)
-        self.dof_pos_limit = torch.tensor([lower_limits, upper_limits], dtype=torch.float32, device=self.device)
+        # Convert to single tensor to avoid PyTorch warning
+        dof_pos_limit_array = torch.tensor([lower_limits, upper_limits], dtype=torch.float32, device=self.device)
+        self.dof_pos_limit = dof_pos_limit_array
 
         # Effort limits
         # TODO: Fetch from mj_model
         try:
-            self.effort_limit = self.robot.effort_limit
+            effort_limit = self.robot.effort_limit
+            if isinstance(effort_limit, (list, torch.Tensor)):
+                self.effort_limit = torch.tensor(effort_limit, dtype=torch.float32, device=self.device)
+            else:
+                self.effort_limit = torch.tensor(effort_limit, dtype=torch.float32, device=self.device)
         except NotImplementedError:
-            self.effort_limit = torch.inf
+            self.effort_limit = torch.tensor(torch.inf, dtype=torch.float32, device=self.device)
 
         # Soft joint position limits
         joint_pos_mean = (lower_limits + upper_limits) / 2
         joint_pos_range = upper_limits - lower_limits
 
-        self.soft_dof_pos_limit = torch.tensor([
-            joint_pos_mean - 0.5 * joint_pos_range * soft_dof_limit_factor,
-            joint_pos_mean + 0.5 * joint_pos_range * soft_dof_limit_factor,
-        ], dtype=torch.float32, device=self.device)
+        # Convert to single tensor to avoid PyTorch warning
+        soft_dof_pos_limit_array = torch.tensor(
+            [
+                joint_pos_mean - 0.5 * joint_pos_range * soft_dof_limit_factor,
+                joint_pos_mean + 0.5 * joint_pos_range * soft_dof_limit_factor,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        self.soft_dof_pos_limit = soft_dof_pos_limit_array
 
     def set_obs_manager(self, obs_manager: "ObservationManager"):
         """
@@ -139,9 +152,11 @@ class ControllerBase(ABC):
         :param effort: Desired motor torques
         :return: Torques constrained within motor limits
         """
-        return torch.clip(effort, -self.effort_limit, self.effort_limit)
+        return torch.clamp(effort, -self.effort_limit, self.effort_limit)
 
-    def _clip_dof_pos(self, joint_pos_targets: torch.Tensor, joint_indices: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def _clip_dof_pos(
+        self, joint_pos_targets: torch.Tensor, joint_indices: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         """
         Enforce soft joint position limits.
 
@@ -149,13 +164,13 @@ class ControllerBase(ABC):
         :return: Positions constrained within soft limits
         """
         if joint_indices is not None:
-            return torch.clip(
+            return torch.clamp(
                 joint_pos_targets[joint_indices],
                 self.soft_dof_pos_limit[0][joint_indices],
                 self.soft_dof_pos_limit[1][joint_indices],
             )
 
-        return torch.clip(joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
+        return torch.clamp(joint_pos_targets, self.soft_dof_pos_limit[0], self.soft_dof_pos_limit[1])
 
     def register_commands(self):
         """

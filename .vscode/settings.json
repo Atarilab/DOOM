@@ -69,5 +69,17 @@
         "*test.py"
     ],
     "python.testing.pytestEnabled": false,
-    "python.testing.unittestEnabled": true
+    "python.testing.unittestEnabled": true,
+    "cursorpyright.analysis.extraPaths": [
+        "/home/atari/workspace/DOOM/install/state_manager/lib/python3.10/site-packages",
+        "/home/atari/workspace/DOOM/install/master_manager/lib/python3.10/site-packages",
+        "/home/atari/dependencies/install/vicon_receiver/local/lib/python3.10/dist-packages",
+        "/home/atari/dependencies/install/unitree_go/local/lib/python3.10/dist-packages",
+        "/home/atari/dependencies/install/unitree_api/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3/dist-packages",
+        "/home/atari/workspace/DOOM/src"
+    ],
+    "cursorpyright.analysis.typeCheckingMode": "basic"
 }

@@ -99,8 +99,8 @@ class Go2StandUpController(ControllerBase):
     to the stand up joint positions which are constants.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "Go2StandUpController"
         self.stand_up_joint_pos = robot.stand_up_joint_pos
@@ -150,8 +150,8 @@ class Go2StandDownController(ControllerBase):
     to the stand down joint positions which are constants.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.stand_up_joint_pos = robot.stand_up_joint_pos
         self.stand_down_joint_pos = robot.stand_down_joint_pos
@@ -199,8 +199,8 @@ class Go2StayDownController(ControllerBase):
     The Stay Down Controller is used to stay down close the ground, to prepare to get up.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.stand_down_joint_pos = robot.stand_down_joint_pos
         self.start_time = 0.0
@@ -243,8 +243,8 @@ class Go2StanceController(ControllerBase):
     The Stance Controller is used to stay in stance. Used to prepare to go to rest from other controllers.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.stand_up_joint_pos = robot.stand_up_joint_pos
         self.start_time = 0.0
@@ -280,24 +280,38 @@ class Go2StanceController(ControllerBase):
             }
         return cmd
 
+
 class G1PhasePDController(ControllerBase):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1PhasePDController"
-        self.total_time = 2  # 2 seconds
+        self.total_time = 5  # 2 seconds
         self.num_steps = int(self.total_time / self.control_dt)
 
         self.leg_joint2motor_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-        self.leg_kps = [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
-        self.leg_kds = [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
-        self.leg_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
-        
+        self.leg_kps = [350.0, 200.0, 200.0, 300.0, 300.0, 150.0, 350.0, 200.0, 200.0, 300.0, 300.0, 150.0]
+        self.leg_kds = [5.0, 5.0, 5.0, 10.0, 5.0, 5.0, 5.0, 5.0, 5.0, 10.0, 5.0, 5.0]
+        self.leg_default_angles = [
+            -0.312,
+            0.0,
+            0.0,
+            0.669,
+            -0.33,
+            0.0,
+            -0.312,
+            0.0,
+            0.0,
+            0.669,
+            -0.33,
+            0.0,
+        ]
+
         self.arm_waist_joint2motor_idx = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
         self.arm_waist_kps = [300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20]
         self.arm_waist_kds = [3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1]
@@ -309,7 +323,7 @@ class G1PhasePDController(ControllerBase):
         self.final_pos = torch.zeros(len(self.robot.actuated_joint_indices), dtype=torch.float32, device=self.device)
         self.dof_size = len(self.robot.actuated_joint_indices)
         self.init_dof_pos = torch.zeros(self.dof_size, dtype=torch.float32, device=self.device)
-        
+
         self.step_counter = 0
 
     def set_mode(self):
@@ -328,7 +342,6 @@ class G1PhasePDController(ControllerBase):
             ObsTerm(
                 current_time,
                 obs_dim=1,
-                
             ),
         )
 
@@ -340,7 +353,7 @@ class G1PhasePDController(ControllerBase):
             self.init_dof_pos[i] = state["robot/joint_pos"][motor_idx]
 
         alpha = self.step_counter / self.num_steps
-        
+
         cmd = {}
         for i, motor_idx in enumerate(self.robot.actuated_joint_indices):
             cmd[f"motor_{motor_idx}"] = {
@@ -358,62 +371,161 @@ class G1PhasePDController(ControllerBase):
                 "kd": 0.0,
                 "tau": 0.0,
             }
-            
+
         self.step_counter = min(self.step_counter + 1, self.num_steps)
         return cmd
-    
+
+
 class G1LateralHandsController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1LateralHandsController"
         self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
-        self.arm_default_targets = torch.tensor([0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
-                                     0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000], dtype=torch.float32, device=self.device)
-        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), self.waist_default_targets, self.arm_default_targets), dim=0)
-        
+        self.arm_default_targets = torch.tensor(
+            [0.0, 1.3, 0.0000, 1.3, 0.0000, 0.0000, 0.0000, 0.0, -1.3, 0.0000, 1.3, 0.0000, 0.0000, 0.0000],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        self.final_pos = torch.cat(
+            (
+                torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                self.waist_default_targets,
+                self.arm_default_targets,
+            ),
+            dim=0,
+        )
+
+
 class G1DefaultHandsController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1DefaultHandsController"
         self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
-        self.arm_default_targets = torch.tensor([
-                                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
-                                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000
-                                     ], dtype=torch.float32, device=self.device)
-        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), self.waist_default_targets, self.arm_default_targets), dim=0)
-        
+        self.arm_default_targets = torch.tensor(
+            [
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        self.final_pos = torch.cat(
+            (
+                torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                self.waist_default_targets,
+                self.arm_default_targets,
+            ),
+            dim=0,
+        )
+
+
+class G1ZeroLegController(G1PhasePDController):
+    """
+    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
+    to the stand up joint positions which are constants.
+    """
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
+
+        self.name = "G1ZeroLegController"
+        self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+        default_joint_pos = torch.tensor(
+            self.configs["controller_config"]["default_joint_pos"], dtype=torch.float32, device=self.device
+        )
+        if default_joint_pos.shape[0] == 17:
+            self.waist_default_targets = default_joint_pos[:3]
+            self.arm_default_targets = default_joint_pos[3:]
+        else:
+            self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+            self.arm_default_targets = default_joint_pos.clone()
+
+        self.kps[self.leg_joint2motor_idx] = 0.0
+        self.kds[self.leg_joint2motor_idx] = 0.0
+
+        self.final_pos = torch.cat(
+            (
+                torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                self.waist_default_targets,
+                self.arm_default_targets,
+            ),
+            dim=0,
+        )
+
+
 class G1ManipulationInitHandsController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1ManipulationInitHandsController"
         self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
-        self.arm_default_targets = torch.tensor([
-                    -0.4500,  0.5000,  0.0000,  0.5000,  0.0000, 0.0000, -0.8000,
-                    -0.4500, -0.5000,  0.0000,  0.5000,  0.0000,  0.0000, 0.8000], dtype=torch.float32, device=self.device)
-        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), self.waist_default_targets, self.arm_default_targets), dim=0)
-    
+        self.arm_default_targets = torch.tensor(
+            [
+                -0.4500,
+                0.5000,
+                0.0000,
+                0.5000,
+                0.0000,
+                0.0000,
+                -0.8000,
+                -0.4500,
+                -0.5000,
+                0.0000,
+                0.5000,
+                0.0000,
+                0.0000,
+                0.8000,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        self.final_pos = torch.cat(
+            (
+                torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                self.waist_default_targets,
+                self.arm_default_targets,
+            ),
+            dim=0,
+        )
+
+
 class G1UpperPhasePDController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1UpperPhasePDController"
         # self.dof_idx = range(self.robot.num_joints)
@@ -424,16 +536,20 @@ class G1UpperPhasePDController(G1PhasePDController):
         self.step_counter = 0
         # self.kps = np.array([300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
         # self.kds = np.array([3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
-        self.kps = torch.tensor([100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20], dtype=torch.float32, device=self.device)
+        self.kps = torch.tensor(
+            [100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20], dtype=torch.float32, device=self.device
+        )
         self.kds = torch.tensor([2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1], dtype=torch.float32, device=self.device)
-        
+
+
 class G1LowerPhasePDController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1LowerPhasePDController"
         # self.dof_idx = range(self.robot.num_joints)
@@ -444,34 +560,133 @@ class G1LowerPhasePDController(G1PhasePDController):
         self.step_counter = 0
         # self.kps = np.array([300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20])
         # self.kds = np.array([3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1])
-        self.kps = torch.tensor([100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20], dtype=torch.float32, device=self.device)
-        self.kds = torch.tensor([2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1], dtype=torch.float32, device=self.device)
+        self.kps = torch.tensor(
+            [
+                100,
+                100,
+                100,
+                150,
+                40,
+                40,
+                100,
+                100,
+                100,
+                150,
+                40,
+                40,
+                300,
+                100,
+                100,
+                50,
+                50,
+                20,
+                20,
+                20,
+                100,
+                100,
+                50,
+                50,
+                20,
+                20,
+                20,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        self.kds = torch.tensor(
+            [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1],
+            dtype=torch.float32,
+            device=self.device,
+        )
 
-class G1LocoStandUpController(G1PhasePDController):
+
+class G1StandUpController(G1PhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
 
-        self.name = "G1LocoStandUpController"
-        self.final_pos = self.configs["controller_config"]["default_joint_pos"]
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
-class G1ManiStandUpController(G1PhasePDController):
-    """
-    The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
-    to the stand up joint positions which are constants.
-    """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+        self.name = "G1StandUpController"
+        default_joint_pos = torch.tensor(
+            self.configs["controller_config"]["default_joint_pos"], dtype=torch.float32, device=self.device
+        )
+        if default_joint_pos.shape[0] == 29:
+            self.final_pos = default_joint_pos
+        elif default_joint_pos.shape[0] == 11:
+            self.waist_default_targets = default_joint_pos[:3]
+            self.arm_default_targets = torch.cat(
+                [
+                    default_joint_pos[3:7],
+                    torch.tensor([0.0, 0.0, -1.449], dtype=torch.float32, device=self.device),
+                    default_joint_pos[7:],
+                    torch.tensor([0.0, 0.0, 1.449], dtype=torch.float32, device=self.device),
+                ],
+                dim=0,
+            )
+            self.final_pos = torch.cat(
+                (
+                    torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                    self.waist_default_targets,
+                    self.arm_default_targets,
+                ),
+                dim=0,
+            )
+        elif default_joint_pos.shape[0] == 17:
+            self.waist_default_targets = default_joint_pos[:3]
+            self.arm_default_targets = default_joint_pos[3:]
+            self.final_pos = torch.cat(
+                (
+                    torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                    self.waist_default_targets,
+                    self.arm_default_targets,
+                ),
+                dim=0,
+            )
+        elif default_joint_pos.shape[0] == 12:
+            self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+            self.arm_default_targets = torch.tensor(
+                [
+                    -0.4500,
+                    0.4000,
+                    0.0000,
+                    0.2000,
+                    0.0000,
+                    0.0000,
+                    -1.449,
+                    -0.4500,
+                    -0.4000,
+                    0.0000,
+                    0.2000,
+                    0.0000,
+                    0.0000,
+                    1.449,
+                ],
+                dtype=torch.float32,
+                device=self.device,
+            )
+            self.final_pos = torch.cat(
+                (
+                    torch.tensor(default_joint_pos.clone(), dtype=torch.float32, device=self.device),
+                    self.waist_default_targets,
+                    self.arm_default_targets,
+                ),
+                dim=0,
+            )
+        else:
+            self.waist_default_targets = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=self.device)
+            self.arm_default_targets = default_joint_pos.clone()
+            self.final_pos = torch.cat(
+                (
+                    torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                    self.waist_default_targets,
+                    self.arm_default_targets,
+                ),
+                dim=0,
+            )
 
-        self.name = "G1ManiStandUpController"
-        self.arm_waist_target = [0.0000, 0.0000, 0.0000, 
-                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
-                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000]
-        self.final_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), torch.tensor(self.arm_waist_target, dtype=torch.float32, device=self.device)), dim=0)
-        
 
 class G1UpperDefaultPosController(G1UpperPhasePDController):
     """
@@ -479,14 +694,31 @@ class G1UpperDefaultPosController(G1UpperPhasePDController):
     to the stand up joint positions which are constants.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1UpperDefaultPosController"
-        self.final_pos = torch.tensor([
-                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000,
-                    0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000, 0.0000], dtype=torch.float32, device=self.device)
-            
+        self.final_pos = torch.tensor(
+            [
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+                0.0000,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
+
 
 class G1UpperExtendLateralController(G1UpperPhasePDController):
     """
@@ -494,14 +726,15 @@ class G1UpperExtendLateralController(G1UpperPhasePDController):
     to the stand up joint positions which are constants.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1UpperExtendLateralController"
-        self.final_pos = torch.tensor([
-                    0.0,  1.3,  0.0000,  1.3,  0.0000, 0.0000, 0.0000,
-                    0.0, -1.3,  0.0000,  1.3,  0.0000,  0.0000, 0.0000], dtype=torch.float32, device=self.device)
-
+        self.final_pos = torch.tensor(
+            [0.0, 1.3, 0.0000, 1.3, 0.0000, 0.0000, 0.0000, 0.0, -1.3, 0.0000, 1.3, 0.0000, 0.0000, 0.0000],
+            dtype=torch.float32,
+            device=self.device,
+        )
 
 
 class G1UpperHomePosController(G1UpperPhasePDController):
@@ -509,25 +742,58 @@ class G1UpperHomePosController(G1UpperPhasePDController):
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1UpperHomePosController"
-        self.final_pos =self.final_pos = torch.tensor(configs["controller_config"]["default_joint_pos"], dtype=torch.float32, device=self.device)
-        
+        self.final_pos = self.final_pos = torch.tensor(
+            configs["controller_config"]["default_joint_pos"], dtype=torch.float32, device=self.device
+        )
+
+
 class G1LowerStandUpController(G1LowerPhasePDController):
     """
     The Stand Up Controller is used to stand up from the ground. It is an interpolation from the stand down joint positions
     to the stand up joint positions which are constants.
     """
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1LowerStandUpController"
-        self.final_pos = torch.tensor([
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-        ], dtype=torch.float32, device=self.device)
+        self.final_pos = torch.tensor(
+            [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )
 
 
 class G1StayUpController(ControllerBase):
@@ -535,8 +801,8 @@ class G1StayUpController(ControllerBase):
     The Stay Up Controller is used to stay up close the ground, to prepare to get up.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1StayUpController"
 
@@ -544,12 +810,11 @@ class G1StayUpController(ControllerBase):
         self.leg_kps = [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
         self.leg_kds = [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
         self.leg_default_angles = [-0.1, 0.0, 0.0, 0.3, -0.2, 0.0, -0.1, 0.0, 0.0, 0.3, -0.2, 0.0]
-        
+
         self.arm_waist_joint2motor_idx = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
         self.arm_waist_kps = [300, 300, 300, 100, 100, 50, 50, 20, 20, 20, 100, 100, 50, 50, 20, 20, 20]
         self.arm_waist_kds = [3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1]
         self.arm_waist_target = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
 
     def set_mode(self):
         self.start_time = time.time()
@@ -600,8 +865,8 @@ class G1LowLevelController(ControllerBase):
     The Low Level Controller is used to control the robot at the low level.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1LowLevelController"
         self.total_time = 3.0  # 2 seconds
@@ -621,7 +886,13 @@ class G1LowLevelController(ControllerBase):
         self.kps = self.leg_kps + self.arm_waist_kps
         self.kds = self.leg_kds + self.arm_waist_kds
 
-        self.default_pos = torch.cat((torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device), torch.tensor(self.arm_waist_target, dtype=torch.float32, device=self.device)), dim=0)
+        self.default_pos = torch.cat(
+            (
+                torch.tensor(self.leg_default_angles, dtype=torch.float32, device=self.device),
+                torch.tensor(self.arm_waist_target, dtype=torch.float32, device=self.device),
+            ),
+            dim=0,
+        )
         self.dof_size = len(self.dof_idx)
         self.init_dof_pos = torch.zeros(self.dof_size, dtype=torch.float32, device=self.device)
 
@@ -868,7 +1139,7 @@ class G1LowLevelController(ControllerBase):
                 "tau": 0.0,
             }
 
-            cmd["mode_pr"] = Mode.AB
+            cmd["mode_pr"] = Mode.PR
             # cmd["mode_machine"] = 1
 
         return cmd

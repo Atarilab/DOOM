@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import pygame
 
@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 class JoystickManager:
     """Manages joystick input and mapping to robot commands."""
 
-    def __init__(self, mode_manager: "ModeManager", robot: str, logger: Optional[logging.Logger] = None, debug: bool = False):
+    def __init__(
+        self, mode_manager: "ModeManager", robot: str, logger: Optional[logging.Logger] = None, debug: bool = False
+    ):
         self.logger = logger or logging.getLogger(__name__)
         self.joystick = None
         self.axis_id = {}
@@ -207,7 +209,7 @@ class JoystickManager:
 
                             self._submode_indices[main_mode] = (current_index + 1) % len(available_submodes)
                             self._last_command_time = current_time
-                            
+
                     elif self.robot == "UnitreeG1":
                         if key_state[self.key_map["select"]]:
                             self.mode_manager.set_mode("ZERO")
@@ -246,7 +248,8 @@ class JoystickManager:
                         elif (
                             key_state[self.key_map["L1"]]
                             and key_state[self.key_map["R1"]]
-                            and self.active_controller.__class__.__name__ in ["G1LocoStandUpController", "G1ManiStandUpController"]
+                            and self.active_controller.__class__.__name__
+                            in ["G1StandUpController", "G1ZeroLegController"]
                         ):
                             # Cycle through available submodes of the for the main mode
                             main_mode = list(self.mode_manager._modes.keys())[3]
@@ -311,10 +314,9 @@ class JoystickManager:
             self._running = True
             if self.joystick_count <= 0:
                 return
-            
+
             self._thread = threading.Thread(target=self._joystick_thread_func, daemon=not self.debug)
             self._thread.start()
-            
 
     def stop_thread(self):
         """Stop the joystick processing thread."""

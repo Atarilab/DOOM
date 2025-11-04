@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
             # Build Docker Image if it doesn't exist
             if ! docker image inspect mujuni-image >/dev/null 2>&1; then
                 echo "Building Docker image 'mujuni-image'..."
-                docker build -t mujuni-image unitree_mujoco_container/.devcontainer/.
+                docker build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) -t mujuni-image unitree_mujoco_container/.devcontainer/.
             else
                 echo "Docker image 'mujuni-image' already exists. Skipping build."
             fi
@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
             if ! docker ps -a --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
                 # If container doesn't exist, create and start a new container
                 xhost +local:root & \
-                docker run --shm-size=1g -it --privileged \
+                docker run --shm-size=2g -it --privileged \
                     --env-file .env.docker \
                     --network host \
                     --device /dev/input \
@@ -94,6 +94,7 @@ while [[ $# -gt 0 ]]; do
                     --user $(id -u):$(id -g) \
                     --gpus all \
                     -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
+                    -v /dev/shm:/dev/shm \
                     -v $PWD/src:/home/atari/workspace/DOOM/src \
                     -v $HOME/.Xauthority:/root/.Xauthority \
                     -v $PWD/.vscode:/home/atari/workspace/.vscode \

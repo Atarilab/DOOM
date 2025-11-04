@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import os
+import time
 
 import rclpy
 
@@ -16,6 +17,11 @@ from utils.ui_interface import RobotControlUI
 
 node = None
 state_manager = None
+
+import gc
+
+gc.set_threshold(10**9, 10**9, 10**9)
+
 
 async def main_async(args=None):
     """
@@ -78,7 +84,7 @@ async def main_async(args=None):
         # Register controllers available for the robot
         for controller_type, controllers in robot.available_controllers.items():
             controller_dict = {
-                controller_name: controller_class(robot, configs)
+                controller_name: controller_class(robot=robot, configs=configs, debug=args.debug)
                 for (controller_name, controller_class) in controllers.items()
             }
             mode_manager.register_mode(controller_type, controller_dict)
@@ -98,30 +104,32 @@ async def main_async(args=None):
 
         logger.info("Starting concurrent tasks")
 
-        # State manager runs at 2x the control frequency (sensor frequency)
+        # Spin state manager at twice the control frequency (sensor frequency)
         def spin_node():
-            spin_freq = (1.0 / configs["controller_config"]["control_dt"]) # 2x the control frequency
-            rate = node.create_rate(spin_freq)
+            sensor_dt = 0.5 * configs["controller_config"]["control_dt"]
+            next_time = time.time() + sensor_dt
+
             while rclpy.ok():
-                try:
-                    rclpy.spin_once(node)
-                    state_manager.spin_subscribers()
-                    rate.sleep()
-                except Exception as e:
-                    logger.error(f"Error in spin loop: {e}")
+                state_manager.spin_subscribers()
+
+                current_time = time.time()
+                sleep_time = next_time - current_time
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                next_time += sensor_dt
 
         # Run node in separate thread
         node_task = asyncio.create_task(asyncio.to_thread(spin_node))
-        
+
         # Create robot control UI if not disabled (non-blocking)
         try:
             if args.ui:
                 app_task = asyncio.create_task(RobotControlUI(mode_manager, task_name=args.task).run_async())
                 app_task.add_done_callback(lambda t: t.result() if not t.cancelled() else None)
-            
+
             # Only wait for the node task
             await node_task
-            
+
         except asyncio.CancelledError:
             mode_manager.set_mode("DAMPING")
             logger.info("Cancelling all tasks in master node before shutdown..")
@@ -140,7 +148,6 @@ async def main_async(args=None):
     finally:
         if node:
             node.cleanup()
-            node.destroy_node()
         if state_manager:
             state_manager.destroy_subscribers()
         rclpy.shutdown()

@@ -19,14 +19,23 @@ class RobotBase(ABC):
         self.logger = logger
         self.device = device
         self.mj_model = MjRobotWrapper(self.xml_path, self.ee_names, self.base_link, device=self.device)
-        
-        if self.floating_base:
-            self.actuated_joint_indices = [self.mj_model.joint_names[joint_name] - 1 for joint_name in self.actuated_joint_names]
-            self.non_actuated_joint_indices = [self.mj_model.joint_names[joint_name] - 1 for joint_name in self.non_actuated_joint_names]
-        else:
-            self.actuated_joint_indices = [self.mj_model.joint_names[joint_name] for joint_name in self.actuated_joint_names]
-            self.non_actuated_joint_indices = [self.mj_model.joint_names[joint_name] for joint_name in self.non_actuated_joint_names]
 
+        if self.floating_base:
+            self.actuated_joint_indices = [
+                self.mj_model.joint_names[joint_name] - 1 for joint_name in self.actuated_joint_names
+            ]
+            self.non_actuated_joint_indices = [
+                self.mj_model.joint_names[joint_name] - 1 for joint_name in self.non_actuated_joint_names
+            ]
+        else:
+            self.actuated_joint_indices = [
+                self.mj_model.joint_names[joint_name] for joint_name in self.actuated_joint_names
+            ]
+            self.non_actuated_joint_indices = [
+                self.mj_model.joint_names[joint_name] for joint_name in self.non_actuated_joint_names
+            ]
+
+        self.interface = "sim" if "sim" in self.task else "real"
 
     @property
     @abstractmethod
@@ -37,12 +46,12 @@ class RobotBase(ABC):
     @abstractmethod
     def actuated_joint_names(self) -> List[str]:
         pass
-    
+
     @property
     @abstractmethod
     def non_actuated_joint_names(self) -> List[str]:
         pass
-    
+
     @property
     @abstractmethod
     def damping_gain(self) -> float:
@@ -84,37 +93,37 @@ class RobotBase(ABC):
     def low_cmd_msg_type(self):
         """Return the low command message type."""
         pass
-    
+
     @property
     @abstractmethod
     def motor_command_attributes(self) -> List[str]:
         """
         Get the list of motor command attributes supported by this robot.
         Override in subclasses for robot-specific attributes.
-        
+
         Returns:
             List[str]: List of attribute names (e.g., ["q", "kp", "dq", "kd", "tau"])
         """
         return ["q", "kp", "dq", "kd", "tau"]
-    
+
     @property
     @abstractmethod
     def base_link(self) -> str:
         """Return the name of the base link."""
         pass
-    
+
     @property
     @abstractmethod
     def floating_base(self) -> bool:
         """Return if the robot has a floating base."""
         pass
-    
+
     @property
     @abstractmethod
     def ee_names(self) -> List[str]:
         """Return the names of the end effectors of the robot."""
         pass
-    
+
     @property
     def num_joints(self):
         """
@@ -127,21 +136,20 @@ class RobotBase(ABC):
     @property
     def get_joint_names(self) -> List[str]:
         return self.actuated_joint_names + self.non_actuated_joint_names
-    
+
     @property
     def get_actuated_joint_indices(self) -> List[int]:
         return self.actuated_joint_indices
-    
+
     @property
     def get_non_actuated_joint_indices(self) -> List[int]:
         return self.non_actuated_joint_indices
-
 
     def init_low_cmd(self, cmd_msg):
         """
         Initialize low-level command message with robot-specific defaults.
         Override in subclasses for robot-specific initialization.
-        
+
         Args:
             cmd_msg: The command message to initialize
         """
@@ -151,7 +159,7 @@ class RobotBase(ABC):
         """
         Update a specific motor command with the provided data.
         Override in subclasses for robot-specific motor command updates.
-        
+
         Args:
             cmd_msg: The command message to update
             motor_idx: Index of the motor to update
@@ -165,7 +173,7 @@ class RobotBase(ABC):
         """
         Update command-level mode settings (e.g., mode_pr, mode_machine).
         Override in subclasses for robot-specific mode updates.
-        
+
         Args:
             cmd_msg: The command message to update
             motor_commands: Dictionary containing mode settings
@@ -176,10 +184,10 @@ class RobotBase(ABC):
         """
         Check if mode initialization is complete based on the current state.
         Override in subclasses for robot-specific mode checking.
-        
+
         Args:
             combined_state: Current robot state
-            
+
         Returns:
             bool: True if mode initialization is complete
         """

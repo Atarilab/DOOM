@@ -70,12 +70,12 @@ class DDSStateSubscriber(StateSubscriber):
             # Extract state from message
             extracted_state = self._extract_state_from_message(msg)
 
-            # Call handler if exists
-            if self.handler_func:
-                extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
+        # Call handler if exists
+        if self.handler_func:
+            extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
 
-            # Save the final state
-            self._latest_state = extracted_state
+        # Save the final state
+        self._latest_state = extracted_state
 
     def _extract_state_from_message(self, msg):
         """
@@ -93,8 +93,8 @@ class DDSStateSubscriber(StateSubscriber):
 
     def get_latest_state(self) -> Dict[str, Any]:
         """Retrieve the latest state."""
-        with self._lock:
-            return self._latest_state.copy()
+        # with self._lock:
+        return self._latest_state.copy()
 
     def spin_once(self):
         """Spin the subscriber node once. This is not required for Unitree Cyclone DDS messages."""
@@ -102,6 +102,10 @@ class DDSStateSubscriber(StateSubscriber):
 
 class ROS2StateSubscriber(StateSubscriber):
     """ROS2-based state subscriber."""
+
+    # Shared node for all ROS2 subscribers
+    _shared_node = None
+    _node_ref_count = 0
 
     def __init__(
         self,
@@ -128,7 +132,12 @@ class ROS2StateSubscriber(StateSubscriber):
         self.handler_func = handler_func
         self.handler_args = handler_args or {}
 
-        self.node = rclpy.create_node(node_name)
+        # Use shared node instead of creating individual nodes
+        if ROS2StateSubscriber._shared_node is None:
+            ROS2StateSubscriber._shared_node = rclpy.create_node("shared_state_manager")
+        self.node = ROS2StateSubscriber._shared_node
+        ROS2StateSubscriber._node_ref_count += 1
+
         self._latest_state = {}
         self._lock = threading.Lock()
         self.subscription = None
@@ -139,12 +148,12 @@ class ROS2StateSubscriber(StateSubscriber):
             # Extract state from message
             extracted_state = self._extract_state_from_message(msg)
 
-            # Call handler if exists
-            if self.handler_func:
-                extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
+        # Call handler if exists
+        if self.handler_func:
+            extracted_state = self.handler_func(extracted_state, **self.handler_args, logger=self.logger)
 
-            # Save the final state
-            self._latest_state = extracted_state
+        # Save the final state
+        self._latest_state = extracted_state
 
     def _extract_state_from_message(self, msg):
         """
@@ -157,14 +166,20 @@ class ROS2StateSubscriber(StateSubscriber):
     def start_subscription(self):
         """Start ROS2 subscription."""
         self.subscription = self.node.create_subscription(
-            self.msg_type, self.topic, self._message_callback, 10  # QoS depth
+            self.msg_type, self.topic, self._message_callback, 1  # QoS depth
         )
 
     def stop_subscription(self):
         """Stop ROS2 subscription."""
         if self.subscription:
             self.node.destroy_subscription(self.subscription)
-        self.node.destroy_node()
+            self.subscription = None
+
+        # Decrement reference count and destroy shared node if no more references
+        ROS2StateSubscriber._node_ref_count -= 1
+        if ROS2StateSubscriber._node_ref_count <= 0 and ROS2StateSubscriber._shared_node is not None:
+            ROS2StateSubscriber._shared_node.destroy_node()
+            ROS2StateSubscriber._shared_node = None
 
     def get_latest_state(self) -> Dict[str, Any]:
         """Retrieve the latest state."""
@@ -173,7 +188,8 @@ class ROS2StateSubscriber(StateSubscriber):
 
     def spin_once(self):
         """Spin the subscriber node once."""
-        rclpy.spin_once(self.node, timeout_sec=0.00)
+        if self.node is not None:
+            rclpy.spin_once(self.node, timeout_sec=0.00)
 
 
 class StateManager:
@@ -241,10 +257,21 @@ class StateManager:
     def spin_subscribers(self):
         """
         Spin all registered subscribers once.
+        For ROS2 subscribers, we only need to spin the shared node once.
         """
+        # Track if we've already spun the shared ROS2 node
+        ros2_node_spun = False
+
         for name, subscriber in self._subscribers.items():
             try:
-                subscriber.spin_once()
+                if isinstance(subscriber, ROS2StateSubscriber):
+                    # Only spin the shared ROS2 node once
+                    if not ros2_node_spun and subscriber.node is not None:
+                        subscriber.spin_once()
+                        ros2_node_spun = True
+                else:
+                    # For DDS subscribers, spin each one individually
+                    subscriber.spin_once()
             except Exception as e:
                 if self.logger:
                     self.logger.error(f"Error spinning subscriber {name}: {e}")

@@ -14,38 +14,38 @@ class G1GainTuningController(ControllerBase):
     """
     A continuous phase-based P-D controller for the G1 robot that moves from joint position A to B
     and back continuously, with tunable gains for each joint.
-    
+
     This controller is designed for tuning the P-D gains of the G1 robot by performing
     continuous oscillatory movements between two joint configurations.
     """
 
-    def __init__(self, robot: "RobotBase", configs: Dict[str, Any]):
-        super().__init__(robot=robot, configs=configs)
+    def __init__(self, robot: "RobotBase", configs: Dict[str, Any], debug: bool = False):
+        super().__init__(robot=robot, configs=configs, debug=debug)
 
         self.name = "G1GainTuningController"
-        
+
         # Timing parameters
         self.cycle_time = 4.0  # Time for one complete cycle (A->B->A)
         self.phase_time = self.cycle_time / 2.0  # Time for A->B or B->A
-        
+
         # Joint configuration for position A (default/rest position)
         self.position_a = np.array(configs["controller_config"]["position_a"])
-        
+
         # Joint configuration for position B (target position)
         self.position_b = np.array(configs["controller_config"]["position_b"])
-        
+
         # Default P-D gains for each joint
         self.default_kps = np.array(configs["controller_config"]["default_kps"])
         self.default_kds = np.array(configs["controller_config"]["default_kds"])
-        
+
         # Current tunable gains (initialized to defaults)
         self.current_kps = self.default_kps.copy()
         self.current_kds = self.default_kds.copy()
-        
+
         # Control state
         self.start_time = 0.0
         self.current_phase = 0.0  # 0.0 = at position A, 1.0 = at position B
-        
+
         # Ensure we have the right number of joints
         expected_joints = 29  # G1 has 29 motors
         if len(self.position_a) != expected_joints:
@@ -78,13 +78,13 @@ class G1GainTuningController(ControllerBase):
         """Register tunable command parameters for gain tuning."""
         if self.command_manager is None:
             return
-            
+
         from commands.command_manager import CommandTerm
-        
+
         cmd_manager = self.command_manager
         if cmd_manager is None:
             return
-            
+
         # Register P gains for each joint
         for i in range(len(self.current_kps)):
             joint_name = f"kp_joint_{i:02d}"
@@ -97,10 +97,10 @@ class G1GainTuningController(ControllerBase):
                     type=float,
                     min_value=0.0,
                     max_value=1000.0,
-                    current_value=float(self.current_kps[i])
-                )
+                    current_value=float(self.current_kps[i]),
+                ),
             )
-        
+
         # Register D gains for each joint
         for i in range(len(self.current_kds)):
             joint_name = f"kd_joint_{i:02d}"
@@ -113,10 +113,10 @@ class G1GainTuningController(ControllerBase):
                     type=float,
                     min_value=0.0,
                     max_value=100.0,
-                    current_value=float(self.current_kds[i])
-                )
+                    current_value=float(self.current_kds[i]),
+                ),
             )
-        
+
         # Register cycle time parameter
         cmd_manager.register(
             "cycle_time",
@@ -127,15 +127,15 @@ class G1GainTuningController(ControllerBase):
                 type=float,
                 min_value=1.0,
                 max_value=20.0,
-                current_value=self.cycle_time
-            )
+                current_value=self.cycle_time,
+            ),
         )
 
     def update_gains_from_commands(self):
         """Update the current gains based on command manager values."""
         if self.command_manager is None:
             return
-            
+
         # Update P gains
         for i in range(len(self.current_kps)):
             joint_name = f"kp_joint_{i:02d}"
@@ -143,7 +143,7 @@ class G1GainTuningController(ControllerBase):
                 cmd_term = self.command_manager._commands[joint_name]
                 if cmd_term.current_value is not None:
                     self.current_kps[i] = float(cmd_term.current_value)
-        
+
         # Update D gains
         for i in range(len(self.current_kds)):
             joint_name = f"kd_joint_{i:02d}"
@@ -151,7 +151,7 @@ class G1GainTuningController(ControllerBase):
                 cmd_term = self.command_manager._commands[joint_name]
                 if cmd_term.current_value is not None:
                     self.current_kds[i] = float(cmd_term.current_value)
-        
+
         # Update cycle time
         if "cycle_time" in self.command_manager._commands:
             cmd_term = self.command_manager._commands["cycle_time"]
@@ -162,45 +162,45 @@ class G1GainTuningController(ControllerBase):
     def compute_phase(self, elapsed_time: float) -> float:
         """
         Compute the current phase (0.0 to 1.0) based on elapsed time.
-        
+
         Args:
             elapsed_time: Time elapsed since controller start
-            
+
         Returns:
             Phase value from 0.0 (position A) to 1.0 (position B)
         """
         # Normalize time to cycle
         cycle_progress = (elapsed_time % self.cycle_time) / self.cycle_time
-        
+
         if cycle_progress < 0.5:
             # First half: A -> B (0.0 to 1.0)
             phase = 2.0 * cycle_progress
         else:
             # Second half: B -> A (1.0 to 0.0)
             phase = 2.0 * (1.0 - cycle_progress)
-        
+
         return np.clip(phase, 0.0, 1.0)
 
     def compute_lowlevelcmd(self, state):
         """Compute low-level motor commands for the G1 robot."""
         super().compute_lowlevelcmd(state)
-        
+
         # Update gains from command manager
         self.update_gains_from_commands()
-        
+
         # Get current time
         if self.obs_manager is None:
             return {}
         obs = self.obs_manager.compute(state)
         # current_time = obs["time"]
         elapsed_time = time.time() - self.start_time
-        
+
         # Compute current phase
         self.current_phase = self.compute_phase(elapsed_time)
-        
+
         # Interpolate between position A and B based on phase
         target_positions = (1.0 - self.current_phase) * self.position_a + self.current_phase * self.position_b
-        
+
         # Generate motor commands
         cmd = {}
         # Handle actuated joints
@@ -223,7 +223,7 @@ class G1GainTuningController(ControllerBase):
                         "kd": 0.0,
                         "tau": 0.0,
                     }
-            
+
             # Handle non-actuated joints
             for i, motor_idx in enumerate(self.robot.non_actuated_joint_indices):
                 cmd[f"motor_{motor_idx}"] = {
@@ -252,7 +252,7 @@ class G1GainTuningController(ControllerBase):
                         "kd": 0.0,
                         "tau": 0.0,
                     }
-        
+
         return cmd
 
     def get_joystick_mappings(self) -> Dict[str, Any]:
@@ -269,18 +269,18 @@ class G1GainTuningController(ControllerBase):
         self.current_kds = self.default_kds.copy()
         self.cycle_time = 4.0
         self.phase_time = self.cycle_time / 2.0
-        
+
         # Update command manager if available
         if self.command_manager is not None:
             for i in range(len(self.current_kps)):
                 kp_name = f"kp_joint_{i:02d}"
                 kd_name = f"kd_joint_{i:02d}"
-                
+
                 if kp_name in self.command_manager._commands:
                     self.command_manager._commands[kp_name].current_value = float(self.current_kps[i])
                 if kd_name in self.command_manager._commands:
                     self.command_manager._commands[kd_name].current_value = float(self.current_kds[i])
-            
+
             if "cycle_time" in self.command_manager._commands:
                 self.command_manager._commands["cycle_time"].current_value = self.cycle_time
 
@@ -289,7 +289,7 @@ class G1GainTuningController(ControllerBase):
         new_cycle_time = np.clip(self.cycle_time + delta, 0.5, 10.0)
         self.cycle_time = new_cycle_time
         self.phase_time = self.cycle_time / 2.0
-        
+
         # Update command manager if available
         if self.command_manager is not None and "cycle_time" in self.command_manager._commands:
             self.command_manager._commands["cycle_time"].current_value = self.cycle_time

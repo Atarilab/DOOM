@@ -1,0 +1,23 @@
+# Optimized Publisher Configuration
+# This configuration file shows how to optimize publisher performance
+
+controller_config:
+  # Enable/disable publishers (set to false for maximum performance)
+  enable_publishers: true
+  
+  # Publisher frequency in Hz (lower = better performance, higher = more responsive)
+  # Default: 5Hz (was 10Hz)
+  publisher_frequency: 5.0
+  
+  # Control frequency (keep this high for robot control)
+  control_dt: 0.01  # 100Hz control loop
+  
+  # Device configuration
+  device: "cuda"  # or "cpu"
+
+# Performance optimization tips:
+# 1. Set enable_publishers: false to completely disable publishers for maximum performance
+# 2. Reduce publisher_frequency to 1-2Hz for visualization-only applications
+# 3. Use enable_publishers: true with low frequency (2-5Hz) for balanced performance
+# 4. The async publishing will not block your control loop regardless of publisher frequency
+

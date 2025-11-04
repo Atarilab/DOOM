@@ -7,13 +7,13 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as Go2LowState_
 from controllers.rl_contact_locomotion_controller import RLQuadrupedLocomotionContactController
 from controllers.rl_velocity_locomotion_controller import RLQuadrupedLocomotionVelocityController
 from controllers.stand_controller import (
+    Go2StanceController,
     Go2StandDownController,
     Go2StandUpController,
     Go2StayDownController,
-    Go2StanceController,
 )
 from robots.robot_base import RobotBase
-from state_manager.msg_handlers import go2_low_state_handler, vicon_handler, sport_mode_state_handler
+from state_manager.msg_handlers import go2_low_state_handler, sport_mode_state_handler, vicon_handler
 from state_manager.state_manager import DDSStateSubscriber, ROS2StateSubscriber
 from utils.joint_mapping import JointMappingInterface
 
@@ -120,7 +120,7 @@ class Go2(RobotBase):
         """
         return []
 
-    def isaaclab_joint_names(self): 
+    def isaaclab_joint_names(self):
         """
         Returns the names of the joints as in IsaacLab order.
         """
@@ -139,7 +139,6 @@ class Go2(RobotBase):
             "RR_calf_joint",
         ]
 
-
     @property
     def base_link(self):
         """Return the name of the base link."""
@@ -149,7 +148,6 @@ class Go2(RobotBase):
     def floating_base(self):
         """Return if the robot has a floating base."""
         return True
-    
 
     def init_low_cmd(self, cmd_msg):
         """Initialize low-level command message with Go2-specific defaults."""
@@ -184,14 +182,13 @@ class Go2(RobotBase):
         # Go2 doesn't have mode_pr or mode_machine settings
         return cmd_msg
 
-
     def get_mode_initialization_state(self, combined_state: Dict) -> bool:
         """Go2 mode initialization is always complete."""
         if combined_state.get("robot/joint_pos", None) is not None:
             return True
         else:
             return False
-    
+
     @property
     def damping_gain(self):
         """Returns the gain used for the damping mode
@@ -199,7 +196,7 @@ class Go2(RobotBase):
         Returns:
             float: Kd value used for damping gain
         """
-        
+
         return 2.0
 
     @property
@@ -231,7 +228,7 @@ class Go2(RobotBase):
             str: The path to the XML file of the robot.
         """
         return "/home/atari/workspace/DOOM/src/robots/go2/go2.xml"
-    
+
     @property
     def low_cmd_msg(self):
         """Return the low command message class."""

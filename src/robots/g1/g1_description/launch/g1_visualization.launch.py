@@ -38,7 +38,7 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "description_file",
-            default_value="g1_29dof_lock_waist_with_hand_rev_1_0.urdf",
+            default_value="g1_29dof.urdf",
             description="URDF/XACRO description file with the robot.",
         )
     )
@@ -102,4 +102,3 @@ def generate_launch_description():
     )
 
     return LaunchDescription(declared_arguments + nodes)
-

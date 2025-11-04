@@ -1,0 +1,21 @@
+policy_path: "waist_g1/policy.pt"
+control_dt: 0.005
+decimation: 4
+action_dim: 17
+action_scale: 0.35
+use_threading: False
+use_buffer: False
+device: "cuda:0"
+horizon_length: 200
+action_filter_alpha: 1.0
+soft_dof_limit_factor: 0.9
+
+
+default_joint_pos: [
+                    0.0000,  0.0000,  0.0000,  
+                    -0.4500,  0.4000,  0.0000,  0.2000,  0.0000, 0.0000, -1.449,
+                    -0.4500, -0.4000,  0.0000,  0.2000,  0.0000,  0.0000, 1.449
+                    ]
+
+visualize:
+  waist_commands: true

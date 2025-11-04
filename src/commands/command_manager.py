@@ -1,13 +1,14 @@
 import dataclasses
+from enum import Enum
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from enum import Enum
 
 import numpy as np
 
 
 class WidgetType(Enum):
     """Types of UI widgets supported for commands."""
+
     INPUT = "input"  # Numeric input field
     BUTTON = "button"  # Button for discrete choices
     DROPDOWN = "dropdown"  # Dropdown for multiple choices
@@ -92,13 +93,13 @@ class CommandManager:
         self._commands[name] = command_term
 
     def register_input_command(
-        self, 
-        name: str, 
-        description: str, 
-        default_value: float, 
-        min_value: Optional[float] = None, 
+        self,
+        name: str,
+        description: str,
+        default_value: float,
+        min_value: Optional[float] = None,
         max_value: Optional[float] = None,
-        step: Optional[float] = None
+        step: Optional[float] = None,
     ):
         """Register a numeric input command."""
         command_term = CommandTerm(
@@ -109,60 +110,52 @@ class CommandManager:
             widget_type=WidgetType.INPUT,
             min_value=min_value,
             max_value=max_value,
-            step=step
+            step=step,
         )
         self.register(name, command_term)
 
     def register_button_command(
-        self, 
-        name: str, 
-        description: str, 
-        options: List[str], 
-        default_value: Optional[str] = None
+        self, name: str, description: str, options: List[str], default_value: Optional[str] = None
     ):
         """Register a button group command for discrete choices."""
         if default_value is None:
             default_value = options[0] if options else ""
-            
+
         command_term = CommandTerm(
             name=name,
             description=description,
             default_value=default_value,
             type=str,
             widget_type=WidgetType.BUTTON,
-            options=options
+            options=options,
         )
         self.register(name, command_term)
 
     def register_dropdown_command(
-        self, 
-        name: str, 
-        description: str, 
-        options: List[str], 
-        default_value: Optional[str] = None
+        self, name: str, description: str, options: List[str], default_value: Optional[str] = None
     ):
         """Register a dropdown command for multiple choices."""
         if default_value is None:
             default_value = options[0] if options else ""
-            
+
         command_term = CommandTerm(
             name=name,
             description=description,
             default_value=default_value,
             type=str,
             widget_type=WidgetType.DROPDOWN,
-            options=options
+            options=options,
         )
         self.register(name, command_term)
 
     def register_slider_command(
-        self, 
-        name: str, 
-        description: str, 
-        default_value: float, 
-        min_value: float, 
+        self,
+        name: str,
+        description: str,
+        default_value: float,
+        min_value: float,
         max_value: float,
-        step: Optional[float] = None
+        step: Optional[float] = None,
     ):
         """Register a slider command for numeric values."""
         command_term = CommandTerm(
@@ -173,7 +166,7 @@ class CommandManager:
             widget_type=WidgetType.SLIDER,
             min_value=min_value,
             max_value=max_value,
-            step=step
+            step=step,
         )
         self.register(name, command_term)
 
@@ -209,20 +202,20 @@ class CommandManager:
                 "current_value": param.current_value,
                 "type": param.type.__name__,
             }
-            
+
             # Add widget-specific parameters
             if param.widget_type in [WidgetType.INPUT, WidgetType.SLIDER]:
                 spec["min_value"] = param.min_value
                 spec["max_value"] = param.max_value
                 if param.step is not None:
                     spec["step"] = param.step
-                    
+
             elif param.widget_type in [WidgetType.BUTTON, WidgetType.DROPDOWN]:
                 if param.options is not None:
                     spec["options"] = param.options
-                    
+
             widget_specs.append(spec)
-            
+
         return widget_specs
 
     def validate_and_change_commands(

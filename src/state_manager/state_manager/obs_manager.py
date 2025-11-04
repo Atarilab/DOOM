@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Callable, Dict, Optional
+
 import torch
 
 from utils.helpers import ObservationHistoryStorage
@@ -75,12 +76,7 @@ class ObsTerm:
         Preallocate the tensor for this observation term.
         """
         if self._obs_dim > 0:
-            self._preallocated_tensor = torch.zeros(
-                self._obs_dim, 
-                dtype=self._dtype, 
-                device=self._device
-            )
-        
+            self._preallocated_tensor = torch.zeros(self._obs_dim, dtype=self._dtype, device=self._device)
 
     def __call__(self, full_state: Dict[str, Any]) -> Any:
         """
@@ -95,9 +91,9 @@ class ObsTerm:
         # Add device and dtype to params if available
         call_params = self._params.copy()
         if self._device is not None:
-            call_params['device'] = self._device
+            call_params["device"] = self._device
         if self._dtype is not None:
-            call_params['dtype'] = self._dtype
+            call_params["dtype"] = self._dtype
 
         # Determine how to call the function
         if self._dependencies is None:
@@ -111,11 +107,10 @@ class ObsTerm:
 
         # If we have a preallocated tensor and the computed observation is a tensor,
         # copy the data instead of creating a new tensor
-        if (self._preallocated_tensor is not None and 
-            isinstance(computed_obs, torch.Tensor)):
+        if self._preallocated_tensor is not None and isinstance(computed_obs, torch.Tensor):
             self._preallocated_tensor.copy_(computed_obs)
             return self._preallocated_tensor
-        
+
         return computed_obs
 
 
@@ -141,13 +136,12 @@ class ObservationManager:
         self.device = device
         self.obs_terms = {}
         self.obs_order = []
-        
+
         # Preallocated full observation tensor
         self.full_obs_tensor = None
         self.full_obs_dim = 0
         self.obs_start_indices = {}  # Track start indices for each observation
         self.obs_buffer = None
-        
 
     def register(self, name: str, obs_term: ObsTerm):
         """
@@ -161,11 +155,11 @@ class ObservationManager:
                 self.logger.warning(f"Overwriting existing observation: {name}")
 
         self.obs_terms[name] = obs_term
-        
+
         # Preallocate tensor if obs_dim is specified
         if obs_term._obs_dim > 0:
             obs_term.preallocate_tensor()
-            
+
             # Track start index for this observation in the full tensor
             self.obs_start_indices[name] = self.full_obs_dim
             self.full_obs_dim += obs_term._obs_dim
@@ -173,60 +167,55 @@ class ObservationManager:
     def preallocate_full_tensor(self, batch_size: int = 1):
         """
         Preallocate the full observation tensor after all observations are registered.
-        
+
         :param batch_size: Batch size for the observation tensor (default: 1)
         """
         if self.full_obs_dim > 0:
-            self.full_obs_tensor = torch.zeros(
-                (batch_size, self.full_obs_dim),
-                dtype=torch.float32,
-                device=self.device
-            )
+            self.full_obs_tensor = torch.zeros((batch_size, self.full_obs_dim), dtype=torch.float32, device=self.device)
             if self.logger:
-                self.logger.info(f"Preallocated full observation tensor with shape: ({batch_size}, {self.full_obs_dim})")
-    
+                self.logger.info(
+                    f"Preallocated full observation tensor with shape: ({batch_size}, {self.full_obs_dim})"
+                )
+
     def initialize_obs_buffer(self, max_buffer_length: int, policy_architecture: str):
         """
         Initialize the observation buffer.
         This should be called after all observations are registered.
         """
         self.obs_buffer = ObservationHistoryStorage(
-                num_envs=1,
-                policy_architecture=policy_architecture,
-                num_obs=self.full_obs_dim,
-                max_length=max_buffer_length,
-                device=self.device,
-            )
-            
+            num_envs=1,
+            policy_architecture=policy_architecture,
+            num_obs=self.full_obs_dim,
+            max_length=max_buffer_length,
+            device=self.device,
+        )
+
         if self.logger:
             self.logger.info(f"Initialized observation buffer with {self.full_obs_dim} observations")
-             
-    
+
     def add_to_buffer(self, observation: torch.Tensor):
         """
         Add observation to the buffer if enabled.
-        
+
         :param observation: Observation tensor to add
         """
         if self.obs_buffer is not None:
             self.obs_buffer.add(observation)
-            
-    
+
     def get_from_buffer(self) -> Optional[torch.Tensor]:
         """
         Get observation from the buffer if enabled.
-        
+
         :return: Observation tensor from buffer, or None if buffer not enabled
         """
         if self.obs_buffer is not None:
             return self.obs_buffer.get()
         return None
-    
-    
+
     def reset_buffer(self, done: torch.Tensor):
         """
         Reset the buffer for environments that are done.
-        
+
         :param done: Mask of done environments
         """
         if self.obs_buffer is not None:
@@ -252,8 +241,10 @@ class ObservationManager:
                 if obs_term._include:
                     observations[name] = computed_obs
                     if self.full_obs_tensor is not None:
-                        self.full_obs_tensor[batch_idx, self.obs_start_indices[name]:self.obs_start_indices[name] + obs_term._obs_dim] = computed_obs
-                        
+                        self.full_obs_tensor[
+                            batch_idx, self.obs_start_indices[name] : self.obs_start_indices[name] + obs_term._obs_dim
+                        ] = computed_obs
+
             except Exception as e:
                 if self.logger:
                     self.logger.error(f"Error computing observation {name}: {e}")
@@ -275,13 +266,13 @@ class ObservationManager:
         self.compute(combined_state, batch_idx)
         if self.obs_buffer is not None:
             self.add_to_buffer(self.full_obs_tensor)
-        
+
         return self.full_obs_tensor
-    
+
     def get_latest_full_obs_tensor(self) -> Optional[torch.Tensor]:
         """
         Get the latest full observation tensor.
-        
+
         :return: Latest full observation tensor
         """
         return self.full_obs_tensor
@@ -298,7 +289,7 @@ class ObservationManager:
     def get_full_obs_dim(self) -> int:
         """
         Get the total dimension of the full observation tensor.
-        
+
         :return: Total observation dimension
         """
         return self.full_obs_dim
@@ -306,7 +297,7 @@ class ObservationManager:
     def get_obs_start_index(self, name: str) -> Optional[int]:
         """
         Get the start index of a specific observation in the full tensor.
-        
+
         :param name: Name of the observation
         :return: Start index in the full tensor, or None if not found
         """

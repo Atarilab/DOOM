@@ -5,7 +5,7 @@ from textual.color import Color
 from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.validation import Number
-from textual.widgets import Button, Header, Input, Label, Static, Select
+from textual.widgets import Button, Header, Input, Label, Select, Static
 
 from commands.command_manager import CommandManager
 from controllers.stand_controller import ControllerBase
@@ -558,22 +558,26 @@ class CommandWidget(Vertical):
 
             # Use the new widget specifications from command manager
             widget_specs = self.controller.command_manager.get_widget_specs()
-            
+
             for spec in widget_specs:
                 yield Label(spec["description"], classes="command-label")
-                
+
                 if spec["widget_type"] == "input":
                     # Create numeric input field
                     with Horizontal(classes="command-input-row"):
                         input_field = Input(
                             placeholder=f"Enter {spec['description']}",
-                            validators=[Number(minimum=spec.get("min_value", -float('inf')), 
-                                             maximum=spec.get("max_value", float('inf')))],
+                            validators=[
+                                Number(
+                                    minimum=spec.get("min_value", -float("inf")),
+                                    maximum=spec.get("max_value", float("inf")),
+                                )
+                            ],
                             classes="command-input",
                             id=f"input-{spec['name']}",
                         )
                         yield input_field
-                        
+
                 elif spec["widget_type"] == "button":
                     # Create button group for discrete choices
                     with Horizontal(classes="gait-buttons-container"):
@@ -583,7 +587,7 @@ class CommandWidget(Vertical):
                                 classes="gait-button",
                                 id=f"button-{spec['name']}-{option}",
                             )
-                            
+
                 elif spec["widget_type"] == "dropdown":
                     # Create dropdown for multiple choices
                     with Horizontal(classes="command-input-row"):
@@ -593,14 +597,18 @@ class CommandWidget(Vertical):
                             id=f"dropdown-{spec['name']}",
                         )
                         yield dropdown
-                        
+
                 elif spec["widget_type"] == "slider":
                     # Create input field for slider (fallback since Slider widget not available)
                     with Horizontal(classes="command-input-row"):
                         input_field = Input(
                             placeholder=f"Enter {spec['description']}",
-                            validators=[Number(minimum=spec.get("min_value", -float('inf')), 
-                                             maximum=spec.get("max_value", float('inf')))],
+                            validators=[
+                                Number(
+                                    minimum=spec.get("min_value", -float("inf")),
+                                    maximum=spec.get("max_value", float("inf")),
+                                )
+                            ],
                             classes="command-input",
                             id=f"input-{spec['name']}",
                         )
@@ -631,7 +639,7 @@ class CommandWidget(Vertical):
     def on_select_changed(self, event: Select.Changed):
         """Handle dropdown selection changes."""
         select_id = event.select.id
-        
+
         if select_id.startswith("dropdown-"):
             # Parse dropdown ID: dropdown-{command_name}
             command_name = select_id.replace("dropdown-", "")
@@ -641,15 +649,14 @@ class CommandWidget(Vertical):
             if hasattr(self.controller, "change_commands"):
                 self.controller.change_commands(updates)
 
-
     def on_input_changed(self, event: Input.Changed):
         """Handle input field changes."""
         input_id = event.input.id
-        
+
         if input_id.startswith("input-"):
             # Parse input ID: input-{command_name}
             command_name = input_id.replace("input-", "")
-            
+
             try:
                 # Convert to float for numeric inputs
                 value = float(event.value) if event.value else 0.0
