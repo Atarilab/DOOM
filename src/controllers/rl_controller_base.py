@@ -207,7 +207,9 @@ class RLControllerBase(ControllerBase, Node):
             controller_config.get("action_filter_alpha", 1.0), self.action_dim, device=self.device
         )
 
-        self.action_term = JointPositionAction(configs, self.action_scale, self.default_joint_pos, self.actions_mapping)
+        self.action_term = JointPositionAction(configs, action_scale=self.action_scale, 
+                                               default_joint_pos=self.default_joint_pos, 
+                                               actions_mapping=self.actions_mapping)
         # Initial state and commands
         self.latest_state = None
         self.joint_pos_targets = torch.zeros(self.robot.num_joints, dtype=torch.float32, device=self.device)
