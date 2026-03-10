@@ -286,6 +286,18 @@ Note: This is a research prototype. Use at your own risk.
 - [x] Add mechanism for real-time state logger and plotter (debug logger in console and file, plotjuggler for ros topics)
 - [x] Test Velocity-conditioned policy
 
+## Citation
+This repository was used for the deployment of the policies in the following work. If you find it useful, please cite:
+```bibtex
+@article{omar2025learningactcontactunified,
+      title={Learning to Act Through Contact: A Unified View of Multi-Task Robot Learning}, 
+      author={Shafeef Omar and Majid Khadiv},
+      year={2025},
+      url={https://arxiv.org/abs/2510.03599}, 
+}
+```
+
+
 
 ## 📚 Resources
 Unitree Guide: https://support.unitree.com/home/en/developer/Quick_start
