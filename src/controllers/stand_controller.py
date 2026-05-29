@@ -127,10 +127,9 @@ class Go2StandUpController(ControllerBase):
 
     def compute_lowlevelcmd(self, state):
         super().compute_lowlevelcmd(state)
-        obs = self.obs_manager.compute(state)
 
-        time = obs["time"] - self.start_time
-        phase = torch.tanh(torch.tensor(time / 1.2, device=self.device))
+        elapsed = time.time() - self.start_time
+        phase = torch.tanh(torch.tensor(elapsed / 1.2, device=self.device))
 
         cmd = {}
         for i in range(self.robot.num_joints):
@@ -178,10 +177,8 @@ class Go2StandDownController(ControllerBase):
     def compute_lowlevelcmd(self, state):
         super().compute_lowlevelcmd(state)
 
-        obs = self.obs_manager.compute(state)
-
-        time = obs["time"] - self.start_time
-        phase = torch.tanh(torch.tensor(time / 1.2, device=self.device))
+        elapsed = time.time() - self.start_time
+        phase = torch.tanh(torch.tensor(elapsed / 1.2, device=self.device))
         cmd = {}
         for i in range(self.robot.num_joints):
             cmd[f"motor_{i}"] = {
@@ -916,8 +913,7 @@ class G1LowLevelController(ControllerBase):
 
     def compute_lowlevelcmd(self, state):
         super().compute_lowlevelcmd(state)
-        obs = self.obs_manager.compute(state)
-        time = obs["time"] - self.start_time
+        elapsed = time.time() - self.start_time
 
         Kp = [
             60,
@@ -1028,10 +1024,10 @@ class G1LowLevelController(ControllerBase):
 
         cmd = {f"motor_{i}": {"q": 0.0, "kp": 0.0, "dq": 0.0, "kd": 0.0, "tau": 0.0} for i in range(G1_NUM_MOTOR)}
         cmd["mode_pr"] = Mode.PR
-        if time < self.total_time:
+        if elapsed < self.total_time:
             # [Stage 1]: set robot to zero posture
             for i in range(G1_NUM_MOTOR):
-                ratio = torch.clamp(torch.tensor(time / self.total_time, device=self.device), 0.0, 1.0)
+                ratio = torch.clamp(torch.tensor(elapsed / self.total_time, device=self.device), 0.0, 1.0)
                 cmd["mode_pr"] = Mode.PR
                 cmd[f"motor_{i}"] = {
                     "q": (1.0 - ratio) * state["robot/joint_pos"][self.dof_idx[i]],
@@ -1042,11 +1038,11 @@ class G1LowLevelController(ControllerBase):
                     "mode": 1,
                 }
 
-        elif time < self.total_time * 2:
+        elif elapsed < self.total_time * 2:
             # [Stage 2]: swing ankle using PR mode
             max_P = torch.pi * 30.0 / 180.0
             max_R = torch.pi * 10.0 / 180.0
-            t = time - self.total_time
+            t = elapsed - self.total_time
             L_P_des = max_P * torch.sin(2.0 * torch.pi * t)
             L_R_des = max_R * torch.sin(2.0 * torch.pi * t)
             R_P_des = max_P * torch.sin(2.0 * torch.pi * t)
@@ -1086,7 +1082,7 @@ class G1LowLevelController(ControllerBase):
             # [Stage 3]: swing ankle using AB mode
             max_A = torch.pi * 30.0 / 180.0
             max_B = torch.pi * 10.0 / 180.0
-            t = time - self.total_time * 2
+            t = elapsed - self.total_time * 2
             L_A_des = max_A * torch.sin(2.0 * torch.pi * t)
             L_B_des = max_B * torch.sin(2.0 * torch.pi * t + torch.pi)
             R_A_des = -max_A * torch.sin(2.0 * torch.pi * t)
