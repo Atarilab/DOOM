@@ -1,7 +1,10 @@
+import json
+import pathlib
 import threading
 import time
 from typing import TYPE_CHECKING, Any, Dict
 
+import numpy as np
 from std_msgs.msg import ColorRGBA, Float32MultiArray, MultiArrayDimension
 import torch
 from visualization_msgs.msg import Marker, MarkerArray
@@ -217,6 +220,27 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         #     log_interval=2.0,  # Reduced for easier testing
         #     logger=self.logger  # Will be updated when logger is available
         # )
+
+        # PCBO offline plan — loaded from export_go2_plan.py JSON output
+        self._pcbo_knots: np.ndarray | None = None
+        pcbo_plan_path = configs["controller_config"].get("pcbo_plan_path", None)
+        if pcbo_plan_path:
+            plan = json.loads(pathlib.Path(pcbo_plan_path).read_text())
+            self._pcbo_knots = np.array(plan["knots"]["data"], dtype=np.float32)
+            print(f"[PCBO] Loaded offline plan: K={self._pcbo_knots.shape[0]} knots from {pcbo_plan_path}")
+
+    def _build_feet_from_pcbo_knots(self, base_xy: np.ndarray) -> torch.Tensor:
+        """ZOH-interpolate PCBO knots (K,4,2) → future_feet_positions_w (4,H,3)."""
+        K = self._pcbo_knots.shape[0]
+        H = self.horizon_length
+        indices = np.minimum(np.arange(H) * K // H, K - 1)
+        deltas = self._pcbo_knots[indices]           # (H, 4, 2)
+        base = np.array([base_xy[0], base_xy[1], 0.0], dtype=np.float32)
+        per_foot = base + self.default_offset.cpu().numpy()  # (4, 3)
+        deltas_3d = np.zeros((H, 4, 3), dtype=np.float32)
+        deltas_3d[:, :, :2] = deltas
+        targets = (per_foot[None] + deltas_3d).transpose(1, 0, 2)  # (4, H, 3)
+        return torch.from_numpy(targets).to(self.device)
 
     def register_observations(self):
         """
@@ -629,6 +653,21 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
         self.goal_completion_counter = 0
         self.current_goal_idx = 0
+
+        # PCBO offline plan: bypass heuristic and use optimised knots
+        if self._pcbo_knots is not None:
+            if pos is None or torch.all(pos == 0):
+                robot_pos = torch.tensor(
+                    self.robot.mj_model.get_body_position_world(self.base_link),
+                    dtype=torch.float32, device=self.device,
+                )
+                base_xy = robot_pos[:2].cpu().numpy()
+            else:
+                base_xy = pos[:2].cpu().numpy()
+            self.future_feet_positions_w[:] = self._build_feet_from_pcbo_knots(base_xy)
+            if self.visualize["future_feet_positions"]:
+                self.pub_future_feet_positions()
+            return
 
         # Use current offset values
         offset = self.current_offset.clone()
