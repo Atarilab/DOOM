@@ -46,6 +46,5 @@ sleep 3
 
 ros2 run master_manager master_node \
   --task rl-contact-real-go2 \
-  --ui \
   --plan "$PLAN_FILE" \
   $STOP_AT_GOAL
