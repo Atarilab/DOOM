@@ -235,10 +235,22 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             goal_pos = plan.get("config", {}).get("task", {}).get("params", {}).get("goal_pos")
             if goal_pos is not None:
                 self._pcbo_goal_offset_xy = np.array(goal_pos[:2], dtype=np.float32)
-                pass  # goal position stored in _pcbo_goal_offset_xy for visualization only
-            # Always execute all knots: hold at the last knot once the full plan is complete
-            self._pcbo_terminal_knot_idx = self._pcbo_knots.shape[0] - 1
-            self._pcbo_terminal_goal_idx = self.horizon_length - 1
+            stop_at_goal = configs["controller_config"].get("pcbo_stop_at_goal", False)
+            if stop_at_goal and goal_pos is not None:
+                # Stop at the knot whose mean foot position is closest to the goal
+                avg_knot_xy = self._pcbo_knots.mean(axis=1)
+                self._pcbo_terminal_knot_idx = int(np.argmin(np.linalg.norm(avg_knot_xy - self._pcbo_goal_offset_xy, axis=1)))
+                horizon_indices = np.minimum(
+                    np.arange(self.horizon_length) * self._pcbo_knots.shape[0] // self.horizon_length,
+                    self._pcbo_knots.shape[0] - 1,
+                )
+                terminal_matches = np.flatnonzero(horizon_indices == self._pcbo_terminal_knot_idx)
+                self._pcbo_terminal_goal_idx = int(terminal_matches[-1]) if terminal_matches.size else self.horizon_length - 1
+                print(f"[PCBO] stop_at_goal=True → terminal knot={self._pcbo_terminal_knot_idx}, step={self._pcbo_terminal_goal_idx}")
+            else:
+                # Execute all knots; hold at the last one
+                self._pcbo_terminal_knot_idx = self._pcbo_knots.shape[0] - 1
+                self._pcbo_terminal_goal_idx = self.horizon_length - 1
             print(f"[PCBO] Loaded offline plan: K={self._pcbo_knots.shape[0]} knots from {pcbo_plan_path}")
 
     def _build_feet_from_pcbo_knots(self, base_xy: np.ndarray) -> torch.Tensor:

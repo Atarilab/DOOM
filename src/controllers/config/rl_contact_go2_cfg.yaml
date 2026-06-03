@@ -4,6 +4,7 @@ policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
 # policy_path: "locomotion_go2/contact_policy_latest.pt"
 fixed_feet_positions: false
 pcbo_plan_path: "/home/atari/workspace/DOOM/src/plans/go2_plan_pcbo_rank0.json"  # in-container path; set to null to restore heuristic stride
+pcbo_stop_at_goal: false  # true = stop and hold at the knot closest to goal (safe); false = execute all knots
 control_dt: 0.005
 decimation: 4
 action_dim: 12
@@ -18,7 +19,7 @@ horizon_length: 15  # match PCBO plan sim_horizon (was 200 — caused 70s runs i
 action_filter_alpha: 0.5
 transition_duration: 0
 visualize: 
-  future_feet_positions: false
+  future_feet_positions: true
   current_contact_locations: true
   pcbo_goal: true
   feet_error: false
