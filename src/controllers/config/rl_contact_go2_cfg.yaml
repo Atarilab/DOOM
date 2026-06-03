@@ -3,7 +3,7 @@
 policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
 # policy_path: "locomotion_go2/contact_policy_latest.pt"
 fixed_feet_positions: false
-pcbo_plan_path: null  # absolute path to a plan_pcbo_rank0_*.json from export_go2_plan.py; null = heuristic stride
+pcbo_plan_path: "/home/atari/workspace/DOOM/src/plans/go2_plan_pcbo_rank0.json"  # in-container path; set to null to restore heuristic stride
 control_dt: 0.005
 decimation: 4
 action_dim: 12
