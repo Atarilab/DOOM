@@ -225,6 +225,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self._pcbo_knots: np.ndarray | None = None
         self._pcbo_goal_offset_xy: np.ndarray | None = None
         self._pcbo_goal_pos_w: torch.Tensor | None = None
+        self._pcbo_plan_finished = False
+        self._pcbo_terminal_knot_idx: int | None = None
+        self._pcbo_terminal_goal_idx: int | None = None
         pcbo_plan_path = configs["controller_config"].get("pcbo_plan_path", None)
         if pcbo_plan_path:
             plan = json.loads(pathlib.Path(pcbo_plan_path).read_text())
@@ -232,20 +235,78 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             goal_pos = plan.get("config", {}).get("task", {}).get("params", {}).get("goal_pos")
             if goal_pos is not None:
                 self._pcbo_goal_offset_xy = np.array(goal_pos[:2], dtype=np.float32)
+                avg_knot_xy = self._pcbo_knots.mean(axis=1)
+                self._pcbo_terminal_knot_idx = int(np.argmin(np.linalg.norm(avg_knot_xy - self._pcbo_goal_offset_xy, axis=1)))
+            else:
+                self._pcbo_terminal_knot_idx = self._pcbo_knots.shape[0] - 1
+            horizon_indices = np.minimum(
+                np.arange(self.horizon_length) * self._pcbo_knots.shape[0] // self.horizon_length,
+                self._pcbo_knots.shape[0] - 1,
+            )
+            terminal_matches = np.flatnonzero(horizon_indices == self._pcbo_terminal_knot_idx)
+            self._pcbo_terminal_goal_idx = int(terminal_matches[-1]) if terminal_matches.size else self.horizon_length - 1
             print(f"[PCBO] Loaded offline plan: K={self._pcbo_knots.shape[0]} knots from {pcbo_plan_path}")
 
     def _build_feet_from_pcbo_knots(self, base_xy: np.ndarray) -> torch.Tensor:
-        """ZOH-interpolate PCBO knots (K,4,2) → future_feet_positions_w (4,H,3)."""
+        """ZOH-interpolate PCBO knots (K,4,2) → future_feet_positions_w (4,H,3).
+
+        Body-frame offsets (default_offset + knot delta) are rotated into world
+        frame using the robot's current base yaw before being added to base_xy.
+        """
         K = self._pcbo_knots.shape[0]
         H = self.horizon_length
         indices = np.minimum(np.arange(H) * K // H, K - 1)
         deltas = self._pcbo_knots[indices]           # (H, 4, 2)
-        base = np.array([base_xy[0], base_xy[1], 0.0], dtype=np.float32)
-        per_foot = base + self.default_offset.cpu().numpy()  # (4, 3)
-        deltas_3d = np.zeros((H, 4, 3), dtype=np.float32)
-        deltas_3d[:, :, :2] = deltas
-        targets = (per_foot[None] + deltas_3d).transpose(1, 0, 2)  # (4, H, 3)
+
+        # Read current base yaw from the rotation matrix (R[1,0], R[0,0])
+        R = self.robot.mj_model.get_body_orientation_world(self.base_link).cpu().numpy()
+        yaw = float(np.arctan2(R[1, 0], R[0, 0]))
+        cos_yaw, sin_yaw = np.cos(yaw), np.sin(yaw)
+        R2 = np.array([[cos_yaw, -sin_yaw], [sin_yaw, cos_yaw]], dtype=np.float32)
+
+        # Rotate body-frame stance offsets into world frame
+        default_offset_b = self.default_offset.cpu().numpy()[:, :2]  # (4, 2)
+        default_offset_w = (R2 @ default_offset_b.T).T              # (4, 2)
+
+        base = np.array([base_xy[0], base_xy[1]], dtype=np.float32)
+        # per_foot_w: natural stance position in world frame (4, 2)
+        per_foot_w = base + default_offset_w
+
+        # Rotate per-step per-foot deltas into world frame: (H, 4, 2)
+        deltas_w = (R2 @ deltas.reshape(-1, 2).T).T.reshape(H, 4, 2)
+
+        targets_xy = per_foot_w[None] + deltas_w                     # (H, 4, 2)
+        targets = np.zeros((H, 4, 3), dtype=np.float32)
+        targets[:, :, :2] = targets_xy
+        targets = targets.transpose(1, 0, 2)                         # (4, H, 3)
+        if self._pcbo_terminal_goal_idx is not None and self._pcbo_terminal_goal_idx < H - 1:
+            targets[:, self._pcbo_terminal_goal_idx + 1 :, :] = targets[
+                :, self._pcbo_terminal_goal_idx : self._pcbo_terminal_goal_idx + 1, :
+            ]
         return torch.from_numpy(targets).to(self.device)
+
+    def _hold_terminal_pcbo_plan(self) -> bool:
+        """Hold the final PCBO waypoint and contact phase once the finite plan is exhausted."""
+        if self._pcbo_knots is None or self.horizon_length <= 0:
+            return False
+        terminal_goal_idx = (
+            self._pcbo_terminal_goal_idx if self._pcbo_terminal_goal_idx is not None else self.horizon_length - 1
+        )
+        if self.current_goal_idx < terminal_goal_idx:
+            return False
+
+        self.current_goal_idx = terminal_goal_idx
+        if not self._pcbo_plan_finished and self.logger is not None:
+            self.logger.info("PCBO plan complete; holding final contact target and contact plan")
+        self._pcbo_plan_finished = True
+        return True
+
+    def _current_pcbo_knot_idx(self) -> int | None:
+        if self._pcbo_knots is None or self.horizon_length <= 0:
+            return None
+
+        goal_idx = max(0, min(self.current_goal_idx, self.horizon_length - 1))
+        return min(goal_idx * self._pcbo_knots.shape[0] // self.horizon_length, self._pcbo_knots.shape[0] - 1)
 
     def register_observations(self):
         """
@@ -480,6 +541,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         """Resample the commands for the controller with thread safety."""
         try:
             with self._gait_lock:
+                if self._hold_terminal_pcbo_plan():
+                    return
+
                 # Apply pending step size change if any
 
                 if hasattr(self, "step_size_change_pending") and self.step_size_change_pending:
@@ -531,6 +595,9 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     avg_base_xy = self.future_feet_positions_w[:, self.current_goal_idx].mean(dim=0).clone()
 
                     self.generate_future_feet_positions(pos=avg_base_xy)
+
+                if self._hold_terminal_pcbo_plan():
+                    return
 
                 # Handle gait transitions
                 if self.pending_gait_change is not None:
@@ -630,8 +697,11 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                             ]
                         )
 
-                # Safety mechanism, if the goal index exceeds the horizon length, reset the goal index and replan feet sequences
+                # Safety mechanism: finite PCBO plans hold the terminal target; heuristic plans regenerate when exhausted
                 if self.current_goal_idx >= self.horizon_length:
+                    if self._pcbo_knots is not None:
+                        self._hold_terminal_pcbo_plan()
+                        return
                     base_pos_w = torch.tensor(
                         self.robot.mj_model.get_body_position_world("base_link"),
                         dtype=torch.float32,
@@ -660,6 +730,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
         self.goal_completion_counter = 0
         self.current_goal_idx = 0
+        self._pcbo_plan_finished = False
 
         # PCBO offline plan: bypass heuristic and use optimised knots
         if self._pcbo_knots is not None:
@@ -1018,6 +1089,28 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             marker.pose.orientation.y = 0.0
             marker.pose.orientation.z = 0.0
             self.pcbo_goal_pub.publish(marker)
+
+            knot_idx = self._current_pcbo_knot_idx()
+            if knot_idx is not None:
+                goal_idx = max(0, min(self.current_goal_idx, self.horizon_length - 1))
+                text_marker = Marker()
+                text_marker.header.frame_id = "world"
+                text_marker.header.stamp = marker.header.stamp
+                text_marker.ns = "pcbo_goal"
+                text_marker.id = 1
+                text_marker.type = Marker.TEXT_VIEW_FACING
+                text_marker.action = Marker.ADD
+                text_marker.scale.z = 0.12
+                text_marker.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
+                text_marker.pose.position.x = float(self._pcbo_goal_pos_w[0])
+                text_marker.pose.position.y = float(self._pcbo_goal_pos_w[1])
+                text_marker.pose.position.z = float(self._pcbo_goal_pos_w[2] + 0.18)
+                text_marker.pose.orientation.w = 1.0
+                text_marker.text = (
+                    f"knot {knot_idx + 1}/{self._pcbo_knots.shape[0]}\n"
+                    f"step {goal_idx + 1}/{self.horizon_length}"
+                )
+                self.pcbo_goal_pub.publish(text_marker)
         except Exception as e:
             if self.logger is not None:
                 self.logger.error(f"Failed to publish PCBO goal marker: {e}")
