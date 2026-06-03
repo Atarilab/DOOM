@@ -353,7 +353,7 @@ def vicon_handler(
         device = torch.device("cuda:0")
 
     # Position offsets in the Vicon frame (in millimeters)
-    x_offset, y_offset, z_offset = 0.0, 0.0, -230.0 + 700
+    x_offset, y_offset, z_offset = 0.0, 0.0, 0.0
 
     # Initialize velocity estimator once using a singleton pattern
     if not hasattr(vicon_handler, "velocity_estimator"):
