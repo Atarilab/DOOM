@@ -14,7 +14,7 @@ use_threading: False
 use_buffer: False
 device: "cuda:0"  
 feet_step_size: 0.0
-horizon_length: 200
+horizon_length: 15  # match PCBO plan sim_horizon (was 200 — caused 70s runs instead of 5.25s)
 action_filter_alpha: 0.5
 transition_duration: 0
 visualize: 
