@@ -223,10 +223,15 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
         # PCBO offline plan — loaded from export_go2_plan.py JSON output
         self._pcbo_knots: np.ndarray | None = None
+        self._pcbo_goal_offset_xy: np.ndarray | None = None
+        self._pcbo_goal_pos_w: torch.Tensor | None = None
         pcbo_plan_path = configs["controller_config"].get("pcbo_plan_path", None)
         if pcbo_plan_path:
             plan = json.loads(pathlib.Path(pcbo_plan_path).read_text())
             self._pcbo_knots = np.array(plan["knots"]["data"], dtype=np.float32)
+            goal_pos = plan.get("config", {}).get("task", {}).get("params", {}).get("goal_pos")
+            if goal_pos is not None:
+                self._pcbo_goal_offset_xy = np.array(goal_pos[:2], dtype=np.float32)
             print(f"[PCBO] Loaded offline plan: K={self._pcbo_knots.shape[0]} knots from {pcbo_plan_path}")
 
     def _build_feet_from_pcbo_knots(self, base_xy: np.ndarray) -> torch.Tensor:
@@ -409,6 +414,8 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
 
             if self.visualize["current_contact_locations"]:
                 self.pub_current_contact_locations()
+            if self.visualize.get("pcbo_goal", False):
+                self.pub_pcbo_goal()
 
             if self.visualize["foot_forces"]:
                 self.pub_foot_forces(self.latest_state["robot/foot_forces"])
@@ -665,6 +672,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             else:
                 base_xy = pos[:2].cpu().numpy()
             self.future_feet_positions_w[:] = self._build_feet_from_pcbo_knots(base_xy)
+            if self._pcbo_goal_offset_xy is not None:
+                self._pcbo_goal_pos_w = torch.tensor(
+                    [base_xy[0] + self._pcbo_goal_offset_xy[0], base_xy[1] + self._pcbo_goal_offset_xy[1], 0.08],
+                    dtype=torch.float32,
+                    device=self.device,
+                )
             if self.visualize["future_feet_positions"]:
                 self.pub_future_feet_positions()
             return
@@ -968,6 +981,8 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.feet_trajectory_pub = self.create_publisher(MarkerArray, "feet_trajectories", 10)
         if self.visualize["current_contact_locations"]:
             self.contact_locations_pub = self.create_publisher(MarkerArray, "contact_locations", 10)
+        if self.visualize.get("pcbo_goal", False):
+            self.pcbo_goal_pub = self.create_publisher(Marker, "pcbo_goal", 10)
         if self.visualize["feet_error"]:
             self.feet_error_pub = self.create_publisher(MarkerArray, "feet_error", 10)
             self.feet_error_norm_pub = self.create_publisher(Float32MultiArray, "feet_error_norm", 10)
@@ -977,6 +992,35 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.foot_forces_pub = self.create_publisher(Float32MultiArray, "foot_forces", 10)
         if self.visualize["contact_status"]:
             self.contact_status_pub = self.create_publisher(Float32MultiArray, "contact_status", 10)
+
+    def pub_pcbo_goal(self):
+        """Visualizes the PCBO task-level base goal in the world frame."""
+        if self._pcbo_goal_pos_w is None:
+            return
+
+        try:
+            marker = Marker()
+            marker.header.frame_id = "world"
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = "pcbo_goal"
+            marker.id = 0
+            marker.type = Marker.CYLINDER
+            marker.action = Marker.ADD
+            marker.scale.x = 0.12
+            marker.scale.y = 0.12
+            marker.scale.z = 0.02
+            marker.color = ColorRGBA(r=1.0, g=0.75, b=0.0, a=0.9)
+            marker.pose.position.x = float(self._pcbo_goal_pos_w[0])
+            marker.pose.position.y = float(self._pcbo_goal_pos_w[1])
+            marker.pose.position.z = float(self._pcbo_goal_pos_w[2])
+            marker.pose.orientation.w = 1.0
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            self.pcbo_goal_pub.publish(marker)
+        except Exception as e:
+            if self.logger is not None:
+                self.logger.error(f"Failed to publish PCBO goal marker: {e}")
 
     def pub_feet_error(self):
         """
