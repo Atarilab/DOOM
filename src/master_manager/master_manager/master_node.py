@@ -4,6 +4,8 @@ import os
 import time
 
 import rclpy
+import gc
+gc.set_threshold(10**9, 10**9, 10**9)
 
 # DOOM Imports
 from controllers.stand_controller import DampingController, ZeroTorqueController
