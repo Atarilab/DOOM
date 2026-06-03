@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Shorthand launcher for the real Go2 robot with a PCBO contact plan.
+# Default: stops and holds at the knot closest to the goal (--stop-at-goal ON).
 # Usage (inside Docker, robot connected):
-#   bash src/plans/run_real.sh              → rank-0 (all knots, default)
-#   bash src/plans/run_real.sh 2            → rank-2
-#   bash src/plans/run_real.sh 0 --stop-at-goal  → stop and hold at goal-closest knot
+#   bash src/plans/run_real.sh              → rank-0, stop at goal knot (default)
+#   bash src/plans/run_real.sh 2            → rank-2, stop at goal knot
+#   bash src/plans/run_real.sh 0 --all-knots  → execute all 6 knots (no stop)
 #   bash src/plans/run_real.sh diverse0     → diverse0 (strong-left-lead)
 #
 # Workflow:
@@ -18,8 +19,8 @@
 #   diverse3_symmetric-best    diverse4_right-lateral
 
 PLAN_ARG="${1:-0}"
-STOP_AT_GOAL=""
-if [ "${2:-}" = "--stop-at-goal" ]; then STOP_AT_GOAL="--stop-at-goal"; fi
+STOP_AT_GOAL="--stop-at-goal"          # ON by default (safest for real robot)
+if [ "${2:-}" = "--all-knots" ]; then STOP_AT_GOAL=""; fi
 PLANS_DIR="src/plans"
 
 case "$PLAN_ARG" in
