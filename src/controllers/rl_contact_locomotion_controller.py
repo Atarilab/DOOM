@@ -235,16 +235,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             goal_pos = plan.get("config", {}).get("task", {}).get("params", {}).get("goal_pos")
             if goal_pos is not None:
                 self._pcbo_goal_offset_xy = np.array(goal_pos[:2], dtype=np.float32)
-                avg_knot_xy = self._pcbo_knots.mean(axis=1)
-                self._pcbo_terminal_knot_idx = int(np.argmin(np.linalg.norm(avg_knot_xy - self._pcbo_goal_offset_xy, axis=1)))
-            else:
-                self._pcbo_terminal_knot_idx = self._pcbo_knots.shape[0] - 1
-            horizon_indices = np.minimum(
-                np.arange(self.horizon_length) * self._pcbo_knots.shape[0] // self.horizon_length,
-                self._pcbo_knots.shape[0] - 1,
-            )
-            terminal_matches = np.flatnonzero(horizon_indices == self._pcbo_terminal_knot_idx)
-            self._pcbo_terminal_goal_idx = int(terminal_matches[-1]) if terminal_matches.size else self.horizon_length - 1
+                pass  # goal position stored in _pcbo_goal_offset_xy for visualization only
+            # Always execute all knots: hold at the last knot once the full plan is complete
+            self._pcbo_terminal_knot_idx = self._pcbo_knots.shape[0] - 1
+            self._pcbo_terminal_goal_idx = self.horizon_length - 1
             print(f"[PCBO] Loaded offline plan: K={self._pcbo_knots.shape[0]} knots from {pcbo_plan_path}")
 
     def _build_feet_from_pcbo_knots(self, base_xy: np.ndarray) -> torch.Tensor:
@@ -279,10 +273,6 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         targets = np.zeros((H, 4, 3), dtype=np.float32)
         targets[:, :, :2] = targets_xy
         targets = targets.transpose(1, 0, 2)                         # (4, H, 3)
-        if self._pcbo_terminal_goal_idx is not None and self._pcbo_terminal_goal_idx < H - 1:
-            targets[:, self._pcbo_terminal_goal_idx + 1 :, :] = targets[
-                :, self._pcbo_terminal_goal_idx : self._pcbo_terminal_goal_idx + 1, :
-            ]
         return torch.from_numpy(targets).to(self.device)
 
     def _hold_terminal_pcbo_plan(self) -> bool:
