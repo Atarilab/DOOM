@@ -72,7 +72,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.future_feet_positions_init_frame = None
         self.future_feet_positions_w = torch.zeros(4, self.horizon_length, 3, device=self.device)
         self.future_feet_positions_b = torch.zeros(4, self.horizon_length, 3, device=self.device)
-        self.desired_ee_position_w = torch.zeros((4, 3))
+        default_contact_locations = self.default_offset.unsqueeze(1).expand(-1, self.horizon_length, -1)
+        self.future_feet_positions_w.copy_(default_contact_locations)
+        self.future_feet_positions_b.copy_(default_contact_locations)
+        self.desired_ee_position_w = self.default_offset.clone()
 
         # Heading command for feet positions
         self.heading_command = 0.0  # Default heading (in radians)
@@ -81,6 +84,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.lateral_pos_change_pending = False  # Flag to indicate pending lateral pos change
 
         # Define gait patterns (FL, FR, RL, RR)
+        self.contact_location_order = ["FL", "FR", "RL", "RR"]
         self.gait_patterns = {
             "transition": torch.tensor(
                 [
@@ -199,6 +203,8 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 ]
             ),
         }
+        self.initial_gait = configs["controller_config"].get("initial_gait", "stance").lower()
+        self.pcbo_initial_gait = configs["controller_config"].get("pcbo_initial_gait", "trot").lower()
         self.current_gait = "stance"  # Default gait
         self.pending_gait_change = None  # Store pending gait change
         self.in_transition = False  # Flag to indicate if we're in a transition phase
@@ -210,10 +216,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         self.transition_start_gait = None  # Starting gait for transition
         self.transition_end_gait = None  # Ending gait for transition
         self.time_left = self.command_duration
-        self.current_contact_plan = self.gait_patterns[self.current_gait].to(self.device)
+        self.current_contact_plan = self._contact_plan_for_gait(self.current_gait)
         self.current_goal_idx = 0
         self.goal_completion_counter = 0
-        self.joint_pos_targets = self.default_joint_pos.clone()
+        self.joint_pos_targets = self._default_joint_pos_targets()
         # # Frequency tracking (logger will be set later in set_cmd_manager)
         # self._frequency_tracker = FrequencyTracker(
         #     name="compute_lowlevelcmd",
@@ -232,6 +238,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         if pcbo_plan_path:
             plan = json.loads(pathlib.Path(pcbo_plan_path).read_text())
             self._pcbo_knots = np.array(plan["knots"]["data"], dtype=np.float32)
+            self._pcbo_knots = self._normalize_pcbo_knots(
+                self._pcbo_knots,
+                plan.get("foot_order", self.contact_location_order),
+            )
             goal_pos = plan.get("config", {}).get("task", {}).get("params", {}).get("goal_pos")
             if goal_pos is not None:
                 self._pcbo_goal_offset_xy = np.array(goal_pos[:2], dtype=np.float32)
@@ -252,6 +262,36 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                 self._pcbo_terminal_knot_idx = self._pcbo_knots.shape[0] - 1
                 self._pcbo_terminal_goal_idx = self.horizon_length - 1
             print(f"[PCBO] Loaded offline plan: K={self._pcbo_knots.shape[0]} knots from {pcbo_plan_path}")
+
+    def _contact_plan_for_gait(self, gait: str) -> torch.Tensor:
+        return self.gait_patterns[gait].to(device=self.device).clone()
+
+    def _default_joint_pos_targets(self) -> torch.Tensor:
+        mapping = self.actions_mapping.to(device=self.default_joint_pos.device, dtype=torch.long)
+        return self.default_joint_pos.index_select(0, mapping).clone()
+
+    def _initial_gait_name(self) -> str:
+        gait = self.pcbo_initial_gait if self._pcbo_knots is not None else self.initial_gait
+        if gait not in self.gait_patterns:
+            if self.logger is not None:
+                self.logger.warning("Invalid initial gait %s; falling back to stance", gait)
+            gait = "stance"
+        return gait
+
+    def _normalize_pcbo_knots(self, knots: np.ndarray, foot_order: list[str]) -> np.ndarray:
+        if knots.ndim != 3 or knots.shape[1:] != (4, 2):
+            raise ValueError(f"Expected PCBO knots with shape (K, 4, 2), got {knots.shape}")
+
+        if foot_order == self.contact_location_order:
+            return knots
+
+        if sorted(foot_order) != sorted(self.contact_location_order):
+            raise ValueError(
+                f"PCBO foot_order {foot_order} does not match expected feet {self.contact_location_order}"
+            )
+
+        reorder = [foot_order.index(foot_name) for foot_name in self.contact_location_order]
+        return knots[:, reorder, :]
 
     def _build_feet_from_pcbo_knots(self, base_xy: np.ndarray) -> torch.Tensor:
         """ZOH-interpolate PCBO knots (K,4,2) → future_feet_positions_w (4,H,3).
@@ -405,7 +445,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             name="gait",
             description="Select Gait Pattern",
             options=list(self.gait_patterns.keys()),
-            default_value="stance",
+            default_value=self._initial_gait_name(),
         )
 
     def set_mode(self):
@@ -415,10 +455,10 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # Call the base class set_mode to activate the controller
         super().set_mode()
 
-        # Set default gait to stance when switching back to RL controller
+        # Initialize gait and contact locations when switching back to the RL controller.
         with self._gait_lock:
-            self.current_gait = "stance"
-            self.current_contact_plan = self.gait_patterns["stance"]
+            self.current_gait = self._initial_gait_name()
+            self.current_contact_plan = self._contact_plan_for_gait(self.current_gait)
 
             self.pending_gait_change = None
             self.in_transition = False
@@ -433,13 +473,13 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             self.pending_step_size = 0.0
             self.pending_lateral_pos = 0.0
 
-        base_pos_w = torch.tensor(
+        base_pos_w = torch.as_tensor(
             self.robot.mj_model.get_body_position_world("base_link"), dtype=torch.float32, device=self.device
         )
         self.lateral_pos = base_pos_w[1]
         self.generate_future_feet_positions(pos=base_pos_w)
 
-        self.joint_pos_targets = self.default_joint_pos.clone()
+        self.joint_pos_targets = self._default_joint_pos_targets()
 
     def compute_lowlevelcmd(self, state):
         """
@@ -616,12 +656,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                             gait for gait in self.gait_patterns.keys() if gait not in ["transition", "stance"]
                         ]:
                             self.current_gait = "transition"
-                            self.current_contact_plan = self.gait_patterns["transition"]
+                            self.current_contact_plan = self._contact_plan_for_gait("transition")
 
                         if self.transition_duration == 0:
                             self.in_transition = False
                             self.current_gait = self.pending_gait_change
-                            self.current_contact_plan = self.gait_patterns[self.pending_gait_change]
+                            self.current_contact_plan = self._contact_plan_for_gait(self.pending_gait_change)
 
                             # Call set_mode() if the pending gait is "stance"
                             if self.pending_gait_change == "stance":
@@ -648,7 +688,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                             # Transition phase complete - apply the pending gait
                             self.in_transition = False
                             self.current_gait = self.pending_gait_change
-                            self.current_contact_plan = self.gait_patterns[self.pending_gait_change]
+                            self.current_contact_plan = self._contact_plan_for_gait(self.pending_gait_change)
 
                             # Call set_mode() if the pending gait is "stance"
                             if self.pending_gait_change == "stance":
@@ -704,7 +744,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
                     if self._pcbo_knots is not None:
                         self._hold_terminal_pcbo_plan()
                         return
-                    base_pos_w = torch.tensor(
+                    base_pos_w = torch.as_tensor(
                         self.robot.mj_model.get_body_position_world("base_link"),
                         dtype=torch.float32,
                         device=self.device,
@@ -737,7 +777,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # PCBO offline plan: bypass heuristic and use optimised knots
         if self._pcbo_knots is not None:
             if pos is None or torch.all(pos == 0):
-                robot_pos = torch.tensor(
+                robot_pos = torch.as_tensor(
                     self.robot.mj_model.get_body_position_world(self.base_link),
                     dtype=torch.float32, device=self.device,
                 )
@@ -780,7 +820,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         # Check if pos is a tensor of zeros (default case)
         if torch.all(pos == 0):
             # Get the robot's current position
-            robot_pos = torch.tensor(
+            robot_pos = torch.as_tensor(
                 self.robot.mj_model.get_body_position_world(self.base_link), dtype=torch.float32, device=self.device
             )
             # Use only the x-dimension of the robot's position
@@ -1133,10 +1173,12 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             ]
 
             # Get feet positions from the state manager
-            feet_errors = (
-                self.robot.mj_model.get_ee_positions_w()
-                - self.future_feet_positions_w[:, self.current_goal_idx].numpy()
+            ee_positions_w = torch.as_tensor(
+                self.robot.mj_model.get_ee_positions_w(), dtype=torch.float32, device=self.device
             )
+            feet_errors = (
+                ee_positions_w - self.future_feet_positions_w[:, self.current_goal_idx]
+            ).detach().cpu().numpy()
             if feet_errors is not None:
                 for i, (name, color) in enumerate(zip(ee_names, colors)):
                     marker = Marker()
@@ -1191,7 +1233,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             foot_names = ["FL", "FR", "RL", "RR"]
 
             # Transpose the tensor to match the expected shape (num_steps, 4, 3)
-            positions_for_viz = self.future_feet_positions_w.permute(1, 0, 2).numpy()
+            positions_for_viz = self.future_feet_positions_w.permute(1, 0, 2).detach().cpu().numpy()
 
             for foot_idx in range(len(foot_names)):
                 # Create a marker for each future position of each foot
@@ -1245,7 +1287,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             marker_array = MarkerArray()
 
             # Get current desired positions for each foot
-            current_positions = self.future_feet_positions_w[:, self.current_goal_idx]
+            current_positions = self.future_feet_positions_w[:, self.current_goal_idx].detach().cpu()
 
             # Create markers for each foot
             for foot_idx in range(4):
@@ -1296,8 +1338,11 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
         """
         try:
             # Calculate error norms directly
+            ee_positions_w = torch.as_tensor(
+                self.robot.mj_model.get_ee_positions_w(), dtype=torch.float32, device=self.device
+            )
             feet_errors = torch.linalg.norm(
-                self.robot.mj_model.get_ee_positions_w() - self.future_feet_positions_w[:, self.current_goal_idx],
+                ee_positions_w - self.future_feet_positions_w[:, self.current_goal_idx],
                 axis=-1,
             )
 
@@ -1307,7 +1352,7 @@ class RLQuadrupedLocomotionContactController(RLControllerBase):
             msg.layout.dim[0].label = "feet"
             msg.layout.dim[0].size = 4
             msg.layout.dim[0].stride = 4
-            msg.data = [float(x) for x in feet_errors]
+            msg.data = [float(x) for x in feet_errors.detach().cpu()]
 
             # Publish the message
             self.feet_error_norm_pub.publish(msg)

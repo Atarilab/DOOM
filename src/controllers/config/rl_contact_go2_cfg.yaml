@@ -5,6 +5,7 @@ policy_path: "locomotion_go2/contact_policy_stanceSeperate.pt"
 fixed_feet_positions: false
 pcbo_plan_path: "/home/atari/workspace/DOOM/src/plans/go2_plan_pcbo_rank0.json"  # in-container path; set to null to restore heuristic stride
 pcbo_stop_at_goal: false  # true = stop and hold at the knot closest to goal (safe); false = execute all knots
+pcbo_initial_gait: "trot"  # gait schedule paired with file-backed PCBO contact locations on controller entry
 control_dt: 0.005
 decimation: 4
 action_dim: 12
