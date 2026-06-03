@@ -1,6 +1,6 @@
 {
   "_description": "Go2 contact plan \u2014 (K, 4, 2) foot offset knots from default stance [m]",
-  "_exported": "2026-06-03 12:35",
+  "_exported": "2026-06-03 14:34",
   "_run_dir": "tmp/experiments/go2_contact_20260528_212619_s0",
   "algorithm": "PCBO",
   "rank": 0,

@@ -450,6 +450,29 @@ def contact_time_left(
     return tensorify([result], dtype=dtype, device=device)
 
 
+def _slice_contact_horizon(
+    future_positions: Any,
+    current_goal_idx: Callable,
+    obs_horizon: int,
+    dtype: torch.dtype,
+    device: Optional[torch.device],
+) -> torch.Tensor:
+    positions = tensorify(future_positions, dtype=dtype, device=device)
+    if positions.ndim != 3 or positions.shape[1] == 0:
+        raise ValueError(f"Expected future contact positions with shape (feet, horizon, xyz), got {positions.shape}")
+
+    goal_idx = current_goal_idx()
+    if torch.is_tensor(goal_idx):
+        goal_idx = int(goal_idx.item())
+    else:
+        goal_idx = int(goal_idx)
+    goal_idx = max(0, min(goal_idx, positions.shape[1] - 1))
+
+    indices = torch.arange(goal_idx, goal_idx + obs_horizon, dtype=torch.long, device=positions.device)
+    indices = torch.clamp(indices, max=positions.shape[1] - 1)
+    return positions.index_select(1, indices)
+
+
 def object_size(
     states: Dict[str, Any],
     size: tuple[float, float, float],
@@ -556,9 +579,10 @@ def contact_locations(
     :param device: Desired tensor device
     :return: Contact locations tensor
     """
-    result = mj_model.transform_init_to_base(
-        future_feet_positions_init_frame()[:, current_goal_idx() : current_goal_idx() + obs_horizon]
-    ).flatten()
+    future_positions = _slice_contact_horizon(
+        future_feet_positions_init_frame(), current_goal_idx, obs_horizon, dtype, device
+    )
+    result = mj_model.transform_init_to_base(future_positions).flatten()
     return tensorify(result, dtype=dtype, device=device)
 
 
@@ -583,9 +607,8 @@ def contact_locations_b(
     :param device: Desired tensor device
     :return: Contact locations in base frame tensor
     """
-    result = mj_model.transform_world_to_base(
-        future_feet_positions_w()[:, current_goal_idx() : current_goal_idx() + obs_horizon]
-    ).flatten()
+    future_positions = _slice_contact_horizon(future_feet_positions_w(), current_goal_idx, obs_horizon, dtype, device)
+    result = mj_model.transform_world_to_base(future_positions).flatten()
     return tensorify(result, dtype=dtype, device=device)
 
 
