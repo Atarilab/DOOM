@@ -154,11 +154,21 @@ class JoystickManager:
 
                 # Only process commands if cooldown period has passed
                 if time_since_last_command >= self._command_cooldown:
+                    command_handled = False
                     # Handle mode switching based on button combinations
                     if self.robot == "UnitreeGo2":
                         if key_state[self.key_map["select"]]:
                             self.mode_manager.set_mode("ZERO")
                             self._last_command_time = current_time
+                        elif (
+                            key_state[self.key_map["L2"]]
+                            and key_state[self.key_map["R2"]]
+                            and self.active_controller.__class__.__name__
+                            == "RLQuadrupedLocomotionContactController"
+                        ):
+                            self.mode_manager.set_mode("STAND", "STANCE")
+                            self._last_command_time = current_time
+                            command_handled = True
                         elif key_state[self.key_map["start"]] and self.active_controller.__class__.__name__ in [
                             "DampingController",
                             "ZeroTorqueController",
@@ -179,7 +189,7 @@ class JoystickManager:
                             self._last_command_time = current_time
                         elif (
                             key_state[self.key_map["down"]]
-                            and self.active_controller.__class__.__name__ == "Go2StandUpController"
+                            and self.active_controller.__class__.__name__ in {"Go2StandUpController", "Go2StanceController"}
                         ):
                             self.mode_manager.set_mode("STAND", "STAND_DOWN")
                             self._last_command_time = current_time
@@ -267,7 +277,11 @@ class JoystickManager:
                             self._last_command_time = current_time
 
                     # Execute controller-specific mappings if available
-                    if self.active_controller and hasattr(self.active_controller, "get_joystick_mappings"):
+                    if (
+                        not command_handled
+                        and self.active_controller
+                        and hasattr(self.active_controller, "get_joystick_mappings")
+                    ):
                         mappings = self.active_controller.get_joystick_mappings()
                         for button, callback in mappings.items():
                             # Handle key combinations (e.g. "L1-right")
