@@ -197,7 +197,7 @@ class Go2(RobotBase):
             float: Kd value used for damping gain
         """
 
-        return 2.0
+        return 8.0
 
     @property
     def default_joint_positions(self):

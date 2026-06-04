@@ -33,7 +33,13 @@ case "$PLAN_ARG" in
   diverse4*)
     PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_diverse4_right-lateral.json" ;;
   *)
-    PLAN_FILE="$PLAN_ARG" ;;   # treat as a full path
+    if [ -f "$PLANS_DIR/${PLAN_ARG}.json" ]; then
+      PLAN_FILE="$PLANS_DIR/${PLAN_ARG}.json"
+    elif [ -f "$PLANS_DIR/$PLAN_ARG" ]; then
+      PLAN_FILE="$PLANS_DIR/$PLAN_ARG"
+    else
+      PLAN_FILE="$PLAN_ARG"   # treat as a full path
+    fi ;;
 esac
 
 echo "Using plan: $PLAN_FILE  ${STOP_AT_GOAL}"
