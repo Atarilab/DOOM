@@ -1,0 +1,127 @@
+{
+  "_description": "Lambda=1.5 sweep \u2014 narrowing search between lambda=1 and lambda=3. 40 iters.",
+  "_task_ref": "other_modules/cbo_to (branch: contact) \u2014 models/go2/scene.xml + policies/contact_policy_stanceSeperate.pt",
+  "_reproduce": "CONFIG=configs_pcbo/go2_contact_gmm_obstacle_lr_5090_const_lambda_1p5.json bash scripts_pcbo/run_go2_contact.sh 0 --algorithms CBOxPolarized",
+  "_runtime_estimate": "N=4000, 23 workers, 40 iters.",
+  "run": {
+    "max_iter": 40,
+    "max_eval": 8
+  },
+  "task": {
+    "name": "go2-contact",
+    "horizon": 6.0,
+    "num_knots": 6,
+    "params": {
+      "n_workers": 23,
+      "sim_horizon": 15,
+      "goal_pos": [
+        1.5,
+        0.0
+      ],
+      "goal_weight": 2.0,
+      "goal_only": true,
+      "foot_dead_zone": 0.15,
+      "foot_penalty_weight": 5.0,
+      "note": "Cost = goal_weight*||base_xy_final - goal_pos|| + foot_penalty_weight*max(0, avg_foot_err - 0.15). No hard clipping on foot positions \u2014 foot penalty self-regulates unreachable targets.",
+      "obstacle": {
+        "enabled": true,
+        "type": "mixture",
+        "weight": 1.0,
+        "components": [
+          {
+            "center": [
+              0.75,
+              0.0
+            ],
+            "sigma": 0.1,
+            "amplitude": 2.0
+          },
+          {
+            "center": [
+              0.75,
+              0.45
+            ],
+            "sigma": 0.1,
+            "amplitude": 1.5
+          },
+          {
+            "center": [
+              0.75,
+              -0.45
+            ],
+            "sigma": 0.1,
+            "amplitude": 1.5
+          }
+        ]
+      }
+    }
+  },
+  "algorithm_defaults": {
+    "num_samples": 4000,
+    "noise_level": 0.16,
+    "temperature": 1e-05,
+    "persist_particles_every": 50,
+    "persist_particles_latest": 50,
+    "persist_particle_gif_count": 0,
+    "per_particle_consensus_every": 1,
+    "per_particle_consensus_kappa": 1.0,
+    "polar_kernel_reg_loss_weight": 1.5,
+    "noise_level_schedule": {
+      "type": "cosine",
+      "start_weight": 5.0,
+      "end_weight": 0.1,
+      "start_iter": 0,
+      "end_iter": 0.9
+    },
+    "kappa_strategy": null,
+    "polar_auto_weight": false,
+    "polar_auto_weight_freeze_iter": null,
+    "polar_auto_weight_update_every": null,
+    "cbo": {
+      "decay": 5.0,
+      "dt": 0.001,
+      "temp_decay": 1.001,
+      "limit_temp": 1e-26,
+      "multiply_cost": false,
+      "multiply_knot_weights": false,
+      "anisotropic": true
+    },
+    "cem": {
+      "sigma_min": 0.01
+    }
+  },
+  "algorithms": [
+    {
+      "name": "CBOxPolarized"
+    }
+  ],
+  "logging": {
+    "mean_knots_cost_every": 10,
+    "gc_every": 5,
+    "jax_clear_every": 50,
+    "tracemalloc_every": 100
+  },
+  "load_particles": {
+    "load_particles_from_disk": false,
+    "load_particles_dir": null,
+    "load_particles_algorithm": null,
+    "load_particles_iteration": null
+  },
+  "artifacts": {
+    "every": 5,
+    "top_k": 5,
+    "render_videos": false,
+    "render_videos_every": 5,
+    "doom_plans_every": 0,
+    "plot_multimodality": true,
+    "plot_obstacles": true,
+    "plot_homotopy": true,
+    "homotopy_every": 5,
+    "homotopy_top_n": 100,
+    "homotopy_y_thresh": 0.1
+  },
+  "plots": {
+    "multimodality_cost_threshold": 0.5
+  },
+  "_task_name": "go2_contact_gmm_obstacle_lr_const_lambda_1p5"
+}

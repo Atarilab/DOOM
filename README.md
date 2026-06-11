@@ -166,9 +166,11 @@ Start: `ZERO`/`DAMPING` -> `STAY_DOWN`
 
 Start: AnyElse -> `IDLE`
 
+L2+R2: `RL-CONTACT` -> `STAND/STANCE`
+
 Up: `STAY_DOWN`/`STAND_DOWN` -> `STAND_UP`
 
-Down: `STAND_UP` -> `STAND_DOWN`
+Down: `STAND_UP`/`STANCE` -> `STAND_DOWN`
 
 Down: `STAND_DOWN` -> `STAY_DOWN`
 

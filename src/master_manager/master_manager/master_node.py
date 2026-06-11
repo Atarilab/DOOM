@@ -49,6 +49,11 @@ async def main_async(args=None):
     parser.add_argument("--log", type=str, default="test", help="Experiment name to log information")
     parser.add_argument("--debug", action="store_true", help="Show debug logs")
     parser.add_argument("--ui", action="store_true", help="Enable the Robot Control UI")
+    parser.add_argument("--plan", type=str, default=None,
+                        help="PCBO plan to use: rank index (0-4) or full path to plan JSON. "
+                             "E.g. --plan 2  or  --plan /abs/path/to/plan.json")
+    parser.add_argument("--stop-at-goal", action="store_true", default=None,
+                        help="Stop and hold at the knot closest to the goal (overrides pcbo_stop_at_goal in config)")
 
     args = parser.parse_args()
 
@@ -64,6 +69,20 @@ async def main_async(args=None):
 
         # Add debug flag to configs
         configs["debug"] = args.debug
+
+        # Override PCBO plan from --plan argument (rank index or explicit path)
+        if args.plan is not None:
+            if args.plan.isdigit():
+                plan_path = f"src/plans/go2_plan_pcbo_rank{args.plan}.json"
+            else:
+                plan_path = args.plan
+            configs["controller_config"]["pcbo_plan_path"] = plan_path
+            logger.info("PCBO plan: %s", plan_path)
+
+        # Override stop-at-goal mode from CLI
+        if args.stop_at_goal:
+            configs["controller_config"]["pcbo_stop_at_goal"] = True
+            logger.info("PCBO stop-at-goal: enabled via --stop-at-goal")
 
         # Initialize communication channel
         await initialize_channel(args.task, configs["robot_interface_config"], logger)

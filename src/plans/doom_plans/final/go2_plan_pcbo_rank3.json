@@ -1,0 +1,238 @@
+{
+  "_description": "Go2 contact plan \u2014 (K, 4, 2) foot offset knots from default stance [m]",
+  "_exported": "2026-06-11 00:51",
+  "_git_commit": "1f6f800",
+  "_run_dir": "tmp/experiments/go2_contact_20260610_234557_s0",
+  "algorithm": "PCBO",
+  "rank": 3,
+  "cost": 0.4364853799343109,
+  "seed": "0",
+  "num_knots": 6,
+  "horizon": 6.0,
+  "command_duration_s": 0.35,
+  "total_rollout_s": 2.0999999999999996,
+  "foot_order": [
+    "FL",
+    "FR",
+    "RL",
+    "RR"
+  ],
+  "default_stance_m": {
+    "FL": [
+      0.1934,
+      0.1465
+    ],
+    "FR": [
+      0.1934,
+      -0.1465
+    ],
+    "RL": [
+      -0.1934,
+      0.1465
+    ],
+    "RR": [
+      -0.1934,
+      -0.1465
+    ]
+  },
+  "knots": {
+    "_shape": "(6, 4, 2)  =  K x [FL,FR,RL,RR] x [dx,dy]",
+    "_units": "metres, offsets from default_stance_m",
+    "data": [
+      [
+        [
+          0.17274338006973267,
+          -0.1546693593263626
+        ],
+        [
+          0.281341552734375,
+          0.1523658037185669
+        ],
+        [
+          0.5336519479751587,
+          -0.7181611657142639
+        ],
+        [
+          0.854019284248352,
+          -0.19137418270111084
+        ]
+      ],
+      [
+        [
+          0.5279643535614014,
+          -0.43794897198677063
+        ],
+        [
+          0.39525315165519714,
+          0.13061238825321198
+        ],
+        [
+          1.3215949535369873,
+          -0.6984323263168335
+        ],
+        [
+          1.7214102745056152,
+          0.11233198642730713
+        ]
+      ],
+      [
+        [
+          1.1691757440567017,
+          -0.13889911770820618
+        ],
+        [
+          1.036576509475708,
+          0.16716183722019196
+        ],
+        [
+          1.5931594371795654,
+          -0.5331633687019348
+        ],
+        [
+          1.8855496644973755,
+          0.1696104109287262
+        ]
+      ],
+      [
+        [
+          2.1195528507232666,
+          0.9154758453369141
+        ],
+        [
+          1.1091536283493042,
+          -1.010197639465332
+        ],
+        [
+          1.1248462200164795,
+          -0.7091836929321289
+        ],
+        [
+          1.7079236507415771,
+          -0.0829397439956665
+        ]
+      ],
+      [
+        [
+          3.7343530654907227,
+          -1.726420283317566
+        ],
+        [
+          -1.6039224863052368,
+          1.6546467542648315
+        ],
+        [
+          0.0803910344839096,
+          -1.693729043006897
+        ],
+        [
+          1.7748208045959473,
+          -3.0608787536621094
+        ]
+      ],
+      [
+        [
+          -1.1227569580078125,
+          0.4611283540725708
+        ],
+        [
+          0.5763029456138611,
+          -2.0870094299316406
+        ],
+        [
+          0.41878291964530945,
+          -0.3120899796485901
+        ],
+        [
+          -0.8318499326705933,
+          1.4767448902130127
+        ]
+      ]
+    ]
+  },
+  "config": {
+    "task": {
+      "name": "go2-contact",
+      "horizon": 6.0,
+      "num_knots": 6,
+      "params": {
+        "n_workers": 23,
+        "sim_horizon": 15,
+        "goal_pos": [
+          1.5,
+          0.0
+        ],
+        "goal_weight": 2.0,
+        "goal_only": true,
+        "foot_dead_zone": 0.15,
+        "foot_penalty_weight": 5.0,
+        "note": "Cost = goal_weight*||base_xy_final - goal_pos|| + foot_penalty_weight*max(0, avg_foot_err - 0.15). No hard clipping on foot positions \u2014 foot penalty self-regulates unreachable targets.",
+        "obstacle": {
+          "enabled": true,
+          "type": "mixture",
+          "weight": 1.0,
+          "components": [
+            {
+              "center": [
+                0.75,
+                0.0
+              ],
+              "sigma": 0.1,
+              "amplitude": 2.0
+            },
+            {
+              "center": [
+                0.75,
+                0.45
+              ],
+              "sigma": 0.1,
+              "amplitude": 1.5
+            },
+            {
+              "center": [
+                0.75,
+                -0.45
+              ],
+              "sigma": 0.1,
+              "amplitude": 1.5
+            }
+          ]
+        }
+      }
+    },
+    "algorithm_defaults": {
+      "num_samples": 4000,
+      "noise_level": 0.16,
+      "temperature": 1e-05,
+      "persist_particles_every": 50,
+      "persist_particles_latest": 50,
+      "persist_particle_gif_count": 0,
+      "per_particle_consensus_every": 1,
+      "per_particle_consensus_kappa": 1.0,
+      "polar_kernel_reg_loss_weight": 1.5,
+      "noise_level_schedule": {
+        "type": "cosine",
+        "start_weight": 5.0,
+        "end_weight": 0.1,
+        "start_iter": 0,
+        "end_iter": 0.9
+      },
+      "kappa_strategy": null,
+      "polar_auto_weight": false,
+      "polar_auto_weight_freeze_iter": null,
+      "polar_auto_weight_update_every": null,
+      "cbo": {
+        "decay": 5.0,
+        "dt": 0.001,
+        "temp_decay": 1.001,
+        "limit_temp": 1e-26,
+        "multiply_cost": false,
+        "multiply_knot_weights": false,
+        "anisotropic": true
+      },
+      "cem": {
+        "sigma_min": 0.01
+      }
+    }
+  },
+  "real_robot_note": "To deploy on a real Go2: feed knots['data'] to the cbo_to real-robot runner (contact Doom et al. authors). The RL policy, observation format, and control frequency (50 Hz) are identical to the simulation."
+}

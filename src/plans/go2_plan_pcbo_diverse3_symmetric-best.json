@@ -1,0 +1,217 @@
+{
+  "_description": "Go2 PCBO diverse plan \u2014 mode: symmetric-best",
+  "_mode": "symmetric-best",
+  "_mode_description": "best cost, symmetric, least asymmetric \u2014 closest to ideal trot",
+  "_exported": "2026-06-03",
+  "_run_dir": "tmp/experiments/go2_contact_20260528_212619_s0",
+  "algorithm": "PCBO",
+  "mode_index": 3,
+  "particle_index": 369,
+  "cost": 0.17799395322799683,
+  "num_knots": 6,
+  "horizon": 15,
+  "command_duration_s": 0.35,
+  "foot_order": [
+    "FL",
+    "FR",
+    "RL",
+    "RR"
+  ],
+  "behavioral_features": {
+    "mean_dx": 0.2831396162509918,
+    "mean_dy": -0.008756500668823719,
+    "asym_left_right": -0.0028448104858398438,
+    "asym_front_back": -0.03258109092712402
+  },
+  "default_stance_m": {
+    "FL": [
+      0.1934,
+      0.1465
+    ],
+    "FR": [
+      0.1934,
+      -0.1465
+    ],
+    "RL": [
+      -0.1934,
+      0.1465
+    ],
+    "RR": [
+      -0.1934,
+      -0.1465
+    ]
+  },
+  "knots": {
+    "_shape": "(6, 4, 2) = K x [FL,FR,RL,RR] x [dx,dy]",
+    "_units": "metres, offsets from default_stance_m",
+    "data": [
+      [
+        [
+          0.1548757553100586,
+          -0.046341389417648315
+        ],
+        [
+          0.37231793999671936,
+          -0.10119383037090302
+        ],
+        [
+          0.271770715713501,
+          -0.10466673970222473
+        ],
+        [
+          0.27521297335624695,
+          -0.04608314856886864
+        ]
+      ],
+      [
+        [
+          0.5376256108283997,
+          -0.001040792092680931
+        ],
+        [
+          0.3954852819442749,
+          -0.4081951975822449
+        ],
+        [
+          0.5967937707901001,
+          0.05518617853522301
+        ],
+        [
+          0.5942017436027527,
+          0.14407429099082947
+        ]
+      ],
+      [
+        [
+          1.1205140352249146,
+          -0.10957804322242737
+        ],
+        [
+          0.5643178224563599,
+          -0.29262569546699524
+        ],
+        [
+          0.9702626466751099,
+          0.09536378085613251
+        ],
+        [
+          1.0143712759017944,
+          0.29200342297554016
+        ]
+      ],
+      [
+        [
+          0.14132705330848694,
+          0.14012597501277924
+        ],
+        [
+          -0.20240187644958496,
+          -0.4535650312900543
+        ],
+        [
+          -0.40520089864730835,
+          -0.02247081696987152
+        ],
+        [
+          0.1273794323205948,
+          0.4649718105792999
+        ]
+      ],
+      [
+        [
+          -0.01698136329650879,
+          0.0842473953962326
+        ],
+        [
+          0.14358969032764435,
+          -0.1730383336544037
+        ],
+        [
+          -0.08665352314710617,
+          0.10229118168354034
+        ],
+        [
+          0.09561195969581604,
+          -0.21026691794395447
+        ]
+      ],
+      [
+        [
+          0.07478250563144684,
+          0.21810594201087952
+        ],
+        [
+          -0.08326367288827896,
+          -0.29463881254196167
+        ],
+        [
+          0.021490294486284256,
+          0.3778509795665741
+        ],
+        [
+          0.11792164295911789,
+          0.07932765781879425
+        ]
+      ]
+    ]
+  },
+  "config": {
+    "task": {
+      "name": "go2-contact",
+      "horizon": 6.0,
+      "num_knots": 6,
+      "params": {
+        "n_workers": 20,
+        "sim_horizon": 15,
+        "goal_pos": [
+          1.0,
+          0.0
+        ],
+        "goal_weight": 1.0,
+        "goal_only": true,
+        "foot_dead_zone": 0.15,
+        "foot_penalty_weight": 5.0,
+        "note": "Cost = goal_weight*||base_xy_final - goal_pos|| + foot_penalty_weight*max(0, avg_foot_err - 0.15). No hard clipping on foot positions \u2014 foot penalty self-regulates unreachable targets."
+      }
+    },
+    "algorithm_defaults": {
+      "num_samples": 800,
+      "noise_level": 0.08,
+      "temperature": 1e-05,
+      "persist_particles_every": 50,
+      "persist_particles_latest": 50,
+      "persist_particle_gif_count": 0,
+      "per_particle_consensus_every": 1,
+      "per_particle_consensus_kappa": 1.0,
+      "polar_kernel_reg_loss_weight": 0.3,
+      "polar_kernel_reg_loss_weight_schedule": {
+        "type": "explore_exploit_explore",
+        "explore_fraction": 0.2,
+        "exploit_fraction": 0.5,
+        "re_explore_fraction": 0.3
+      },
+      "noise_level_schedule": {
+        "type": "explore_exploit_explore",
+        "explore_fraction": 0.2,
+        "exploit_fraction": 0.5,
+        "re_explore_fraction": 0.3
+      },
+      "kappa_strategy": null,
+      "polar_auto_weight": false,
+      "polar_auto_weight_freeze_iter": null,
+      "polar_auto_weight_update_every": null,
+      "cbo": {
+        "decay": 5.0,
+        "dt": 0.001,
+        "temp_decay": 1.001,
+        "limit_temp": 1e-26,
+        "multiply_cost": false,
+        "multiply_knot_weights": false,
+        "anisotropic": true
+      },
+      "cem": {
+        "sigma_min": 0.01
+      }
+    }
+  }
+}

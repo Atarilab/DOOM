@@ -88,15 +88,14 @@ class LowLevelCmdPublisher(Node):
         start_time = time.time()
         self.running_time += self.dt
 
-        # Get active controller and compute torques
-        active_controller = self.mode_manager.get_active_controller()
-        # self.mode_manager.get_active_obs_manager()
-
         try:
             # current_time = self.get_clock().now().nanoseconds / 1e9
 
             # Update joystick state and handle mode switching
             self.joystick_manager.update()
+
+            # Get active controller after joystick handling, since joystick input can switch modes.
+            active_controller = self.mode_manager.get_active_controller()
 
             # Retrieve states from state manager
             combined_state = self.state_manager.get_combined_state()

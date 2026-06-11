@@ -262,6 +262,19 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /contact_locations
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: PCBO Goal
+      Namespaces:
+        pcbo_goal: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /pcbo_goal
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 238; 238; 236

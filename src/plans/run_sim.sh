@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Shorthand launcher for the Go2 contact simulation with a PCBO plan.
+# Default: stops and holds at the knot closest to the goal (--stop-at-goal ON).
+# Usage (inside Docker):
+#   bash src/plans/run_sim.sh              → rank-0, stop at goal knot (default)
+#   bash src/plans/run_sim.sh 2            → rank-2, stop at goal knot
+#   bash src/plans/run_sim.sh 0 --all-knots  → execute all 6 knots (no stop)
+#   bash src/plans/run_sim.sh diverse0     → diverse0 (strong-left-lead)
+#   bash src/plans/run_sim.sh diverse4     → diverse4 (right-lateral)
+#
+# Full plan names in src/plans/:
+#   rank0 .. rank4
+#   diverse0_strong-left-lead  diverse1_front-heavy  diverse2_symmetric-moderate
+#   diverse3_symmetric-best    diverse4_right-lateral
+
+PLAN_ARG="${1:-0}"
+STOP_AT_GOAL="--stop-at-goal"          # ON by default
+if [ "${2:-}" = "--all-knots" ]; then STOP_AT_GOAL=""; fi
+PLANS_DIR="src/plans"
+
+# Accept short aliases: "0".."4" → rank files; "diverse0".."diverse4" → diverse files
+case "$PLAN_ARG" in
+  0|1|2|3|4)
+    PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_rank${PLAN_ARG}.json" ;;
+  diverse0*)
+    PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_diverse0_strong-left-lead.json" ;;
+  diverse1*)
+    PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_diverse1_front-heavy.json" ;;
+  diverse2*)
+    PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_diverse2_symmetric-moderate.json" ;;
+  diverse3*)
+    PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_diverse3_symmetric-best.json" ;;
+  diverse4*)
+    PLAN_FILE="$PLANS_DIR/go2_plan_pcbo_diverse4_right-lateral.json" ;;
+  *)
+    if [ -f "$PLANS_DIR/${PLAN_ARG}.json" ]; then
+      PLAN_FILE="$PLANS_DIR/${PLAN_ARG}.json"
+    elif [ -f "$PLANS_DIR/$PLAN_ARG" ]; then
+      PLAN_FILE="$PLANS_DIR/$PLAN_ARG"
+    else
+      PLAN_FILE="$PLAN_ARG"   # treat as a full path
+    fi ;;
+esac
+
+echo "Using plan: $PLAN_FILE  ${STOP_AT_GOAL}"
+ros2 run master_manager master_node \
+  --task rl-contact-sim-go2 \
+  --plan "$PLAN_FILE" \
+  $STOP_AT_GOAL
