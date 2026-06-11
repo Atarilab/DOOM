@@ -1,10 +1,10 @@
 {
-  "_description": "3 Gaussian pillars obstacle config with sigma scheduling: large diffusion noise at start (exploration) decaying to small sigma (exploitation). Based on go2_contact_gmm_obstacle_lr_5090.json.",
-  "_task_ref": "other_modules/cbo_to (branch: contact) — models/go2/scene.xml + policies/contact_policy_stanceSeperate.pt",
-  "_reproduce": "bash scripts_pcbo/run_go2_contact.sh 0,1,2 --config configs_pcbo/go2_contact_gmm_obstacle_lr_5090_sigma_scheduling.json",
-  "_runtime_estimate": "N=4000, 30 workers, 1000 iters.",
+  "_description": "Lambda=1.5 sweep \u2014 narrowing search between lambda=1 and lambda=3. 40 iters.",
+  "_task_ref": "other_modules/cbo_to (branch: contact) \u2014 models/go2/scene.xml + policies/contact_policy_stanceSeperate.pt",
+  "_reproduce": "CONFIG=configs_pcbo/go2_contact_gmm_obstacle_lr_5090_const_lambda_1p5.json bash scripts_pcbo/run_go2_contact.sh 0 --algorithms CBOxPolarized",
+  "_runtime_estimate": "N=4000, 23 workers, 40 iters.",
   "run": {
-    "max_iter": 100,
+    "max_iter": 40,
     "max_eval": 8
   },
   "task": {
@@ -22,24 +22,33 @@
       "goal_only": true,
       "foot_dead_zone": 0.15,
       "foot_penalty_weight": 5.0,
-      "note": "Cost = goal_weight*||base_xy_final - goal_pos|| + foot_penalty_weight*max(0, avg_foot_err - 0.15). No hard clipping on foot positions — foot penalty self-regulates unreachable targets.",
+      "note": "Cost = goal_weight*||base_xy_final - goal_pos|| + foot_penalty_weight*max(0, avg_foot_err - 0.15). No hard clipping on foot positions \u2014 foot penalty self-regulates unreachable targets.",
       "obstacle": {
         "enabled": true,
         "type": "mixture",
         "weight": 1.0,
         "components": [
           {
-            "center": [0.75, 0.0],
+            "center": [
+              0.75,
+              0.0
+            ],
             "sigma": 0.1,
             "amplitude": 2.0
           },
           {
-            "center": [0.75, 0.45],
+            "center": [
+              0.75,
+              0.45
+            ],
             "sigma": 0.1,
             "amplitude": 1.5
           },
           {
-            "center": [0.75, -0.45],
+            "center": [
+              0.75,
+              -0.45
+            ],
             "sigma": 0.1,
             "amplitude": 1.5
           }
@@ -56,13 +65,7 @@
     "persist_particle_gif_count": 0,
     "per_particle_consensus_every": 1,
     "per_particle_consensus_kappa": 1.0,
-    "polar_kernel_reg_loss_weight": 1.0,
-    "polar_kernel_reg_loss_weight_schedule": {
-      "type": "explore_exploit_explore",
-      "explore_fraction": 0.2,
-      "exploit_fraction": 0.5,
-      "re_explore_fraction": 0.3
-    },
+    "polar_kernel_reg_loss_weight": 1.5,
     "noise_level_schedule": {
       "type": "cosine",
       "start_weight": 5.0,
@@ -90,24 +93,6 @@
   "algorithms": [
     {
       "name": "CBOxPolarized"
-    },
-    {
-      "name": "SV-CMA-ES",
-      "params": {
-        "sves": {
-          "num_populations": 20,
-          "std_init": 0.06
-        }
-      }
-    },
-    {
-      "name": "MultiStartMPPI",
-      "params": {
-        "multi_start_mppi": {
-          "num_starts": 5,
-          "start_noise_level": 0.4
-        }
-      }
     }
   ],
   "logging": {
@@ -125,14 +110,18 @@
   "artifacts": {
     "every": 5,
     "top_k": 5,
-    "render_videos": true,
+    "render_videos": false,
     "render_videos_every": 5,
-    "doom_plans_every": 5,
+    "doom_plans_every": 0,
     "plot_multimodality": true,
-    "plot_obstacles": true
+    "plot_obstacles": true,
+    "plot_homotopy": true,
+    "homotopy_every": 5,
+    "homotopy_top_n": 100,
+    "homotopy_y_thresh": 0.1
   },
   "plots": {
     "multimodality_cost_threshold": 0.5
   },
-  "_task_name": "go2_contact_gmm_obstacle_lr_sigma_scheduling"
+  "_task_name": "go2_contact_gmm_obstacle_lr_const_lambda_1p5"
 }
